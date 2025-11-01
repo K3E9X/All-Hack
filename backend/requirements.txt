@@ -1,0 +1,34 @@
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+pydantic==2.5.0
+pydantic-settings==2.1.0
+httpx==0.25.2
+aiohttp==3.9.1
+requests==2.31.0
+python-multipart==0.0.6
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+python-dotenv==1.0.0
+
+# Security & Pentest Tools
+dnspython==2.4.2
+beautifulsoup4==4.12.2
+lxml==4.9.3
+pyOpenSSL==23.3.0
+cryptography==41.0.7
+PyJWT==2.8.0
+wafw00f==2.2.0
+paramiko==3.4.0
+
+# Network scanning
+shodan==1.31.0
+censys==2.2.8
+
+# Analysis
+validators==0.22.0
+tldextract==5.1.1
+publicsuffix2==2.20191221
+
+# Async support
+asyncio==3.4.3
+aiofiles==23.2.1
