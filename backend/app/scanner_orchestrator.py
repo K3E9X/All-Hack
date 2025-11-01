@@ -29,7 +29,11 @@ from app.scanners import (
     IDORScanner,
     PrivilegeEscalationScanner,
     SecurityHeadersScanner,
-    CORSScanner
+    CORSScanner,
+    PortScanner,
+    DirectoryFuzzer,
+    SubdomainScanner,
+    SSLScanner
 )
 
 logger = logging.getLogger(__name__)
@@ -86,8 +90,39 @@ class ScanOrchestrator:
                 rate_limit=scan_request.rate_limit
             )
 
-            # Phase 1: Reconnaissance
-            logger.info(f"[{scan_id}] Phase 1: Reconnaissance")
+            # Phase 0: Infrastructure Reconnaissance
+            logger.info(f"[{scan_id}] Phase 0: Infrastructure Reconnaissance")
+            scan_result.status = "infrastructure_recon"
+
+            vulnerabilities = []
+            misconfigurations = []
+
+            # Port Scanning
+            logger.info(f"[{scan_id}] Scanning ports and services...")
+            port_scanner = PortScanner(target_url)
+            open_ports, port_vulns, port_misconfigs = await port_scanner.scan()
+            vulnerabilities.extend(port_vulns)
+            misconfigurations.extend(port_misconfigs)
+            logger.info(f"[{scan_id}] Found {len(open_ports)} open ports, "
+                       f"{len(port_vulns)} vulnerabilities")
+
+            # SSL/TLS Analysis
+            if target_url.startswith('https://'):
+                logger.info(f"[{scan_id}] Analyzing SSL/TLS configuration...")
+                ssl_scanner = SSLScanner(target_url)
+                ssl_vulns, ssl_misconfigs = await ssl_scanner.scan()
+                vulnerabilities.extend(ssl_vulns)
+                misconfigurations.extend(ssl_misconfigs)
+                logger.info(f"[{scan_id}] SSL/TLS: Found {len(ssl_vulns)} vulnerabilities")
+
+            # Subdomain Enumeration
+            logger.info(f"[{scan_id}] Enumerating subdomains...")
+            subdomain_scanner = SubdomainScanner(target_url)
+            subdomains = await subdomain_scanner.scan()
+            logger.info(f"[{scan_id}] Found {len(subdomains)} subdomains")
+
+            # Phase 1: Application Reconnaissance
+            logger.info(f"[{scan_id}] Phase 1: Application Reconnaissance")
             scan_result.status = "reconnaissance"
 
             # Detect technologies
@@ -96,45 +131,56 @@ class ScanOrchestrator:
             scan_result.detected_technologies = technologies
             logger.info(f"[{scan_id}] Detected {len(technologies)} technologies")
 
-            # Discover endpoints
+            # Discover endpoints - Basic crawling
             endpoint_discovery = EndpointDiscovery(client, max_depth=scan_request.max_depth)
-            endpoints = await endpoint_discovery.discover(enable_fuzzing=scan_request.enable_fuzzing)
+            endpoints = await endpoint_discovery.discover(enable_fuzzing=False)  # Basic first
+            logger.info(f"[{scan_id}] Initial crawl found {len(endpoints)} endpoints")
+
+            # Advanced Directory Fuzzing
+            logger.info(f"[{scan_id}] Starting aggressive directory fuzzing...")
+            directory_fuzzer = DirectoryFuzzer(client)
+            fuzzed_endpoints = await directory_fuzzer.fuzz(aggressive=scan_request.enable_fuzzing)
+            endpoints.extend(fuzzed_endpoints)
+            logger.info(f"[{scan_id}] Fuzzing discovered {len(fuzzed_endpoints)} additional endpoints")
+
             scan_result.discovered_endpoints = endpoints
-            logger.info(f"[{scan_id}] Discovered {len(endpoints)} endpoints")
+            logger.info(f"[{scan_id}] Total endpoints discovered: {len(endpoints)}")
 
             # Extract endpoint URLs for vulnerability scanning
             endpoint_urls = [ep.url for ep in endpoints]
 
-            # Phase 2: OWASP Top 10 Scanning
-            logger.info(f"[{scan_id}] Phase 2: OWASP Top 10 Vulnerability Scanning")
+            # Phase 2: OWASP Top 10 Vulnerability Scanning
+            logger.info(f"[{scan_id}] Phase 2: OWASP Top 10 Deep Vulnerability Scanning")
             scan_result.status = "owasp_scanning"
 
-            vulnerabilities = []
-
-            # SQL Injection
+            # SQL Injection - Test ALL endpoints
             if scan_request.enable_active_tests:
+                logger.info(f"[{scan_id}] Testing for SQL Injection...")
                 sql_scanner = SQLInjectionScanner(client)
-                sql_vulns = await sql_scanner.scan(endpoint_urls[:50])  # Limit for performance
+                sql_vulns = await sql_scanner.scan(endpoint_urls)  # Test all endpoints
                 vulnerabilities.extend(sql_vulns)
                 logger.info(f"[{scan_id}] SQL Injection: Found {len(sql_vulns)} vulnerabilities")
 
-            # XSS
+            # XSS - Test ALL endpoints
             if scan_request.enable_active_tests:
+                logger.info(f"[{scan_id}] Testing for Cross-Site Scripting (XSS)...")
                 xss_scanner = XSSScanner(client)
-                xss_vulns = await xss_scanner.scan(endpoint_urls[:50])
+                xss_vulns = await xss_scanner.scan(endpoint_urls)
                 vulnerabilities.extend(xss_vulns)
                 logger.info(f"[{scan_id}] XSS: Found {len(xss_vulns)} vulnerabilities")
 
             # Command Injection
             if scan_request.enable_active_tests:
+                logger.info(f"[{scan_id}] Testing for Command Injection...")
                 cmd_scanner = CommandInjectionScanner(client)
-                cmd_vulns = await cmd_scanner.scan(endpoint_urls[:30])
+                cmd_vulns = await cmd_scanner.scan(endpoint_urls)
                 vulnerabilities.extend(cmd_vulns)
                 logger.info(f"[{scan_id}] Command Injection: Found {len(cmd_vulns)} vulnerabilities")
 
             # SSRF
+            logger.info(f"[{scan_id}] Testing for Server-Side Request Forgery (SSRF)...")
             ssrf_scanner = SSRFScanner(client)
-            ssrf_vulns = await ssrf_scanner.scan(endpoint_urls[:30])
+            ssrf_vulns = await ssrf_scanner.scan(endpoint_urls)
             vulnerabilities.extend(ssrf_vulns)
             logger.info(f"[{scan_id}] SSRF: Found {len(ssrf_vulns)} vulnerabilities")
 
@@ -158,8 +204,6 @@ class ScanOrchestrator:
             # Phase 4: Security Misconfiguration
             logger.info(f"[{scan_id}] Phase 4: Security Misconfiguration")
             scan_result.status = "misconfiguration_scanning"
-
-            misconfigurations = []
 
             # Security Headers
             headers_scanner = SecurityHeadersScanner(client)
