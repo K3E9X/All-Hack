@@ -21,11 +21,17 @@ function Scanner({ onScanStart, onScanComplete }) {
   const [eventLog, setEventLog] = useState([])
 
   const startScan = async () => {
+    console.log('🚀 Start Scan button clicked!')
+    console.log('URL:', url)
+    console.log('Mode:', mode)
+    console.log('Scan Depth:', scanDepth)
+
     if (!url) {
-      alert('Please enter a target URL')
+      alert('⚠️ Please enter a target URL before starting the scan')
       return
     }
 
+    console.log('✅ URL validation passed, starting scan...')
     setLoading(true)
     setStatus('Starting scan...')
     setProgress(0)
@@ -37,11 +43,20 @@ function Scanner({ onScanStart, onScanComplete }) {
         try {
           parsedSequence = JSON.parse(authSequenceText)
         } catch (error) {
+          console.error('❌ Invalid auth sequence JSON:', error)
           setLoading(false)
           setStatus('Error: Invalid authentication sequence JSON')
+          alert('❌ Authentication sequence must be valid JSON')
           return
         }
       }
+
+      console.log('📡 Sending POST request to:', `${API_URL}/scans`)
+      console.log('Request payload preview:', {
+        target_url: url,
+        mode: mode,
+        scan_depth: scanDepth,
+      })
 
       // Start the scan
       const response = await axios.post(`${API_URL}/scans`, {
@@ -62,7 +77,10 @@ function Scanner({ onScanStart, onScanComplete }) {
         track_stability: stabilityTracking
       })
 
+      console.log('✅ Scan started successfully! Response:', response.data)
       const scanId = response.data.scan_id
+      console.log('📋 Scan ID:', scanId)
+
       onScanStart(scanId)
       setStatus('Scan started. Monitoring progress...')
 
@@ -107,9 +125,24 @@ function Scanner({ onScanStart, onScanComplete }) {
       }, 2000) // Poll every 2 seconds
 
     } catch (error) {
+      console.error('❌ Scan error:', error)
+      console.error('Error details:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+        config: error.config
+      })
+
       setLoading(false)
-      setStatus('Error: ' + (error.response?.data?.detail || error.message))
-      console.error('Scan error:', error)
+      const errorMessage = error.response?.data?.detail || error.message || 'Unknown error'
+      setStatus('Error: ' + errorMessage)
+
+      // Show user-friendly error
+      if (error.code === 'ERR_NETWORK' || error.message.includes('Network Error')) {
+        alert('❌ Cannot connect to backend server. Please ensure:\n\n1. Backend is running (uvicorn app.main:app --reload)\n2. Backend is accessible at ' + API_URL)
+      } else {
+        alert('❌ Scan failed: ' + errorMessage)
+      }
     }
   }
 
@@ -343,23 +376,31 @@ function Scanner({ onScanStart, onScanComplete }) {
       )}
 
       {/* Start Button */}
-      <button
-        onClick={startScan}
-        disabled={loading || !url}
-        className="btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
-      >
-        {loading ? (
-          <span className="flex items-center justify-center gap-2">
-            <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-            </svg>
-            Scanning...
-          </span>
-        ) : (
-          'Start Scan'
+      <div>
+        <button
+          onClick={startScan}
+          disabled={loading || !url}
+          className="btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
+          title={!url ? 'Please enter a target URL first' : 'Start security scan'}
+        >
+          {loading ? (
+            <span className="flex items-center justify-center gap-2">
+              <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+              </svg>
+              Scanning...
+            </span>
+          ) : (
+            'Start Scan'
+          )}
+        </button>
+        {!url && !loading && (
+          <p className="text-sm text-yellow-500 mt-2">
+            ⚠️ Please enter a target URL above to enable the scan button
+          </p>
         )}
-      </button>
+      </div>
     </div>
   )
 }
