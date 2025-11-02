@@ -19,6 +19,7 @@ cryptography==41.0.7
 PyJWT==2.8.0
 wafw00f==2.2.0
 paramiko==3.4.0
+pyotp==2.9.0
 
 # Network scanning
 shodan==1.31.0

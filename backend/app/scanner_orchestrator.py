@@ -5,7 +5,7 @@ import asyncio
 import logging
 import uuid
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 from urllib.parse import urlparse
 
 from app.models import (
@@ -16,7 +16,13 @@ from app.models import (
     Misconfiguration,
     EndpointInfo,
     TechnologyInfo,
-    SeverityLevel
+    SeverityLevel,
+    TimelineEvent,
+    AttackChainStep,
+    ScanArtifact,
+    PlaybookRequest,
+    PlaybookRun,
+    StabilitySnapshot,
 )
 from app.utils import PentestHTTPClient
 from app.utils.target_validator import TargetValidator
@@ -24,6 +30,15 @@ from app.utils.robust_scanner import RobustScanner
 from app.intelligence import ScanBrain
 from app.persistence import ScanStorage
 from app.config import settings
+from app.utils.auth import AdvancedAuthManager
+from app.utils.hooks import ExternalToolHookRunner
+from app.utils.stability_monitor import StabilityMonitor
+from app.intelligence.exploitation_assistant import ExploitationAssistant
+from app.scanners.reconnaissance import (
+    BrowserCrawler,
+    APISchemaCollector,
+    LocalOSINTEnricher,
+)
 from app.scanners import (
     TechnologyDetector,
     EndpointDiscovery,
@@ -64,6 +79,10 @@ class ScanOrchestrator:
         )
         self.storage = ScanStorage(settings.SCAN_STORAGE_DIR)
         self.last_save_time: Dict[str, datetime] = {}
+        self.hook_runner = ExternalToolHookRunner(settings.EXTERNAL_TOOL_HOOKS)
+        self.stability_monitor = StabilityMonitor()
+        self.exploitation_assistant = ExploitationAssistant()
+        self.playbooks: Dict[str, PlaybookRun] = {}
 
     async def start_scan(self, scan_request: ScanRequest) -> str:
         """Start a new intelligent scan"""
@@ -101,6 +120,36 @@ class ScanOrchestrator:
 
         return scan_id
 
+    def _record_event(
+        self,
+        scan_result: ScanResult,
+        phase: str,
+        message: str,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> TimelineEvent:
+        event = TimelineEvent(
+            id=str(uuid.uuid4()),
+            timestamp=datetime.utcnow(),
+            phase=phase,
+            message=message,
+            metadata=metadata or {},
+        )
+        scan_result.timeline.append(event)
+        return event
+
+    def _snapshot_stability(self, scan_result: ScanResult, label: str) -> Optional[StabilitySnapshot]:
+        metrics = self.stability_monitor.snapshot(label)
+        if not metrics:
+            return None
+        snapshot = StabilitySnapshot(
+            label=label,
+            timestamp=metrics["timestamp"],
+            load_average=metrics["load_average"],
+            memory=metrics["memory"],
+        )
+        scan_result.stability_metrics.append(snapshot)
+        return snapshot
+
     async def _execute_intelligent_scan(
         self,
         scan_id: str,
@@ -125,12 +174,41 @@ class ScanOrchestrator:
 
             vulnerabilities = []
             misconfigurations = []
+            osint_findings = []
+            dynamic_endpoints: List[EndpointInfo] = []
+
+            if scan_request.auth_sequence:
+                auth_manager = AdvancedAuthManager(client)
+                auth_results = await auth_manager.execute_sequence(
+                    scan_request.auth_sequence,
+                    totp_secret=scan_request.mfa_totp_secret,
+                )
+                self._record_event(
+                    scan_result,
+                    "authentication",
+                    "Completed advanced authentication sequence",
+                    {
+                        "steps": [
+                            {
+                                "index": step.index,
+                                "method": step.method,
+                                "path": step.path,
+                                "status_code": step.status_code,
+                                "notes": step.notes,
+                            }
+                            for step in auth_results
+                        ]
+                    }
+                )
 
             # ===== PHASE 0: INFRASTRUCTURE RECONNAISSANCE =====
             logger.info(f"\n{'='*70}")
             logger.info(f"🔍 [PHASE 0] INFRASTRUCTURE RECONNAISSANCE")
             logger.info(f"{'='*70}")
             scan_result.status = "infrastructure_recon"
+            self._record_event(scan_result, "phase_0", "Infrastructure reconnaissance started")
+            if scan_request.track_stability and settings.ENABLE_STABILITY_MONITORING:
+                self._snapshot_stability(scan_result, "phase_0_start")
             await self._auto_save(scan_id)
 
             # Port Scanning
@@ -141,6 +219,12 @@ class ScanOrchestrator:
             vulnerabilities.extend(port_vulns or [])
             misconfigurations.extend(port_misconfigs or [])
             logger.info(f"✅ Found {len(open_ports or [])} open ports, {len(port_vulns or [])} vulnerabilities")
+            self._record_event(
+                scan_result,
+                "phase_0",
+                "Port scan completed",
+                {"open_ports": open_ports}
+            )
 
             # SSL/TLS Analysis
             if target_url.startswith('https://'):
@@ -151,6 +235,12 @@ class ScanOrchestrator:
                 vulnerabilities.extend(ssl_vulns or [])
                 misconfigurations.extend(ssl_misconfigs or [])
                 logger.info(f"✅ SSL/TLS: Found {len(ssl_vulns or [])} vulnerabilities")
+                self._record_event(
+                    scan_result,
+                    "phase_0",
+                    "SSL/TLS analysis completed",
+                    {"vulnerabilities": len(ssl_vulns or [])}
+                )
 
             # Subdomain Enumeration
             logger.info(f"🌐 Enumerating subdomains...")
@@ -158,6 +248,25 @@ class ScanOrchestrator:
                 self._safe_subdomain_scan, target_url
             )
             logger.info(f"✅ Found {len(subdomains or [])} subdomains")
+            self._record_event(
+                scan_result,
+                "phase_0",
+                "Subdomain enumeration finished",
+                {"count": len(subdomains or [])}
+            )
+
+            if scan_request.enrich_osint and settings.ENABLE_OSINT_ENRICHMENT:
+                logger.info("🔎 Collecting OSINT enrichment data...")
+                osint_enricher = LocalOSINTEnricher(target_url, client)
+                osint_findings = await self.robust_scanner.execute_with_retry(osint_enricher.collect)
+                scan_result.osint_findings = osint_findings or []
+                brain.register_osint(scan_result.osint_findings)
+                self._record_event(
+                    scan_result,
+                    "phase_0",
+                    "OSINT enrichment completed",
+                    {"findings": scan_result.osint_findings}
+                )
 
             # 🧠 INTELLIGENT ANALYSIS: Infrastructure
             logger.info(f"\n🧠 [BRAIN] Analyzing infrastructure results...")
@@ -167,12 +276,21 @@ class ScanOrchestrator:
                 logger.info(f"💡 {reasoning}")
 
             await self._auto_save(scan_id)
+            if scan_request.track_stability and settings.ENABLE_STABILITY_MONITORING:
+                self._snapshot_stability(scan_result, "phase_0_end")
+            await self.hook_runner.run_phase_hooks(
+                "infrastructure",
+                {"scan_id": scan_id, "target": target_url, "open_ports": open_ports}
+            )
 
             # ===== PHASE 1: APPLICATION RECONNAISSANCE =====
             logger.info(f"\n{'='*70}")
             logger.info(f"🔍 [PHASE 1] APPLICATION RECONNAISSANCE")
             logger.info(f"{'='*70}")
             scan_result.status = "reconnaissance"
+            self._record_event(scan_result, "phase_1", "Application reconnaissance started")
+            if scan_request.track_stability and settings.ENABLE_STABILITY_MONITORING:
+                self._snapshot_stability(scan_result, "phase_1_start")
 
             # Technology Detection
             logger.info(f"🔬 Detecting technologies...")
@@ -182,6 +300,12 @@ class ScanOrchestrator:
             )
             scan_result.detected_technologies = technologies or []
             logger.info(f"✅ Detected {len(technologies or [])} technologies")
+            self._record_event(
+                scan_result,
+                "phase_1",
+                "Technology detection finished",
+                {"count": len(technologies or [])}
+            )
 
             # 🧠 INTELLIGENT ANALYSIS: Technologies
             logger.info(f"\n🧠 [BRAIN] Analyzing technology stack...")
@@ -197,6 +321,27 @@ class ScanOrchestrator:
                 endpoint_discovery.discover, enable_fuzzing=False
             )
             logger.info(f"✅ Initial crawl found {len(endpoints or [])} endpoints")
+            self._record_event(
+                scan_result,
+                "phase_1",
+                "Primary crawler completed",
+                {"count": len(endpoints or [])}
+            )
+
+            if scan_request.browser_crawling and settings.ENABLE_BROWSER_CRAWLER:
+                logger.info("🧭 Launching browser-based crawler for dynamic routes...")
+                browser_crawler = BrowserCrawler(target_url)
+                dynamic_endpoints = await self.robust_scanner.execute_with_retry(browser_crawler.crawl)
+                scan_result.dynamic_endpoints = dynamic_endpoints or []
+                scan_result.browser_crawl_summary = (
+                    f"Browser crawler captured {len(dynamic_endpoints or [])} additional endpoints"
+                )
+                self._record_event(
+                    scan_result,
+                    "phase_1",
+                    "Browser crawler finished",
+                    {"count": len(dynamic_endpoints or [])}
+                )
 
             # Advanced Directory Fuzzing
             logger.info(f"💣 Starting aggressive directory fuzzing...")
@@ -212,6 +357,23 @@ class ScanOrchestrator:
             endpoint_urls = [ep.url for ep in (endpoints or [])]
             logger.info(f"📍 Total endpoints discovered: {len(endpoint_urls)}")
 
+            if scan_request.collect_api_schemas and settings.ENABLE_API_SCHEMA_COLLECTION:
+                logger.info("📘 Collecting API schemas for deeper testing...")
+                collector = APISchemaCollector(client)
+                candidate_paths = list({
+                    urlparse(url).path or '/' for url in endpoint_urls + [
+                        ep.url for ep in (dynamic_endpoints or [])
+                    ]
+                })
+                api_schemas = await collector.collect(candidate_paths)
+                scan_result.api_schemas = api_schemas
+                self._record_event(
+                    scan_result,
+                    "phase_1",
+                    "API schema collection finished",
+                    {"count": len(api_schemas)}
+                )
+
             # 🧠 INTELLIGENT ANALYSIS: Endpoints
             logger.info(f"\n🧠 [BRAIN] Analyzing discovered endpoints...")
             endpoint_intelligence = brain.analyze_endpoints(endpoints or [])
@@ -226,12 +388,25 @@ class ScanOrchestrator:
                 logger.info(f"💡 {reasoning}")
 
             await self._auto_save(scan_id)
+            if scan_request.track_stability and settings.ENABLE_STABILITY_MONITORING:
+                self._snapshot_stability(scan_result, "phase_1_end")
+            await self.hook_runner.run_phase_hooks(
+                "reconnaissance",
+                {
+                    "scan_id": scan_id,
+                    "target": target_url,
+                    "endpoint_count": len(endpoint_urls),
+                }
+            )
 
             # ===== PHASE 2: OWASP TOP 10 - ADAPTIVE TESTING =====
             logger.info(f"\n{'='*70}")
             logger.info(f"🔥 [PHASE 2] OWASP TOP 10 VULNERABILITY SCANNING (ADAPTIVE)")
             logger.info(f"{'='*70}")
             scan_result.status = "owasp_scanning"
+            self._record_event(scan_result, "phase_2", "OWASP Top 10 scanning started")
+            if scan_request.track_stability and settings.ENABLE_STABILITY_MONITORING:
+                self._snapshot_stability(scan_result, "phase_2_start")
 
             if scan_request.enable_active_tests:
                 # Prioritize based on intelligence
@@ -296,12 +471,31 @@ class ScanOrchestrator:
                     logger.info(f"  Step {chain['step']}: {chain['action']} - {chain['reason']}")
 
             await self._auto_save(scan_id)
+            if scan_request.track_stability and settings.ENABLE_STABILITY_MONITORING:
+                self._snapshot_stability(scan_result, "phase_2_end")
+            self._record_event(
+                scan_result,
+                "phase_2",
+                "OWASP Top 10 scanning finished",
+                {"vulnerability_count": len(vulnerabilities)}
+            )
+            await self.hook_runner.run_phase_hooks(
+                "owasp",
+                {
+                    "scan_id": scan_id,
+                    "target": target_url,
+                    "vulnerability_count": len(vulnerabilities),
+                }
+            )
 
             # ===== PHASE 3: ACCESS CONTROL =====
             logger.info(f"\n{'='*70}")
             logger.info(f"🔒 [PHASE 3] ACCESS CONTROL TESTING")
             logger.info(f"{'='*70}")
             scan_result.status = "access_control_testing"
+            self._record_event(scan_result, "phase_3", "Access control testing started")
+            if scan_request.track_stability and settings.ENABLE_STABILITY_MONITORING:
+                self._snapshot_stability(scan_result, "phase_3_start")
 
             # IDOR
             logger.info(f"🔑 Testing for IDOR...")
@@ -323,12 +517,31 @@ class ScanOrchestrator:
                 logger.info(f"✅ Privilege Escalation: Found {len(priv_vulns or [])} vulnerabilities")
 
             await self._auto_save(scan_id)
+            if scan_request.track_stability and settings.ENABLE_STABILITY_MONITORING:
+                self._snapshot_stability(scan_result, "phase_3_end")
+            self._record_event(
+                scan_result,
+                "phase_3",
+                "Access control testing finished",
+                {"idor": len(idor_vulns or []), "privilege": len(priv_vulns or []) if 'priv_vulns' in locals() else 0}
+            )
+            await self.hook_runner.run_phase_hooks(
+                "access_control",
+                {
+                    "scan_id": scan_id,
+                    "target": target_url,
+                    "idor": len(idor_vulns or []),
+                }
+            )
 
             # ===== PHASE 4: SECURITY MISCONFIGURATION =====
             logger.info(f"\n{'='*70}")
             logger.info(f"🔧 [PHASE 4] SECURITY MISCONFIGURATION")
             logger.info(f"{'='*70}")
             scan_result.status = "misconfiguration_scanning"
+            self._record_event(scan_result, "phase_4", "Security misconfiguration review started")
+            if scan_request.track_stability and settings.ENABLE_STABILITY_MONITORING:
+                self._snapshot_stability(scan_result, "phase_4_start")
 
             # Security Headers
             logger.info(f"🛡️  Checking security headers...")
@@ -348,7 +561,39 @@ class ScanOrchestrator:
             misconfigurations.extend(cors_issues or [])
             logger.info(f"✅ CORS: Found {len(cors_issues or [])} issues")
 
+            if scan_request.track_stability and settings.ENABLE_STABILITY_MONITORING:
+                self._snapshot_stability(scan_result, "phase_4_end")
+            self._record_event(
+                scan_result,
+                "phase_4",
+                "Security misconfiguration review finished",
+                {"misconfigurations": len(misconfigurations)}
+            )
+            await self.hook_runner.run_phase_hooks(
+                "misconfiguration",
+                {
+                    "scan_id": scan_id,
+                    "target": target_url,
+                    "misconfigurations": len(misconfigurations),
+                }
+            )
+
             # ===== FINALIZATION =====
+            scan_result.attack_chains = brain.plan_attack_chains(
+                vulnerabilities,
+                osint_findings=osint_findings,
+                dynamic_endpoints=dynamic_endpoints,
+            )
+            artifacts = self.exploitation_assistant.build_artifacts(vulnerabilities)
+            if artifacts:
+                scan_result.artifacts.extend(artifacts)
+                self._record_event(
+                    scan_result,
+                    "finalization",
+                    "Generated exploitation artifacts",
+                    {"count": len(artifacts)}
+                )
+
             scan_result.vulnerabilities = vulnerabilities
             scan_result.misconfigurations = misconfigurations
             scan_result.end_time = datetime.utcnow()
@@ -363,6 +608,16 @@ class ScanOrchestrator:
 
             # Final save
             self.storage.save_scan(scan_result)
+            self._record_event(
+                scan_result,
+                "finalization",
+                "Scan completed",
+                {
+                    "duration": scan_result.scan_duration,
+                    "vulnerabilities": len(vulnerabilities),
+                    "misconfigurations": len(misconfigurations),
+                }
+            )
 
             logger.info(f"\n{'='*70}")
             logger.info(f"✅ SCAN COMPLETED!")
@@ -378,6 +633,12 @@ class ScanOrchestrator:
             scan_result.status = "failed"
             scan_result.error_message = str(e)
             scan_result.end_time = datetime.utcnow()
+            self._record_event(
+                scan_result,
+                "finalization",
+                "Scan failed",
+                {"error": str(e)}
+            )
             self.storage.save_scan(scan_result)
 
     # Helper methods
@@ -433,3 +694,68 @@ class ScanOrchestrator:
                 counts[severity_key] += 1
 
         return counts
+
+    async def start_playbook(self, playbook_request: PlaybookRequest) -> PlaybookRun:
+        playbook_id = str(uuid.uuid4())
+        run = PlaybookRun(
+            playbook_id=playbook_id,
+            name=playbook_request.name,
+            started_at=datetime.utcnow(),
+            targets=playbook_request.targets,
+            sequential=playbook_request.sequential,
+        )
+        self.playbooks[playbook_id] = run
+
+        for target in playbook_request.targets:
+            scan_request = ScanRequest(
+                target_url=target.target_url,
+                mode=target.mode,
+                auth_token=target.auth_token,
+                custom_headers=target.custom_headers,
+                cookies=target.cookies,
+            )
+            scan_id = await self.start_scan(scan_request)
+            run.scan_ids.append(scan_id)
+            active_scan = self.active_scans.get(scan_id)
+            if active_scan:
+                active_scan.playbook_runs.append(run)
+
+        return run
+
+    def get_playbook(self, playbook_id: str) -> Optional[PlaybookRun]:
+        run = self.playbooks.get(playbook_id)
+        if not run:
+            return None
+
+        status_overview = []
+        all_completed = True
+
+        for scan_id in run.scan_ids:
+            result = self.get_scan_result(scan_id)
+            status = result.status if result else "unknown"
+            status_overview.append({
+                "scan_id": scan_id,
+                "status": status,
+                "target": result.target_url if result else None,
+            })
+            if status != "completed":
+                all_completed = False
+
+        run.completed = all_completed
+        run.status_overview = status_overview
+        return run
+
+    def generate_report(self, scan_id: str) -> Dict[str, Any]:
+        result = self.get_scan_result(scan_id)
+        if not result:
+            raise ValueError("Scan not found")
+        return self.storage.generate_markdown_report(result)
+
+    def compare_scans(self, scan_a_id: str, scan_b_id: str) -> Dict[str, Any]:
+        scan_a = self.get_scan_result(scan_a_id)
+        scan_b = self.get_scan_result(scan_b_id)
+
+        if not scan_a or not scan_b:
+            raise ValueError("Both scans must exist to compare")
+
+        return self.storage.compare_scans(scan_a, scan_b)
