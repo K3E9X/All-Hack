@@ -63,6 +63,36 @@ cd frontend
 npm install
 ```
 
+## Optional Features
+
+### Browser-Based Crawling (Playwright)
+
+**Status:** Optional - not installed by default
+
+For dynamic Single Page Applications (React/Vue/Angular), you can enable browser-based crawling:
+
+```bash
+cd backend
+source venv/bin/activate
+pip install playwright==1.40.0
+playwright install chromium
+```
+
+**What it does:** Discovers client-side routes that don't appear in static HTML
+
+**When to use:** Testing SPAs with dynamic routing
+
+**If not installed:** Tool works normally but skips browser-based discovery (logs a warning)
+
+### Future Integrations (Not Yet Implemented)
+
+The following features are planned but not yet available:
+
+- **SQLMap Integration** - Advanced SQL injection testing
+- **Nuclei Templates** - Community vulnerability templates
+
+See `PROJECT_GAPS.md` for complete list of known limitations.
+
 ## Quick Start
 
 **Launch everything with one command:**
@@ -99,11 +129,34 @@ npm run dev
 
 ## Configuration
 
+### Scan Settings
+
 Scans support long-running operations:
 - **Scan timeout**: 12 hours
 - **Auto-save**: Every 5 minutes
 - **Max retries**: 5 with exponential backoff
 - **Resume**: Automatic recovery after crashes
+
+### Environment Variables
+
+All configuration is portable and environment-based. Create `backend/.env` to customize:
+
+```bash
+# API Settings
+ALLOWED_ORIGINS=http://localhost:5173,https://your-domain.com
+VERIFY_SSL=false  # Disable SSL verification for pentesting
+
+# Scan Configuration
+MAX_CONCURRENT_SCANS=5
+SCAN_TIMEOUT=43200  # 12 hours
+REQUEST_TIMEOUT=60
+
+# Paths (auto-detected, override if needed)
+# TOOLS_DIR=/custom/path/to/tools
+# WORDLISTS_DIR=/custom/path/to/wordlists
+```
+
+**Note:** All paths use relative resolution by default - no hard-coded absolute paths
 
 ## Architecture
 
