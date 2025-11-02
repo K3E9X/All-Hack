@@ -20,6 +20,25 @@ Automated penetration testing tool for web applications with intelligent analysi
 - **Robust** - Auto-retry with exponential backoff, auto-save every 5 minutes
 - **IP Support** - Accepts URLs, domains, and IP addresses
 
+## Platform Support
+
+- **Linux** - Fully supported
+- **macOS ARM** (Apple Silicon) - Fully supported
+- **macOS Intel** - Fully supported
+- **Windows** - Supported with WSL2 recommended
+
+**macOS Prerequisites:**
+```bash
+# Install Xcode Command Line Tools (required for lxml, cryptography)
+xcode-select --install
+
+# Install Homebrew (if not already installed)
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+
+# Install Python 3.9+ and Node.js
+brew install python@3.9 node
+```
+
 ## Installation
 
 ### Backend
