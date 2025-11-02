@@ -71,6 +71,7 @@ class ScanOrchestrator:
     def __init__(self):
         self.active_scans: Dict[str, ScanResult] = {}
         self.scan_brains: Dict[str, ScanBrain] = {}
+        self.stop_flags: Dict[str, bool] = {}  # Track scans that should be stopped
         self.robust_scanner = RobustScanner(
             max_retries=settings.MAX_RETRIES,
             base_timeout=settings.BASE_TIMEOUT,
@@ -470,6 +471,14 @@ class ScanOrchestrator:
                 }
             )
 
+            # Check if stop requested
+            if self._should_stop(scan_id):
+                logger.info(f"🛑 Scan {scan_id} stopped by user after Phase 1")
+                scan_result.status = "stopped"
+                self._record_event(scan_result, "scan_control", "Scan stopped by user after reconnaissance phase")
+                await self._finalize_scan(scan_id, scan_result, target_url, vulnerabilities, misconfigurations, scan_time)
+                return
+
             # ===== PHASE 2: OWASP TOP 10 - ADAPTIVE TESTING =====
             logger.info(f"\n{'='*70}")
             logger.info(f"🔥 [PHASE 2] OWASP TOP 10 VULNERABILITY SCANNING (ADAPTIVE)")
@@ -486,10 +495,15 @@ class ScanOrchestrator:
             if scan_request.track_stability and settings.ENABLE_STABILITY_MONITORING:
                 self._snapshot_stability(scan_result, "phase_2_start")
 
+            # Create progress callback to send live updates
+            async def progress_callback(message: str):
+                logger.info(message)
+                self._record_event(scan_result, "phase_2", message)
+
             if scan_request.enable_active_tests:
                 # SQL Injection
                 logger.info(f"🗃️  Testing for SQL Injection on {len(endpoint_urls_to_test)} endpoints...")
-                sql_scanner = SQLInjectionScanner(client, scan_depth=scan_request.scan_depth)
+                sql_scanner = SQLInjectionScanner(client, scan_depth=scan_request.scan_depth, progress_callback=progress_callback)
                 sql_vulns = await self.robust_scanner.execute_batch_safe(
                     endpoint_urls_to_test,
                     lambda urls: sql_scanner.scan(urls),
@@ -500,7 +514,7 @@ class ScanOrchestrator:
 
                 # XSS
                 logger.info(f"🎨 Testing for Cross-Site Scripting (XSS) on {len(endpoint_urls_to_test)} endpoints...")
-                xss_scanner = XSSScanner(client, scan_depth=scan_request.scan_depth)
+                xss_scanner = XSSScanner(client, scan_depth=scan_request.scan_depth, progress_callback=progress_callback)
                 xss_vulns = await self.robust_scanner.execute_batch_safe(
                     endpoint_urls_to_test,
                     lambda urls: xss_scanner.scan(urls),
@@ -511,7 +525,7 @@ class ScanOrchestrator:
 
                 # Command Injection
                 logger.info(f"💻 Testing for Command Injection on {len(endpoint_urls_to_test)} endpoints...")
-                cmd_scanner = CommandInjectionScanner(client, scan_depth=scan_request.scan_depth)
+                cmd_scanner = CommandInjectionScanner(client, scan_depth=scan_request.scan_depth, progress_callback=progress_callback)
                 cmd_vulns = await self.robust_scanner.execute_batch_safe(
                     endpoint_urls_to_test,
                     lambda urls: cmd_scanner.scan(urls),
@@ -522,7 +536,7 @@ class ScanOrchestrator:
 
             # SSRF
             logger.info(f"🌐 Testing for SSRF on {len(endpoint_urls_to_test)} endpoints...")
-            ssrf_scanner = SSRFScanner(client, scan_depth=scan_request.scan_depth)
+            ssrf_scanner = SSRFScanner(client, scan_depth=scan_request.scan_depth, progress_callback=progress_callback)
             ssrf_vulns = await self.robust_scanner.execute_with_retry(
                 ssrf_scanner.scan, endpoint_urls_to_test
             )
@@ -749,6 +763,18 @@ class ScanOrchestrator:
 
         # Try loading from disk
         return self.storage.load_scan(scan_id)
+
+    def stop_scan(self, scan_id: str) -> bool:
+        """Request to stop a running scan"""
+        if scan_id in self.active_scans:
+            self.stop_flags[scan_id] = True
+            logger.info(f"🛑 Stop requested for scan {scan_id}")
+            return True
+        return False
+
+    def _should_stop(self, scan_id: str) -> bool:
+        """Check if scan should stop"""
+        return self.stop_flags.get(scan_id, False)
 
     def _count_by_severity(self, vulnerabilities: List[Vulnerability]) -> Dict[str, int]:
         """Count vulnerabilities by severity"""

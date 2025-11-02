@@ -139,6 +139,19 @@ async def get_scan_status(scan_id: str):
         "recent_events": [event.model_dump() for event in (result.timeline[-5:] if result.timeline else [])]
     }
 
+@app.post(f"{settings.API_PREFIX}/scans/{{scan_id}}/stop")
+async def stop_scan(scan_id: str):
+    """Stop a running scan and return partial results"""
+    success = orchestrator.stop_scan(scan_id)
+
+    if not success:
+        raise HTTPException(status_code=404, detail="Scan not found or already completed")
+
+    return {
+        "scan_id": scan_id,
+        "message": "Stop request sent. Scan will stop after current phase completes.",
+        "status": "stopping"
+    }
 
 # TODO: Playbook functionality not yet implemented
 # @app.post(f"{settings.API_PREFIX}/playbooks")

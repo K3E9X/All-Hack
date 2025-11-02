@@ -19,7 +19,9 @@ function Scanner({ onScanStart, onScanComplete }) {
   const [authSequenceText, setAuthSequenceText] = useState('')
   const [mfaSecret, setMfaSecret] = useState('')
   const [eventLog, setEventLog] = useState([])
+  const [currentScanId, setCurrentScanId] = useState(null)
   const eventLogRef = useRef(null)
+  const pollIntervalRef = useRef(null)
 
   // Auto-scroll to bottom when new events arrive
   useEffect(() => {
@@ -27,6 +29,42 @@ function Scanner({ onScanStart, onScanComplete }) {
       eventLogRef.current.scrollTop = eventLogRef.current.scrollHeight
     }
   }, [eventLog])
+
+  const stopScan = async () => {
+    if (!currentScanId) {
+      alert('⚠️ No active scan to stop')
+      return
+    }
+
+    try {
+      console.log('🛑 Stopping scan:', currentScanId)
+      await axios.post(`${API_URL}/scans/${currentScanId}/stop`)
+
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current)
+        pollIntervalRef.current = null
+      }
+
+      setStatus('⏹️  Scan stopped by user. Fetching partial results...')
+
+      // Wait a bit then fetch partial results
+      setTimeout(async () => {
+        try {
+          const resultsResponse = await axios.get(`${API_URL}/scans/${currentScanId}`)
+          onScanComplete(resultsResponse.data)
+          setLoading(false)
+          setStatus('✅ Scan stopped. Partial results available.')
+        } catch (error) {
+          console.error('Error fetching partial results:', error)
+          setLoading(false)
+          setStatus('⚠️  Scan stopped but could not fetch results')
+        }
+      }, 2000)
+    } catch (error) {
+      console.error('❌ Error stopping scan:', error)
+      alert('Failed to stop scan: ' + (error.response?.data?.detail || error.message))
+    }
+  }
 
   const startScan = async () => {
     console.log('🚀 Start Scan button clicked!')
@@ -89,11 +127,12 @@ function Scanner({ onScanStart, onScanComplete }) {
       const scanId = response.data.scan_id
       console.log('📋 Scan ID:', scanId)
 
+      setCurrentScanId(scanId)
       onScanStart(scanId)
       setStatus('Scan started. Monitoring progress...')
 
       // Poll for status
-      const pollInterval = setInterval(async () => {
+      pollIntervalRef.current = setInterval(async () => {
         try {
           const statusResponse = await axios.get(`${API_URL}/scans/${scanId}/status`)
           const data = statusResponse.data
@@ -112,19 +151,23 @@ function Scanner({ onScanStart, onScanComplete }) {
             })
           }
 
-          // Check if scan is complete
-          if (data.status === 'completed') {
-            clearInterval(pollInterval)
+          // Check if scan is complete or stopped
+          if (data.status === 'completed' || data.status === 'stopped') {
+            clearInterval(pollIntervalRef.current)
+            pollIntervalRef.current = null
 
-            // Get full results
+            // Get full/partial results
             const resultsResponse = await axios.get(`${API_URL}/scans/${scanId}`)
             onScanComplete(resultsResponse.data)
 
             setLoading(false)
-            setStatus('Scan completed!')
+            setCurrentScanId(null)
+            setStatus(data.status === 'stopped' ? 'Scan stopped!' : 'Scan completed!')
           } else if (data.status === 'failed') {
-            clearInterval(pollInterval)
+            clearInterval(pollIntervalRef.current)
+            pollIntervalRef.current = null
             setLoading(false)
+            setCurrentScanId(null)
             setStatus('Scan failed!')
           }
         } catch (error) {
@@ -408,24 +451,36 @@ function Scanner({ onScanStart, onScanComplete }) {
 
       {/* Start Button */}
       <div>
-        <button
-          onClick={startScan}
-          disabled={loading || !url}
-          className="btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
-          title={!url ? 'Please enter a target URL first' : 'Start security scan'}
-        >
-          {loading ? (
-            <span className="flex items-center justify-center gap-2">
-              <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-              </svg>
-              Scanning...
-            </span>
-          ) : (
-            'Start Scan'
+        <div className="flex gap-3">
+          <button
+            onClick={startScan}
+            disabled={loading || !url}
+            className="btn-primary flex-1 disabled:opacity-50 disabled:cursor-not-allowed"
+            title={!url ? 'Please enter a target URL first' : 'Start security scan'}
+          >
+            {loading ? (
+              <span className="flex items-center justify-center gap-2">
+                <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+                Scanning...
+              </span>
+            ) : (
+              'Start Scan'
+            )}
+          </button>
+
+          {loading && (
+            <button
+              onClick={stopScan}
+              className="bg-red-600 hover:bg-red-700 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-200"
+              title="Stop the current scan and get partial results"
+            >
+              🛑 Stop Scan
+            </button>
           )}
-        </button>
+        </div>
         {!url && !loading && (
           <p className="text-sm text-yellow-500 mt-2">
             ⚠️ Please enter a target URL above to enable the scan button

@@ -69,34 +69,41 @@ class SQLInjectionScanner:
         r"Syntax error.*near",
     ]
 
-    def __init__(self, client: PentestHTTPClient, scan_depth: str = "balanced"):
+    def __init__(self, client: PentestHTTPClient, scan_depth: str = "balanced", progress_callback=None):
         self.client = client
         self.scan_depth = scan_depth
+        self.progress_callback = progress_callback
 
         # Adjust payload limits based on scan depth
         if scan_depth == "quick":
-            self.payload_limit = 3  # Only test 3 fast payloads
-            self.skip_time_based = True  # Skip SLEEP/WAITFOR payloads
+            self.payload_limit = 8  # Quick but reasonable coverage
+            self.skip_time_based = True  # Skip SLEEP/WAITFOR payloads (saves 5s+ per test)
         elif scan_depth == "balanced":
-            self.payload_limit = 10
+            self.payload_limit = 20  # Good coverage, ~5-10min per endpoint
             self.skip_time_based = False
         else:  # deep
-            self.payload_limit = len(self.PAYLOADS)
+            self.payload_limit = len(self.PAYLOADS)  # All payloads, maximum coverage
             self.skip_time_based = False
 
     async def scan(self, endpoints: List[str]) -> List[Vulnerability]:
         """Scan for SQL injection vulnerabilities"""
         vulnerabilities = []
+        total_endpoints = len(endpoints)
 
-        tasks = []
-        for endpoint in endpoints:
-            tasks.append(self._test_endpoint(endpoint))
+        for idx, endpoint in enumerate(endpoints, 1):
+            if self.progress_callback:
+                await self.progress_callback(f"🗃️  Testing SQL Injection on endpoint {idx}/{total_endpoints}: {endpoint[:60]}...")
 
-        results = await asyncio.gather(*tasks, return_exceptions=True)
+            try:
+                vulns = await self._test_endpoint(endpoint)
+                vulnerabilities.extend(vulns)
 
-        for result in results:
-            if isinstance(result, list):
-                vulnerabilities.extend(result)
+                if vulns and self.progress_callback:
+                    await self.progress_callback(f"✅ Found {len(vulns)} SQL injection vulnerability(ies) on {endpoint[:60]}")
+            except Exception as e:
+                logger.error(f"Error testing endpoint {endpoint}: {e}")
+                if self.progress_callback:
+                    await self.progress_callback(f"⚠️  Error testing {endpoint[:60]}: {str(e)[:50]}")
 
         return vulnerabilities
 

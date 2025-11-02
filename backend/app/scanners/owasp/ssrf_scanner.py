@@ -70,31 +70,38 @@ class SSRFScanner:
         "Network is unreachable",
     ]
 
-    def __init__(self, client: PentestHTTPClient, scan_depth: str = "balanced"):
+    def __init__(self, client: PentestHTTPClient, scan_depth: str = "balanced", progress_callback=None):
         self.client = client
         self.scan_depth = scan_depth
+        self.progress_callback = progress_callback
 
         # Adjust payload limits based on scan depth
         if scan_depth == "quick":
-            self.payload_limit = 5  # Test only top 5 payloads
+            self.payload_limit = 10  # Test top 10 payloads (localhost, AWS, GCP, Azure)
         elif scan_depth == "balanced":
-            self.payload_limit = 15
+            self.payload_limit = 20  # Comprehensive coverage
         else:  # deep
-            self.payload_limit = len(self.PAYLOADS)
+            self.payload_limit = len(self.PAYLOADS)  # All payloads
 
     async def scan(self, endpoints: List[str]) -> List[Vulnerability]:
         """Scan for SSRF vulnerabilities"""
         vulnerabilities = []
+        total_endpoints = len(endpoints)
 
-        tasks = []
-        for endpoint in endpoints:
-            tasks.append(self._test_endpoint(endpoint))
+        for idx, endpoint in enumerate(endpoints, 1):
+            if self.progress_callback:
+                await self.progress_callback(f"🌐 Testing SSRF on endpoint {idx}/{total_endpoints}: {endpoint[:60]}...")
 
-        results = await asyncio.gather(*tasks, return_exceptions=True)
+            try:
+                vulns = await self._test_endpoint(endpoint)
+                vulnerabilities.extend(vulns)
 
-        for result in results:
-            if isinstance(result, list):
-                vulnerabilities.extend(result)
+                if vulns and self.progress_callback:
+                    await self.progress_callback(f"✅ Found {len(vulns)} SSRF vulnerability(ies) on {endpoint[:60]}")
+            except Exception as e:
+                logger.error(f"Error testing endpoint {endpoint}: {e}")
+                if self.progress_callback:
+                    await self.progress_callback(f"⚠️  Error testing {endpoint[:60]}: {str(e)[:50]}")
 
         return vulnerabilities
 
