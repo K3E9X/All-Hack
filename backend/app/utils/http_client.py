@@ -53,7 +53,7 @@ class PentestHTTPClient:
                 async with httpx.AsyncClient(
                     timeout=settings.REQUEST_TIMEOUT,
                     follow_redirects=True,
-                    verify=False  # For testing, ignore SSL errors
+                    verify=settings.VERIFY_SSL  # Configurable SSL verification
                 ) as client:
                     response = await client.request(
                         method,

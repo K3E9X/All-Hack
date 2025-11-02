@@ -19,7 +19,7 @@ class NetworkError(ScanError):
     """Network-related errors"""
     pass
 
-class TimeoutError(ScanError):
+class ScanTimeoutError(ScanError):
     """Timeout errors"""
     pass
 
@@ -73,7 +73,7 @@ class RobustScanner:
 
             except asyncio.TimeoutError:
                 logger.warning(f"Timeout after {timeout}s on attempt {attempt + 1}/{self.max_retries}")
-                last_exception = TimeoutError(f"Timeout after {timeout}s")
+                last_exception = ScanTimeoutError(f"Timeout after {timeout}s")
 
                 # Increase timeout for next attempt
                 timeout = min(timeout * self.backoff_factor, self.max_timeout)

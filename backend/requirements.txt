@@ -31,5 +31,4 @@ tldextract==5.1.1
 publicsuffix2==2.20191221
 
 # Async support
-asyncio==3.4.3
 aiofiles==23.2.1

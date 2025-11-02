@@ -2,7 +2,7 @@
 Configuration file for the pentest application
 """
 from pydantic_settings import BaseSettings
-from typing import Optional
+from typing import Optional, List
 import os
 
 class Settings(BaseSettings):
@@ -11,13 +11,13 @@ class Settings(BaseSettings):
     API_VERSION: str = "1.0.0"
     API_PREFIX: str = "/api/v1"
 
-    # CORS
-    ALLOWED_ORIGINS: list = [
-        "http://localhost:3000",
-        "http://localhost:5173",
-        "http://127.0.0.1:3000",
-        "http://127.0.0.1:5173"
-    ]
+    # CORS - can be set via ALLOWED_ORIGINS env var (comma-separated)
+    ALLOWED_ORIGINS: str = "http://localhost:3000,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:5173"
+
+    @property
+    def cors_origins(self) -> List[str]:
+        """Parse ALLOWED_ORIGINS string into list"""
+        return [origin.strip() for origin in self.ALLOWED_ORIGINS.split(',')]
 
     # Scanning Configuration
     MAX_CONCURRENT_SCANS: int = 5
@@ -45,6 +45,9 @@ class Settings(BaseSettings):
 
     # User Agent
     USER_AGENT: str = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+
+    # SSL/TLS Configuration
+    VERIFY_SSL: bool = False  # Disable SSL verification for pentesting (many targets have invalid certs)
 
     # Security Headers to check
     SECURITY_HEADERS: list = [
