@@ -3,7 +3,7 @@
 Automated penetration testing tool for web applications with intelligent analysis and adaptive testing.
 
 ![Version](https://img.shields.io/badge/version-1.0.0-blue)
-![Python](https://img.shields.io/badge/python-3.9+-green)
+![Python](https://img.shields.io/badge/python-3.9--3.12-green)
 ![React](https://img.shields.io/badge/react-18+-61dafb)
 
 ## Legal Warning
@@ -35,8 +35,9 @@ xcode-select --install
 # Install Homebrew (if not already installed)
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 
-# Install Python 3.9+ and Node.js
-brew install python@3.9 node
+# Install Python 3.11 or 3.12 and Node.js
+# ⚠️ Python 3.14+ not yet supported (pydantic-core compatibility)
+brew install python@3.11 node
 ```
 
 ## Installation
@@ -44,8 +45,15 @@ brew install python@3.9 node
 ### Backend
 ```bash
 cd backend
-python -m venv venv
+
+# macOS: Use python3.11 or python3.12 explicitly
+python3.11 -m venv venv  # or python3.12
+
+# Linux/WSL: python3 is fine
+# python3 -m venv venv
+
 source venv/bin/activate  # Windows: venv\Scripts\activate
+pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
