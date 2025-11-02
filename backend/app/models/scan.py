@@ -1,7 +1,7 @@
 """
 Data models for pentest scans
 """
-from pydantic import BaseModel, HttpUrl, Field
+from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
 from enum import Enum
 from datetime import datetime
@@ -41,6 +41,14 @@ class ScanRequest(BaseModel):
     auth_token: Optional[str] = Field(None, description="Authentication token (Bearer)")
     cookies: Optional[Dict[str, str]] = Field(None, description="Session cookies")
     custom_headers: Optional[Dict[str, str]] = Field(None, description="Custom HTTP headers")
+    auth_sequence: Optional[List[Dict[str, Any]]] = Field(
+        default=None,
+        description="List of HTTP steps to reproduce complex authentication flows",
+    )
+    mfa_totp_secret: Optional[str] = Field(
+        default=None,
+        description="TOTP secret for MFA flows",
+    )
 
     # Test users for access control testing (grey box)
     test_users: Optional[List[Dict[str, str]]] = Field(None, description="Test users with different privileges")
@@ -50,6 +58,10 @@ class ScanRequest(BaseModel):
     enable_fuzzing: bool = Field(default=True, description="Enable endpoint fuzzing")
     enable_nuclei: bool = Field(default=True, description="Enable Nuclei template scanning")
     enable_sqlmap: bool = Field(default=True, description="Enable SQLMap for SQL injection")
+    browser_crawling: bool = Field(default=True, description="Use headless browser to discover SPA routes")
+    collect_api_schemas: bool = Field(default=True, description="Attempt to download OpenAPI/GraphQL schemas")
+    enrich_osint: bool = Field(default=True, description="Collect local OSINT data (DNS, certs, secrets)")
+    track_stability: bool = Field(default=True, description="Capture host stability metrics during the scan")
 
     # Advanced options
     rate_limit: int = Field(default=10, description="Requests per second")
@@ -69,7 +81,7 @@ class Vulnerability(BaseModel):
     remediation: str
     cwe_id: Optional[str] = None
     owasp_category: Optional[str] = None
-    references: List[str] = []
+    references: List[str] = Field(default_factory=list)
 
 class Misconfiguration(BaseModel):
     title: str
@@ -85,14 +97,71 @@ class EndpointInfo(BaseModel):
     method: str
     status_code: int
     requires_auth: bool
-    parameters: List[str] = []
-    headers: Dict[str, str] = {}
+    parameters: List[str] = Field(default_factory=list)
+    headers: Dict[str, str] = Field(default_factory=dict)
 
 class TechnologyInfo(BaseModel):
     name: str
     version: Optional[str] = None
     category: str  # framework, server, language, etc.
     confidence: float  # 0.0 to 1.0
+
+
+class TimelineEvent(BaseModel):
+    id: str
+    timestamp: datetime
+    phase: str
+    message: str
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+
+
+class AttackChainStep(BaseModel):
+    name: str
+    severity: SeverityLevel
+    description: str
+    steps: List[str] = Field(default_factory=list)
+    impacted_assets: List[str] = Field(default_factory=list)
+
+
+class ScanArtifact(BaseModel):
+    name: str
+    type: str
+    description: str
+    content: str
+    related_items: List[str] = Field(default_factory=list)
+
+
+class PlaybookTarget(BaseModel):
+    target_url: str
+    mode: ScanMode = ScanMode.BLACK_BOX
+    auth_token: Optional[str] = None
+    custom_headers: Optional[Dict[str, str]] = None
+    cookies: Optional[Dict[str, str]] = None
+    notes: Optional[str] = None
+
+
+class PlaybookRequest(BaseModel):
+    name: str
+    targets: List[PlaybookTarget]
+    sequential: bool = True
+
+
+class PlaybookRun(BaseModel):
+    playbook_id: str
+    name: str
+    started_at: datetime
+    targets: List[PlaybookTarget]
+    scan_ids: List[str] = Field(default_factory=list)
+    completed: bool = False
+    status_overview: List[Dict[str, Any]] = Field(default_factory=list)
+    sequential: bool = True
+
+
+class StabilitySnapshot(BaseModel):
+    label: str
+    timestamp: datetime
+    load_average: Dict[str, float]
+    memory: Dict[str, float]
 
 class ScanProgress(BaseModel):
     scan_id: str
@@ -111,15 +180,25 @@ class ScanResult(BaseModel):
     status: str
 
     # Results
-    vulnerabilities: List[Vulnerability] = []
-    misconfigurations: List[Misconfiguration] = []
-    discovered_endpoints: List[EndpointInfo] = []
-    detected_technologies: List[TechnologyInfo] = []
+    vulnerabilities: List[Vulnerability] = Field(default_factory=list)
+    misconfigurations: List[Misconfiguration] = Field(default_factory=list)
+    discovered_endpoints: List[EndpointInfo] = Field(default_factory=list)
+    detected_technologies: List[TechnologyInfo] = Field(default_factory=list)
+    dynamic_endpoints: List[EndpointInfo] = Field(default_factory=list)
+    api_schemas: Dict[str, Any] = Field(default_factory=dict)
+    osint_findings: List[Dict[str, Any]] = Field(default_factory=list)
+    timeline: List[TimelineEvent] = Field(default_factory=list)
+    attack_chains: List[AttackChainStep] = Field(default_factory=list)
+    artifacts: List[ScanArtifact] = Field(default_factory=list)
+    stability_metrics: List[StabilitySnapshot] = Field(default_factory=list)
 
     # Statistics
     total_requests: int = 0
-    vulnerabilities_by_severity: Dict[str, int] = {}
+    vulnerabilities_by_severity: Dict[str, int] = Field(default_factory=dict)
 
     # Metadata
     scan_duration: Optional[float] = None  # seconds
     error_message: Optional[str] = None
+    browser_crawl_summary: Optional[str] = None
+    playbook_runs: List[PlaybookRun] = Field(default_factory=list)
+    scan_notes: Optional[str] = None
