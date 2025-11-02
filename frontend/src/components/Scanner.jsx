@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import axios from 'axios'
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1'
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001/api/v1'
 
 function Scanner({ onScanStart, onScanComplete }) {
   const [url, setUrl] = useState('')
@@ -19,6 +19,14 @@ function Scanner({ onScanStart, onScanComplete }) {
   const [authSequenceText, setAuthSequenceText] = useState('')
   const [mfaSecret, setMfaSecret] = useState('')
   const [eventLog, setEventLog] = useState([])
+  const eventLogRef = useRef(null)
+
+  // Auto-scroll to bottom when new events arrive
+  useEffect(() => {
+    if (eventLogRef.current && eventLog.length > 0) {
+      eventLogRef.current.scrollTop = eventLogRef.current.scrollHeight
+    }
+  }, [eventLog])
 
   const startScan = async () => {
     console.log('🚀 Start Scan button clicked!')
@@ -347,31 +355,54 @@ function Scanner({ onScanStart, onScanComplete }) {
         </div>
       )}
 
-      {/* Progress Bar */}
+      {/* Progress Bar and Live Test Output */}
       {loading && (
         <div className="mb-6">
           <div className="flex justify-between text-sm text-gray-400 mb-2">
-            <span>{status}</span>
-            <span>{Math.round(progress)}%</span>
+            <span className="font-semibold text-accent-primary">{status}</span>
+            <span className="font-bold">{Math.round(progress)}%</span>
           </div>
-          <div className="w-full bg-dark-hover rounded-full h-2 overflow-hidden">
+          <div className="w-full bg-dark-hover rounded-full h-3 overflow-hidden border border-dark-border">
             <div
-              className="bg-accent-primary h-full transition-all duration-500"
+              className="bg-gradient-to-r from-accent-primary to-accent-secondary h-full transition-all duration-500"
               style={{ width: `${progress}%` }}
             ></div>
           </div>
-          {eventLog.length > 0 && (
-            <div className="mt-4 max-h-48 overflow-y-auto text-sm bg-dark-card border border-dark-border rounded-lg p-3 space-y-2">
-              {eventLog.map((event) => (
-                <div key={event.id} className="flex flex-col">
-                  <span className="text-xs text-gray-500">
-                    {new Date(event.timestamp).toLocaleTimeString()} • {event.phase}
-                  </span>
-                  <span className="text-gray-200">{event.message}</span>
-                </div>
-              ))}
+
+          {/* Live Test Output */}
+          <div className="mt-4">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-2 h-2 bg-accent-primary rounded-full animate-pulse"></div>
+              <h3 className="text-sm font-semibold text-gray-300">Live Test Output</h3>
             </div>
-          )}
+            <div ref={eventLogRef} className="max-h-96 overflow-y-auto text-sm bg-dark-card border border-dark-border rounded-lg p-4 space-y-1 font-mono">
+              {eventLog.length === 0 ? (
+                <div className="text-gray-500 italic text-center py-4">
+                  Waiting for scan to start...
+                </div>
+              ) : (
+                eventLog.map((event, index) => (
+                  <div
+                    key={event.id}
+                    className="flex items-start gap-2 py-1 border-l-2 border-dark-border pl-3 hover:border-accent-primary transition-colors"
+                  >
+                    <span className="text-xs text-gray-600 flex-shrink-0 w-20">
+                      {new Date(event.timestamp).toLocaleTimeString()}
+                    </span>
+                    <span className="text-xs font-semibold text-accent-secondary flex-shrink-0 w-32 truncate" title={event.phase}>
+                      [{event.phase}]
+                    </span>
+                    <span className="text-gray-100 flex-1">{event.message}</span>
+                  </div>
+                ))
+              )}
+              {eventLog.length > 0 && (
+                <div className="text-xs text-gray-600 text-center pt-2 border-t border-dark-border mt-2">
+                  {eventLog.length} events logged
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
 

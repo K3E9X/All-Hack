@@ -28,10 +28,10 @@ cleanup() {
 trap cleanup SIGINT SIGTERM
 
 # Start backend
-echo "🔧 Starting backend on http://localhost:8000..."
+echo "🔧 Starting backend on http://localhost:8001..."
 cd backend
 source venv/bin/activate
-uvicorn app.main:app --host 0.0.0.0 --port 8000 > /tmp/pentest-backend.log 2>&1 &
+uvicorn app.main:app --host 0.0.0.0 --port 8001 > /tmp/pentest-backend.log 2>&1 &
 BACKEND_PID=$!
 cd ..
 
@@ -48,9 +48,9 @@ cd ..
 echo ""
 echo "✅ Services started successfully!"
 echo ""
-echo "📍 Backend API: http://localhost:8000"
+echo "📍 Backend API: http://localhost:8001"
 echo "📍 Frontend UI: http://localhost:5173"
-echo "📍 API Docs: http://localhost:8000/docs"
+echo "📍 API Docs: http://localhost:8001/docs"
 echo ""
 echo "📋 Logs:"
 echo "   Backend: tail -f /tmp/pentest-backend.log"

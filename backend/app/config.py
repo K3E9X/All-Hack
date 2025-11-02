@@ -14,6 +14,8 @@ class Settings(BaseSettings):
     API_TITLE: str = "Advanced Pentest Tool"
     API_VERSION: str = "1.0.0"
     API_PREFIX: str = "/api/v1"
+    API_HOST: str = "0.0.0.0"
+    API_PORT: int = 8001  # Changed from 8000 to avoid conflicts
 
     # CORS - can be set via ALLOWED_ORIGINS env var (comma-separated)
     ALLOWED_ORIGINS: str = "http://localhost:3000,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:5173"
