@@ -36,6 +36,13 @@ class Settings(BaseSettings):
     TOOLS_DIR: str = "/home/user/devasc-study-team/backend/app/tools"
     WORDLISTS_DIR: str = "/home/user/devasc-study-team/backend/wordlists"
 
+    # Optional integrations
+    ENABLE_BROWSER_CRAWLER: bool = True
+    ENABLE_OSINT_ENRICHMENT: bool = True
+    ENABLE_API_SCHEMA_COLLECTION: bool = True
+    ENABLE_STABILITY_MONITORING: bool = True
+    EXTERNAL_TOOL_HOOKS: list = []
+
     # User Agent
     USER_AGENT: str = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 

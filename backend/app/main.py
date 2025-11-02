@@ -2,13 +2,13 @@
 Advanced Pentest Tool - FastAPI Backend
 """
 import logging
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
 
 from app.config import settings
-from app.models import ScanRequest, ScanResult, ScanProgress
+from app.models import ScanRequest, ScanResult, ScanProgress, PlaybookRequest, PlaybookRun
 from app.scanner_orchestrator import ScanOrchestrator
 
 # Configure logging
@@ -20,6 +20,18 @@ logger = logging.getLogger(__name__)
 
 # Global orchestrator instance
 orchestrator = ScanOrchestrator()
+
+
+PHASE_PROGRESS = {
+    "initializing": (0.0, "Initializing scan"),
+    "infrastructure_recon": (15.0, "Infrastructure reconnaissance"),
+    "reconnaissance": (25.0, "Application reconnaissance"),
+    "owasp_scanning": (55.0, "OWASP Top 10 testing"),
+    "access_control_testing": (75.0, "Access control testing"),
+    "misconfiguration_scanning": (90.0, "Security misconfiguration review"),
+    "completed": (100.0, "Completed"),
+    "failed": (0.0, "Failed"),
+}
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -117,26 +129,62 @@ async def get_scan_status(scan_id: str):
     if not result:
         raise HTTPException(status_code=404, detail="Scan not found")
 
-    progress = 0.0
-    if result.status == "reconnaissance":
-        progress = 25.0
-    elif result.status == "owasp_scanning":
-        progress = 50.0
-    elif result.status == "access_control_testing":
-        progress = 75.0
-    elif result.status == "misconfiguration_scanning":
-        progress = 90.0
-    elif result.status == "completed":
-        progress = 100.0
+    progress, phase_label = PHASE_PROGRESS.get(
+        result.status,
+        (0.0, result.status.replace("_", " ").title() if result.status else "Unknown"),
+    )
+
+    recent_events = [
+        event.model_dump()
+        for event in (result.timeline[-5:] if result.timeline else [])
+    ]
+
+    last_event = result.timeline[-1].model_dump() if result.timeline else None
 
     return {
         "scan_id": scan_id,
         "status": result.status,
         "progress": progress,
         "current_phase": result.status,
+        "current_phase_label": phase_label,
         "vulnerabilities_found": len(result.vulnerabilities),
-        "misconfigurations_found": len(result.misconfigurations)
+        "misconfigurations_found": len(result.misconfigurations),
+        "recent_events": recent_events,
+        "current_event": last_event,
     }
+
+
+@app.post(f"{settings.API_PREFIX}/playbooks", response_model=PlaybookRun)
+async def create_playbook(playbook: PlaybookRequest):
+    """Start a playbook consisting of multiple scans."""
+    run = await orchestrator.start_playbook(playbook)
+    return run
+
+
+@app.get(f"{settings.API_PREFIX}/playbooks/{{playbook_id}}")
+async def get_playbook(playbook_id: str):
+    run = orchestrator.get_playbook(playbook_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="Playbook not found")
+    return run
+
+
+@app.get(f"{settings.API_PREFIX}/scans/{{scan_id}}/report")
+async def download_report(scan_id: str):
+    try:
+        report = orchestrator.generate_report(scan_id)
+        return report
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+
+@app.get(f"{settings.API_PREFIX}/scans/compare")
+async def compare_scans(scan_a: str = Query(...), scan_b: str = Query(...)):
+    try:
+        comparison = orchestrator.compare_scans(scan_a, scan_b)
+        return comparison
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
 
 @app.get(f"{settings.API_PREFIX}/scans/{{scan_id}}/vulnerabilities")
 async def get_vulnerabilities(scan_id: str, severity: str = None):
