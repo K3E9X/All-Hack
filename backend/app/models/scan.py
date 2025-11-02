@@ -62,8 +62,10 @@ class ScanRequest(BaseModel):
     # Scan options
     enable_active_tests: bool = Field(default=True, description="Enable active exploitation tests")
     enable_fuzzing: bool = Field(default=True, description="Enable endpoint fuzzing")
-    enable_nuclei: bool = Field(default=True, description="Enable Nuclei template scanning")
-    enable_sqlmap: bool = Field(default=True, description="Enable SQLMap for SQL injection")
+    # TODO: Not implemented yet - Nuclei integration planned for future release
+    # enable_nuclei: bool = Field(default=False, description="Enable Nuclei template scanning")
+    # TODO: Not implemented yet - SQLMap integration planned for future release
+    # enable_sqlmap: bool = Field(default=False, description="Enable SQLMap for SQL injection")
     browser_crawling: bool = Field(default=True, description="Use headless browser to discover SPA routes")
     collect_api_schemas: bool = Field(default=True, description="Attempt to download OpenAPI/GraphQL schemas")
     enrich_osint: bool = Field(default=True, description="Collect local OSINT data (DNS, certs, secrets)")

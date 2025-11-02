@@ -53,8 +53,7 @@ function Scanner({ onScanStart, onScanComplete }) {
         mfa_totp_secret: mfaSecret || null,
         enable_active_tests: true,
         enable_fuzzing: true,
-        enable_nuclei: false,
-        enable_sqlmap: false,
+        // Note: enable_nuclei and enable_sqlmap removed (not implemented yet)
         rate_limit: 10,
         max_depth: 3,
         browser_crawling: browserCrawling,

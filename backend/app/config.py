@@ -4,6 +4,10 @@ Configuration file for the pentest application
 from pydantic_settings import BaseSettings
 from typing import Optional, List
 import os
+from pathlib import Path
+
+# Get the base directory (project root)
+BASE_DIR = Path(__file__).resolve().parent.parent
 
 class Settings(BaseSettings):
     # API Configuration
@@ -32,9 +36,9 @@ class Settings(BaseSettings):
     SCAN_STORAGE_DIR: str = "/tmp/pentest_scans"
     AUTO_SAVE_INTERVAL: int = 300  # Auto-save every 5 minutes
 
-    # Tool Paths
-    TOOLS_DIR: str = "/home/user/devasc-study-team/backend/app/tools"
-    WORDLISTS_DIR: str = "/home/user/devasc-study-team/backend/wordlists"
+    # Tool Paths - relative to backend directory
+    TOOLS_DIR: str = str(BASE_DIR / "app" / "tools")
+    WORDLISTS_DIR: str = str(BASE_DIR / "wordlists")
 
     # Optional integrations
     ENABLE_BROWSER_CRAWLER: bool = True
