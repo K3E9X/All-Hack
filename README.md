@@ -36,16 +36,29 @@ cd frontend
 npm install
 ```
 
+## Quick Start
+
+**Launch everything with one command:**
+```bash
+./start.sh
+```
+
+Access the app at `http://localhost:5173`
+
+Press `Ctrl+C` to stop all services.
+
 ## Usage
 
-### Start Backend
+### Manual Start
+
+**Backend:**
 ```bash
 cd backend
 source venv/bin/activate
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-### Start Frontend
+**Frontend:**
 ```bash
 cd frontend
 npm run dev
