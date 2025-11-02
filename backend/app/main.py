@@ -2,13 +2,15 @@
 Advanced Pentest Tool - FastAPI Backend
 """
 import logging
-from fastapi import FastAPI, HTTPException
+from contextlib import asynccontextmanager
+from typing import Any, Dict, List, Optional
+
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from contextlib import asynccontextmanager
 
 from app.config import settings
-from app.models import ScanRequest, ScanResult, ScanProgress
+from app.models import ScanRequest, ScanResult, PlaybookRequest, PlaybookRun
 from app.scanner_orchestrator import ScanOrchestrator
 
 # Configure logging
@@ -20,6 +22,130 @@ logger = logging.getLogger(__name__)
 
 # Global orchestrator instance
 orchestrator = ScanOrchestrator()
+
+
+PHASE_PROGRESS = {
+    "initializing": (0.0, "Initializing scan"),
+    "infrastructure_recon": (15.0, "Infrastructure reconnaissance"),
+    "reconnaissance": (25.0, "Application reconnaissance"),
+    "owasp_scanning": (55.0, "OWASP Top 10 testing"),
+    "access_control_testing": (75.0, "Access control testing"),
+    "misconfiguration_scanning": (90.0, "Security misconfiguration review"),
+    "completed": (100.0, "Completed"),
+    "failed": (0.0, "Failed"),
+}
+
+PHASE_ORDER: List[str] = [
+    "initializing",
+    "infrastructure_recon",
+    "reconnaissance",
+    "owasp_scanning",
+    "access_control_testing",
+    "misconfiguration_scanning",
+    "completed",
+]
+
+PHASE_EVENT_TO_STATUS: Dict[str, str] = {
+    "phase_0": "infrastructure_recon",
+    "phase_1": "reconnaissance",
+    "phase_2": "owasp_scanning",
+    "phase_3": "access_control_testing",
+    "phase_4": "misconfiguration_scanning",
+}
+
+
+def _determine_failure_phase(result: ScanResult) -> Optional[str]:
+    """Best effort mapping from timeline events to the phase that failed."""
+
+    for event in reversed(result.timeline or []):
+        mapped = PHASE_EVENT_TO_STATUS.get(event.phase)
+        if mapped:
+            return mapped
+    return None
+
+
+def _serialize_recent_events(result: ScanResult, limit: int = 5) -> List[Dict[str, Any]]:
+    """Return the most recent timeline events as dictionaries."""
+
+    if not result.timeline:
+        return []
+
+    events = sorted(result.timeline[-limit:], key=lambda evt: evt.timestamp)
+    return [event.model_dump() for event in events]
+
+
+def _build_phase_progression(result: ScanResult) -> List[Dict[str, Any]]:
+    """Build a structured view of scan phase progression for the UI."""
+
+    status = result.status
+    failure_phase = _determine_failure_phase(result) if status == "failed" else None
+
+    try:
+        current_index = PHASE_ORDER.index(status)
+    except ValueError:
+        current_index = None
+
+    failure_index: Optional[int] = None
+    if failure_phase:
+        try:
+            failure_index = PHASE_ORDER.index(failure_phase)
+        except ValueError:
+            failure_index = None
+
+    progression: List[Dict[str, Any]] = []
+
+    for idx, phase in enumerate(PHASE_ORDER):
+        progress_value, label = PHASE_PROGRESS.get(
+            phase,
+            (0.0, phase.replace("_", " ").title()),
+        )
+
+        state = "pending"
+
+        if status == "failed":
+            if failure_index is not None:
+                if idx < failure_index:
+                    state = "completed"
+                elif idx == failure_index:
+                    state = "failed"
+            else:
+                # Failure occurred before any phase transition
+                if idx == 0:
+                    state = "failed"
+        else:
+            if current_index is not None:
+                if idx < current_index:
+                    state = "completed"
+                elif idx == current_index:
+                    state = "completed" if status == "completed" else "current"
+                elif status == "completed":
+                    state = "completed"
+
+        # Ensure that a completed scan marks all phases as completed
+        if status == "completed" and current_index is not None and idx <= current_index:
+            state = "completed"
+
+        progression.append(
+            {
+                "id": phase,
+                "label": label,
+                "state": state,
+                "progress": progress_value,
+            }
+        )
+
+    if status == "failed":
+        failed_progress, failed_label = PHASE_PROGRESS.get("failed", (0.0, "Failed"))
+        progression.append(
+            {
+                "id": "failed",
+                "label": failed_label,
+                "state": "failed",
+                "progress": failed_progress,
+            }
+        )
+
+    return progression
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -117,26 +243,60 @@ async def get_scan_status(scan_id: str):
     if not result:
         raise HTTPException(status_code=404, detail="Scan not found")
 
-    progress = 0.0
-    if result.status == "reconnaissance":
-        progress = 25.0
-    elif result.status == "owasp_scanning":
-        progress = 50.0
-    elif result.status == "access_control_testing":
-        progress = 75.0
-    elif result.status == "misconfiguration_scanning":
-        progress = 90.0
-    elif result.status == "completed":
-        progress = 100.0
+    progress, phase_label = PHASE_PROGRESS.get(
+        result.status,
+        (0.0, result.status.replace("_", " ").title() if result.status else "Unknown"),
+    )
+
+    recent_events = _serialize_recent_events(result)
+
+    last_event = recent_events[-1] if recent_events else None
 
     return {
         "scan_id": scan_id,
         "status": result.status,
         "progress": progress,
         "current_phase": result.status,
+        "current_phase_label": phase_label,
         "vulnerabilities_found": len(result.vulnerabilities),
-        "misconfigurations_found": len(result.misconfigurations)
+        "misconfigurations_found": len(result.misconfigurations),
+        "recent_events": recent_events,
+        "current_event": last_event,
+        "phase_progression": _build_phase_progression(result),
     }
+
+
+@app.post(f"{settings.API_PREFIX}/playbooks", response_model=PlaybookRun)
+async def create_playbook(playbook: PlaybookRequest):
+    """Start a playbook consisting of multiple scans."""
+    run = await orchestrator.start_playbook(playbook)
+    return run
+
+
+@app.get(f"{settings.API_PREFIX}/playbooks/{{playbook_id}}")
+async def get_playbook(playbook_id: str):
+    run = orchestrator.get_playbook(playbook_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="Playbook not found")
+    return run
+
+
+@app.get(f"{settings.API_PREFIX}/scans/{{scan_id}}/report")
+async def download_report(scan_id: str):
+    try:
+        report = orchestrator.generate_report(scan_id)
+        return report
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+
+@app.get(f"{settings.API_PREFIX}/scans/compare")
+async def compare_scans(scan_a: str = Query(...), scan_b: str = Query(...)):
+    try:
+        comparison = orchestrator.compare_scans(scan_a, scan_b)
+        return comparison
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
 
 @app.get(f"{settings.API_PREFIX}/scans/{{scan_id}}/vulnerabilities")
 async def get_vulnerabilities(scan_id: str, severity: str = None):

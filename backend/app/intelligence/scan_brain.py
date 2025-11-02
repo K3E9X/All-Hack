@@ -4,7 +4,13 @@ Intelligent Scan Brain - Analyzes results and adapts scanning strategy
 import logging
 from typing import List, Dict, Any, Optional
 from dataclasses import dataclass, field
-from app.models import Vulnerability, Misconfiguration, TechnologyInfo, SeverityLevel
+from app.models import (
+    Vulnerability,
+    Misconfiguration,
+    TechnologyInfo,
+    SeverityLevel,
+    AttackChainStep,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -134,8 +140,12 @@ class ScanBrain:
                 f"Will perform deeper reconnaissance"
             )
 
-        logger.info(f"🧠 [BRAIN] Infrastructure analysis complete. "
-                   f"Found {len(recommendations['attack_vectors'])} attack vectors")
+        self.intelligence.promising_attack_vectors.extend(recommendations['attack_vectors'])
+
+        logger.info(
+            f"🧠 [BRAIN] Infrastructure analysis complete. "
+            f"Found {len(recommendations['attack_vectors'])} attack vectors"
+        )
 
         return recommendations
 
@@ -228,12 +238,14 @@ class ScanBrain:
             # Admin endpoints - HIGH PRIORITY
             if any(keyword in url.lower() for keyword in ['admin', 'dashboard', 'panel', 'manage']):
                 self.intelligence.admin_endpoints.append(url)
-                recommendations['priority_targets'].append({
+                target = {
                     'url': url,
                     'type': 'admin',
                     'tests': ['authentication_bypass', 'privilege_escalation', 'idor'],
                     'priority': 'HIGH'
-                })
+                }
+                recommendations['priority_targets'].append(target)
+                self.intelligence.promising_attack_vectors.append(target)
                 recommendations['reasoning'].append(
                     f"🎯 Admin endpoint found: {url} - Will test for authentication bypass "
                     f"and privilege escalation"
@@ -242,21 +254,25 @@ class ScanBrain:
             # API endpoints - TEST THOROUGHLY
             if any(keyword in url.lower() for keyword in ['/api/', '/rest/', '/graphql']):
                 self.intelligence.api_endpoints.append(url)
-                recommendations['priority_targets'].append({
+                target = {
                     'url': url,
                     'type': 'api',
                     'tests': ['mass_assignment', 'idor', 'rate_limiting', 'injection'],
                     'priority': 'HIGH'
-                })
+                }
+                recommendations['priority_targets'].append(target)
+                self.intelligence.promising_attack_vectors.append(target)
 
             # File upload endpoints - DANGEROUS
             if any(keyword in url.lower() for keyword in ['upload', 'file', 'media']):
-                recommendations['priority_targets'].append({
+                target = {
                     'url': url,
                     'type': 'upload',
                     'tests': ['file_upload_bypass', 'path_traversal', 'rce'],
                     'priority': 'CRITICAL'
-                })
+                }
+                recommendations['priority_targets'].append(target)
+                self.intelligence.promising_attack_vectors.append(target)
                 recommendations['reasoning'].append(
                     f"🚨 CRITICAL: File upload endpoint: {url} - This is a HIGH-RISK area. "
                     f"Will test for upload restrictions bypass and RCE."
@@ -417,3 +433,71 @@ class ScanBrain:
             )
 
         return strategy
+
+    def plan_attack_chains(
+        self,
+        vulnerabilities: List[Vulnerability],
+        osint_findings: Optional[List[Dict[str, Any]]] = None,
+        dynamic_endpoints: Optional[List[Any]] = None,
+    ) -> List[AttackChainStep]:
+        """Build chained attack scenarios using gathered intelligence."""
+
+        chains: List[AttackChainStep] = []
+
+        critical_vulns = [v for v in vulnerabilities if v.severity == SeverityLevel.CRITICAL]
+        if critical_vulns:
+            chains.append(
+                AttackChainStep(
+                    name='Critical vulnerability triage',
+                    severity=SeverityLevel.CRITICAL,
+                    description='Validate and weaponize critical issues rapidly.',
+                    steps=[
+                        'Confirm vulnerability in isolated environment',
+                        'Capture proof with screenshots/logs',
+                        'Extract sensitive data or demonstrate lateral movement',
+                    ],
+                    impacted_assets=[v.affected_url for v in critical_vulns],
+                )
+            )
+
+        if any('exposed_file' == finding.get('type') for finding in osint_findings or []):
+            exposed = [f for f in (osint_findings or []) if f.get('type') == 'exposed_file']
+            chains.append(
+                AttackChainStep(
+                    name='Secrets to compromise chain',
+                    severity=SeverityLevel.HIGH,
+                    description='Use exposed secrets to escalate access and compromise admin portals.',
+                    steps=[
+                        'Download exposed secret file',
+                        'Identify credentials/tokens',
+                        'Replay credentials against admin/API endpoints',
+                        'Pivot to privilege escalation',
+                    ],
+                    impacted_assets=[item.get('path') for item in exposed],
+                )
+            )
+
+        if dynamic_endpoints:
+            spa_targets = [ep.url for ep in dynamic_endpoints if hasattr(ep, 'url')]
+            if spa_targets:
+                chains.append(
+                    AttackChainStep(
+                        name='SPA route fuzzing chain',
+                        severity=SeverityLevel.MEDIUM,
+                        description='Fuzz dynamically discovered SPA routes for auth and IDOR issues.',
+                        steps=[
+                            'Replay browser-discovered routes with varied roles',
+                            'Attempt parameter pollution and method tampering',
+                            'Monitor for GraphQL or REST anomalies',
+                        ],
+                        impacted_assets=spa_targets[:10],
+                    )
+                )
+
+        logger.info("🧠 [BRAIN] Planned %s attack chain(s)", len(chains))
+        return chains
+
+    def register_osint(self, findings: List[Dict[str, Any]]) -> None:
+        if not findings:
+            return
+        self.intelligence.promising_attack_vectors.extend(findings)
