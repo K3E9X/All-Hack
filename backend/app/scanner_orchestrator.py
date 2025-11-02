@@ -150,6 +150,69 @@ class ScanOrchestrator:
         scan_result.stability_metrics.append(snapshot)
         return snapshot
 
+    def _prioritize_endpoints(
+        self,
+        endpoints: List[EndpointInfo],
+        scan_depth: str,
+        priority_targets: List[str] = None
+    ) -> List[str]:
+        """
+        Prioritize and limit endpoints based on scan depth
+
+        Returns limited list of endpoint URLs optimized for scanning
+        """
+        from app.models import ScanDepth
+
+        # Score endpoints by priority
+        scored_endpoints = []
+        for ep in endpoints:
+            score = 0
+            url_lower = ep.url.lower()
+
+            # High priority patterns
+            if any(pattern in url_lower for pattern in ['/admin', '/api', '/upload', '/login', '/auth']):
+                score += 10
+            if any(pattern in url_lower for pattern in ['/user', '/account', '/profile', '/settings']):
+                score += 7
+            if any(pattern in url_lower for pattern in ['/delete', '/update', '/create', '/edit']):
+                score += 5
+            if '?' in url_lower:  # Has parameters
+                score += 3
+            if ep.url in (priority_targets or []):
+                score += 15  # Brain-identified priority targets
+
+            scored_endpoints.append((score, ep))
+
+        # Sort by score (highest first)
+        scored_endpoints.sort(key=lambda x: x[0], reverse=True)
+
+        # Apply limits based on scan depth
+        depth_limits = {
+            ScanDepth.QUICK: 10,      # ~5-15 min
+            ScanDepth.BALANCED: 50,   # ~30-60 min (DEFAULT)
+            ScanDepth.DEEP: 999999    # All endpoints (2-10h)
+        }
+
+        limit = depth_limits.get(scan_depth, 50)
+        selected_endpoints = [ep.url for score, ep in scored_endpoints[:limit]]
+
+        logger.info(f"📊 Endpoint prioritization: {len(endpoints)} total → {len(selected_endpoints)} selected for {scan_depth} scan")
+        logger.info(f"⏱️  Estimated scan time: {self._estimate_scan_time(len(selected_endpoints))}")
+
+        return selected_endpoints
+
+    def _estimate_scan_time(self, endpoint_count: int) -> str:
+        """Estimate scan time based on endpoint count"""
+        # Rough estimate: ~20-30 seconds per endpoint for OWASP tests
+        minutes = (endpoint_count * 25) / 60  # 25 seconds average
+
+        if minutes < 15:
+            return f"{int(minutes)} minutes"
+        elif minutes < 120:
+            return f"{int(minutes)} minutes ({minutes/60:.1f} hours)"
+        else:
+            return f"{minutes/60:.1f} hours"
+
     async def _execute_intelligent_scan(
         self,
         scan_id: str,
@@ -387,6 +450,14 @@ class ScanOrchestrator:
             for reasoning in strategy.get('reasoning', []):
                 logger.info(f"💡 {reasoning}")
 
+            # 🎯 SMART ENDPOINT SELECTION - Adapt based on scan depth
+            priority_targets = endpoint_intelligence.get('priority_targets', [])
+            endpoint_urls_to_test = self._prioritize_endpoints(
+                endpoints or [],
+                scan_request.scan_depth,
+                priority_targets
+            )
+
             await self._auto_save(scan_id)
             if scan_request.track_stability and settings.ENABLE_STABILITY_MONITORING:
                 self._snapshot_stability(scan_result, "phase_1_end")
@@ -402,6 +473,7 @@ class ScanOrchestrator:
             # ===== PHASE 2: OWASP TOP 10 - ADAPTIVE TESTING =====
             logger.info(f"\n{'='*70}")
             logger.info(f"🔥 [PHASE 2] OWASP TOP 10 VULNERABILITY SCANNING (ADAPTIVE)")
+            logger.info(f"📊 Testing {len(endpoint_urls_to_test)} priority endpoints (Mode: {scan_request.scan_depth})")
             logger.info(f"{'='*70}")
             scan_result.status = "owasp_scanning"
             self._record_event(scan_result, "phase_2", "OWASP Top 10 scanning started")
@@ -409,17 +481,11 @@ class ScanOrchestrator:
                 self._snapshot_stability(scan_result, "phase_2_start")
 
             if scan_request.enable_active_tests:
-                # Prioritize based on intelligence
-                priority_targets = endpoint_intelligence.get('priority_targets', [])
-
-                if priority_targets:
-                    logger.info(f"🎯 Testing {len(priority_targets)} high-priority targets first...")
-
                 # SQL Injection
-                logger.info(f"🗃️  Testing for SQL Injection...")
+                logger.info(f"🗃️  Testing for SQL Injection on {len(endpoint_urls_to_test)} endpoints...")
                 sql_scanner = SQLInjectionScanner(client)
                 sql_vulns = await self.robust_scanner.execute_batch_safe(
-                    endpoint_urls,
+                    endpoint_urls_to_test,
                     lambda urls: sql_scanner.scan(urls),
                     max_concurrent=5
                 )
@@ -427,10 +493,10 @@ class ScanOrchestrator:
                 logger.info(f"✅ SQL Injection: Found {len([v for v in sql_vulns if v])} vulnerabilities")
 
                 # XSS
-                logger.info(f"🎨 Testing for Cross-Site Scripting (XSS)...")
+                logger.info(f"🎨 Testing for Cross-Site Scripting (XSS) on {len(endpoint_urls_to_test)} endpoints...")
                 xss_scanner = XSSScanner(client)
                 xss_vulns = await self.robust_scanner.execute_batch_safe(
-                    endpoint_urls,
+                    endpoint_urls_to_test,
                     lambda urls: xss_scanner.scan(urls),
                     max_concurrent=5
                 )
@@ -438,10 +504,10 @@ class ScanOrchestrator:
                 logger.info(f"✅ XSS: Found {len([v for v in xss_vulns if v])} vulnerabilities")
 
                 # Command Injection
-                logger.info(f"💻 Testing for Command Injection...")
+                logger.info(f"💻 Testing for Command Injection on {len(endpoint_urls_to_test)} endpoints...")
                 cmd_scanner = CommandInjectionScanner(client)
                 cmd_vulns = await self.robust_scanner.execute_batch_safe(
-                    endpoint_urls,
+                    endpoint_urls_to_test,
                     lambda urls: cmd_scanner.scan(urls),
                     max_concurrent=3
                 )
@@ -449,10 +515,10 @@ class ScanOrchestrator:
                 logger.info(f"✅ Command Injection: Found {len([v for v in cmd_vulns if v])} vulnerabilities")
 
             # SSRF
-            logger.info(f"🌐 Testing for SSRF...")
+            logger.info(f"🌐 Testing for SSRF on {len(endpoint_urls_to_test)} endpoints...")
             ssrf_scanner = SSRFScanner(client)
             ssrf_vulns = await self.robust_scanner.execute_with_retry(
-                ssrf_scanner.scan, endpoint_urls
+                ssrf_scanner.scan, endpoint_urls_to_test
             )
             vulnerabilities.extend(ssrf_vulns or [])
             logger.info(f"✅ SSRF: Found {len(ssrf_vulns or [])} vulnerabilities")

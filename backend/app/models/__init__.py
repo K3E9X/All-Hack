@@ -1,6 +1,7 @@
 from .scan import (
     ScanRequest,
     ScanMode,
+    ScanDepth,
     ScanResult,
     Vulnerability,
     Misconfiguration,
@@ -14,6 +15,7 @@ from .scan import (
 __all__ = [
     "ScanRequest",
     "ScanMode",
+    "ScanDepth",
     "ScanResult",
     "Vulnerability",
     "Misconfiguration",

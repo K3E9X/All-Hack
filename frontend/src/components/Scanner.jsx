@@ -6,6 +6,7 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1'
 function Scanner({ onScanStart, onScanComplete }) {
   const [url, setUrl] = useState('')
   const [mode, setMode] = useState('black_box')
+  const [scanDepth, setScanDepth] = useState('balanced')
   const [authToken, setAuthToken] = useState('')
   const [loading, setLoading] = useState(false)
   const [status, setStatus] = useState(null)
@@ -46,6 +47,7 @@ function Scanner({ onScanStart, onScanComplete }) {
       const response = await axios.post(`${API_URL}/scans`, {
         target_url: url,
         mode: mode,
+        scan_depth: scanDepth,
         auth_token: authToken || null,
         auth_sequence: parsedSequence,
         mfa_totp_secret: mfaSecret || null,
@@ -157,6 +159,47 @@ function Scanner({ onScanStart, onScanComplete }) {
             <span className="text-gray-300">Grey Box (With Authentication)</span>
           </label>
         </div>
+      </div>
+
+      {/* Scan Depth */}
+      <div className="mb-6">
+        <label className="block text-sm font-medium text-gray-300 mb-2">Scan Depth / Speed</label>
+        <div className="flex gap-4">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="radio"
+              value="quick"
+              checked={scanDepth === 'quick'}
+              onChange={(e) => setScanDepth(e.target.value)}
+              disabled={loading}
+              className="w-4 h-4"
+            />
+            <span className="text-gray-300">Quick (10 endpoints, ~5-15 min) ⚡</span>
+          </label>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="radio"
+              value="balanced"
+              checked={scanDepth === 'balanced'}
+              onChange={(e) => setScanDepth(e.target.value)}
+              disabled={loading}
+              className="w-4 h-4"
+            />
+            <span className="text-gray-300">Balanced (50 endpoints, ~30-60 min) ⚖️</span>
+          </label>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="radio"
+              value="deep"
+              checked={scanDepth === 'deep'}
+              onChange={(e) => setScanDepth(e.target.value)}
+              disabled={loading}
+              className="w-4 h-4"
+            />
+            <span className="text-gray-300">Deep (All endpoints, 2-10 hours) 🔥</span>
+          </label>
+        </div>
+        <p className="text-xs text-gray-500 mt-2">Balanced is recommended for most scans. Quick for testing, Deep for comprehensive pentests.</p>
       </div>
 
       {/* Advanced Options */}

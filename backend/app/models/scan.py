@@ -10,6 +10,11 @@ class ScanMode(str, Enum):
     BLACK_BOX = "black_box"  # No authentication, external perspective
     GREY_BOX = "grey_box"    # With credentials, partial knowledge
 
+class ScanDepth(str, Enum):
+    QUICK = "quick"          # Fast scan - 10 priority endpoints, ~5-15 min
+    BALANCED = "balanced"    # Balanced scan - 50 endpoints, ~30-60 min (DEFAULT)
+    DEEP = "deep"            # Deep scan - all endpoints, 2-10 hours
+
 class SeverityLevel(str, Enum):
     CRITICAL = "critical"
     HIGH = "high"
@@ -36,6 +41,7 @@ class VulnerabilityCategory(str, Enum):
 class ScanRequest(BaseModel):
     target_url: str = Field(..., description="Target URL to scan")
     mode: ScanMode = Field(default=ScanMode.BLACK_BOX, description="Scan mode")
+    scan_depth: ScanDepth = Field(default=ScanDepth.BALANCED, description="Scan depth/speed")
 
     # Grey box options
     auth_token: Optional[str] = Field(None, description="Authentication token (Bearer)")
