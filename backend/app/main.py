@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.config import settings
-from app.models import ScanRequest, ScanResult, ScanProgress, PlaybookRequest, PlaybookRun
+from app.models import ScanRequest, ScanResult, PlaybookRequest, PlaybookRun
 from app.scanner_orchestrator import ScanOrchestrator
 
 # Configure logging
@@ -250,7 +250,7 @@ async def get_scan_status(scan_id: str):
 
     recent_events = _serialize_recent_events(result)
 
-    last_event = result.timeline[-1].model_dump() if result.timeline else None
+    last_event = recent_events[-1] if recent_events else None
 
     return {
         "scan_id": scan_id,

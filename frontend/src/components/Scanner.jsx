@@ -104,7 +104,7 @@ function Scanner({ onScanStart, onScanComplete }) {
           const data = statusResponse.data
 
           setProgress(data.progress)
-          const phaseLabel = data.current_phase_label || data.current_phase
+          const phaseLabel = data.current_phase_label || data.current_phase || 'Processing'
           setCurrentPhaseLabel(phaseLabel)
           setStatus(`${phaseLabel} • ${data.vulnerabilities_found} vulnerabilities found`)
           if (Array.isArray(data.recent_events)) {
@@ -125,6 +125,8 @@ function Scanner({ onScanStart, onScanComplete }) {
           setCurrentEvent(data.current_event || null)
           if (Array.isArray(data.phase_progression)) {
             setPhaseProgression(data.phase_progression)
+          } else {
+            setPhaseProgression([])
           }
 
           // Check if scan is complete
