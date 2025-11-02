@@ -64,6 +64,16 @@ def _determine_failure_phase(result: ScanResult) -> Optional[str]:
     return None
 
 
+def _serialize_recent_events(result: ScanResult, limit: int = 5) -> List[Dict[str, Any]]:
+    """Return the most recent timeline events as dictionaries."""
+
+    if not result.timeline:
+        return []
+
+    events = sorted(result.timeline[-limit:], key=lambda evt: evt.timestamp)
+    return [event.model_dump() for event in events]
+
+
 def _build_phase_progression(result: ScanResult) -> List[Dict[str, Any]]:
     """Build a structured view of scan phase progression for the UI."""
 
@@ -238,10 +248,7 @@ async def get_scan_status(scan_id: str):
         (0.0, result.status.replace("_", " ").title() if result.status else "Unknown"),
     )
 
-    recent_events = [
-        event.model_dump()
-        for event in (result.timeline[-5:] if result.timeline else [])
-    ]
+    recent_events = _serialize_recent_events(result)
 
     last_event = result.timeline[-1].model_dump() if result.timeline else None
 
