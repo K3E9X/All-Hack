@@ -20,6 +20,33 @@ function Scanner({ onScanStart, onScanComplete }) {
   const [eventLog, setEventLog] = useState([])
   const [currentPhaseLabel, setCurrentPhaseLabel] = useState('')
   const [currentEvent, setCurrentEvent] = useState(null)
+  const [phaseProgression, setPhaseProgression] = useState([])
+
+  const getPhaseStateStyles = (state) => {
+    switch (state) {
+      case 'completed':
+        return 'bg-accent-primary/10 border border-accent-primary/40 text-accent-primary'
+      case 'current':
+        return 'bg-dark-hover border border-accent-secondary/60 text-gray-100'
+      case 'failed':
+        return 'bg-accent-danger/10 border border-accent-danger/40 text-accent-danger'
+      default:
+        return 'bg-dark-card border border-dark-border text-gray-400'
+    }
+  }
+
+  const getPhaseStateLabel = (state) => {
+    switch (state) {
+      case 'completed':
+        return 'Completed'
+      case 'current':
+        return 'In progress'
+      case 'failed':
+        return 'Failed'
+      default:
+        return 'Pending'
+    }
+  }
 
   const startScan = async () => {
     if (!url) {
@@ -33,6 +60,7 @@ function Scanner({ onScanStart, onScanComplete }) {
     setEventLog([])
     setCurrentPhaseLabel('')
     setCurrentEvent(null)
+    setPhaseProgression([])
 
     try {
       let parsedSequence = null
@@ -95,6 +123,9 @@ function Scanner({ onScanStart, onScanComplete }) {
           }
 
           setCurrentEvent(data.current_event || null)
+          if (Array.isArray(data.phase_progression)) {
+            setPhaseProgression(data.phase_progression)
+          }
 
           // Check if scan is complete
           if (data.status === 'completed') {
@@ -297,6 +328,30 @@ function Scanner({ onScanStart, onScanComplete }) {
             ></div>
           </div>
           <div className="mt-4 space-y-3">
+            {phaseProgression.length > 0 && (
+              <div className="bg-dark-card border border-dark-border rounded-lg p-3">
+                <p className="text-xs uppercase tracking-wide text-gray-500 mb-2">Scan phases</p>
+                <ol className="space-y-2">
+                  {phaseProgression.map((phase) => (
+                    <li
+                      key={phase.id}
+                      className={`rounded-lg px-3 py-2 flex items-center justify-between gap-4 ${getPhaseStateStyles(
+                        phase.state
+                      )}`}
+                    >
+                      <div>
+                        <p className="text-sm font-medium">{phase.label}</p>
+                        <p className="text-[11px] text-gray-400">{getPhaseStateLabel(phase.state)}</p>
+                      </div>
+                      <span className="text-xs text-gray-400">
+                        {typeof phase.progress === 'number' ? `${Math.round(phase.progress)}%` : '—'}
+                      </span>
+                    </li>
+                  ))}
+                </ol>
+              </div>
+            )}
+
             {currentEvent && (
               <div className="bg-dark-card border border-accent-primary/40 rounded-lg p-3">
                 <p className="text-xs uppercase tracking-wide text-accent-primary mb-1">

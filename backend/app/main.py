@@ -8,6 +8,8 @@ from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
 
 from app.config import settings
+from typing import Any, Dict, List, Optional
+
 from app.models import ScanRequest, ScanResult, ScanProgress, PlaybookRequest, PlaybookRun
 from app.scanner_orchestrator import ScanOrchestrator
 
@@ -32,6 +34,108 @@ PHASE_PROGRESS = {
     "completed": (100.0, "Completed"),
     "failed": (0.0, "Failed"),
 }
+
+PHASE_ORDER: List[str] = [
+    "initializing",
+    "infrastructure_recon",
+    "reconnaissance",
+    "owasp_scanning",
+    "access_control_testing",
+    "misconfiguration_scanning",
+    "completed",
+]
+
+PHASE_EVENT_TO_STATUS: Dict[str, str] = {
+    "phase_0": "infrastructure_recon",
+    "phase_1": "reconnaissance",
+    "phase_2": "owasp_scanning",
+    "phase_3": "access_control_testing",
+    "phase_4": "misconfiguration_scanning",
+}
+
+
+def _determine_failure_phase(result: ScanResult) -> Optional[str]:
+    """Best effort mapping from timeline events to the phase that failed."""
+
+    for event in reversed(result.timeline or []):
+        mapped = PHASE_EVENT_TO_STATUS.get(event.phase)
+        if mapped:
+            return mapped
+    return None
+
+
+def _build_phase_progression(result: ScanResult) -> List[Dict[str, Any]]:
+    """Build a structured view of scan phase progression for the UI."""
+
+    status = result.status
+    failure_phase = _determine_failure_phase(result) if status == "failed" else None
+
+    try:
+        current_index = PHASE_ORDER.index(status)
+    except ValueError:
+        current_index = None
+
+    failure_index: Optional[int] = None
+    if failure_phase:
+        try:
+            failure_index = PHASE_ORDER.index(failure_phase)
+        except ValueError:
+            failure_index = None
+
+    progression: List[Dict[str, Any]] = []
+
+    for idx, phase in enumerate(PHASE_ORDER):
+        progress_value, label = PHASE_PROGRESS.get(
+            phase,
+            (0.0, phase.replace("_", " ").title()),
+        )
+
+        state = "pending"
+
+        if status == "failed":
+            if failure_index is not None:
+                if idx < failure_index:
+                    state = "completed"
+                elif idx == failure_index:
+                    state = "failed"
+            else:
+                # Failure occurred before any phase transition
+                if idx == 0:
+                    state = "failed"
+        else:
+            if current_index is not None:
+                if idx < current_index:
+                    state = "completed"
+                elif idx == current_index:
+                    state = "completed" if status == "completed" else "current"
+                elif status == "completed":
+                    state = "completed"
+
+        # Ensure that a completed scan marks all phases as completed
+        if status == "completed" and current_index is not None and idx <= current_index:
+            state = "completed"
+
+        progression.append(
+            {
+                "id": phase,
+                "label": label,
+                "state": state,
+                "progress": progress_value,
+            }
+        )
+
+    if status == "failed":
+        failed_progress, failed_label = PHASE_PROGRESS.get("failed", (0.0, "Failed"))
+        progression.append(
+            {
+                "id": "failed",
+                "label": failed_label,
+                "state": "failed",
+                "progress": failed_progress,
+            }
+        )
+
+    return progression
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -151,6 +255,7 @@ async def get_scan_status(scan_id: str):
         "misconfigurations_found": len(result.misconfigurations),
         "recent_events": recent_events,
         "current_event": last_event,
+        "phase_progression": _build_phase_progression(result),
     }
 
 
