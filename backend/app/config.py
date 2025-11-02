@@ -21,9 +21,16 @@ class Settings(BaseSettings):
 
     # Scanning Configuration
     MAX_CONCURRENT_SCANS: int = 5
-    SCAN_TIMEOUT: int = 3600  # 1 hour
-    REQUEST_TIMEOUT: int = 30
-    MAX_RETRIES: int = 3
+    SCAN_TIMEOUT: int = 43200  # 12 hours - Real pentests take time!
+    REQUEST_TIMEOUT: int = 60  # 1 minute per request
+    MAX_RETRIES: int = 5  # More retries for robustness
+    BASE_TIMEOUT: int = 30
+    MAX_TIMEOUT: int = 300  # 5 minutes max per operation
+    BACKOFF_FACTOR: float = 2.0  # Exponential backoff
+
+    # Persistence
+    SCAN_STORAGE_DIR: str = "/tmp/pentest_scans"
+    AUTO_SAVE_INTERVAL: int = 300  # Auto-save every 5 minutes
 
     # Tool Paths
     TOOLS_DIR: str = "/home/user/devasc-study-team/backend/app/tools"
