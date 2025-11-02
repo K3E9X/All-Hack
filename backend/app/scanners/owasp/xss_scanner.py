@@ -52,8 +52,20 @@ class XSSScanner:
     # Unique marker to identify our payload
     MARKER = "XSSTEST123456"
 
-    def __init__(self, client: PentestHTTPClient):
+    def __init__(self, client: PentestHTTPClient, scan_depth: str = "balanced"):
         self.client = client
+        self.scan_depth = scan_depth
+
+        # Adjust payload limits based on scan depth
+        if scan_depth == "quick":
+            self.get_payload_limit = 3  # Only 3 payloads for GET params
+            self.form_payload_limit = 2  # Only 2 payloads for forms
+        elif scan_depth == "balanced":
+            self.get_payload_limit = 10
+            self.form_payload_limit = 5
+        else:  # deep
+            self.get_payload_limit = len(self.PAYLOADS)
+            self.form_payload_limit = len(self.PAYLOADS)
 
     async def scan(self, endpoints: List[str]) -> List[Vulnerability]:
         """Scan for XSS vulnerabilities"""
@@ -116,7 +128,7 @@ class XSSScanner:
                 continue  # Not reflected, skip
 
             # If reflected, test with actual XSS payloads
-            for payload in self.PAYLOADS[:10]:  # Limit for performance
+            for payload in self.PAYLOADS[:self.get_payload_limit]:
                 test_params = params.copy()
                 test_params[param_name] = payload
 
@@ -183,7 +195,7 @@ class XSSScanner:
                         continue
 
                     # Test with XSS payloads
-                    for payload in self.PAYLOADS[:5]:
+                    for payload in self.PAYLOADS[:self.form_payload_limit]:
                         form_data[input_field['name']] = payload
 
                         if form['method'] == 'POST':

@@ -69,8 +69,20 @@ class SQLInjectionScanner:
         r"Syntax error.*near",
     ]
 
-    def __init__(self, client: PentestHTTPClient):
+    def __init__(self, client: PentestHTTPClient, scan_depth: str = "balanced"):
         self.client = client
+        self.scan_depth = scan_depth
+
+        # Adjust payload limits based on scan depth
+        if scan_depth == "quick":
+            self.payload_limit = 3  # Only test 3 fast payloads
+            self.skip_time_based = True  # Skip SLEEP/WAITFOR payloads
+        elif scan_depth == "balanced":
+            self.payload_limit = 10
+            self.skip_time_based = False
+        else:  # deep
+            self.payload_limit = len(self.PAYLOADS)
+            self.skip_time_based = False
 
     async def scan(self, endpoints: List[str]) -> List[Vulnerability]:
         """Scan for SQL injection vulnerabilities"""
@@ -121,7 +133,14 @@ class SQLInjectionScanner:
 
         # Test each parameter
         for param_name, original_value in params.items():
-            for payload in self.PAYLOADS[:15]:  # Limit payloads for performance
+            # Filter payloads based on scan depth
+            payloads_to_test = self.PAYLOADS[:self.payload_limit]
+            if self.skip_time_based:
+                # Skip time-based payloads (SLEEP, WAITFOR) in quick mode
+                payloads_to_test = [p for p in payloads_to_test
+                                   if 'SLEEP' not in p and 'WAITFOR' not in p]
+
+            for payload in payloads_to_test:
                 test_params = params.copy()
                 test_params[param_name] = payload
 

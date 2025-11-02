@@ -69,8 +69,20 @@ class CommandInjectionScanner:
         r"[a-z0-9_-]+\\[a-z0-9_-]+",  # Windows: DOMAIN\user
     ]
 
-    def __init__(self, client: PentestHTTPClient):
+    def __init__(self, client: PentestHTTPClient, scan_depth: str = "balanced"):
         self.client = client
+        self.scan_depth = scan_depth
+
+        # Adjust payload limits based on scan depth
+        if scan_depth == "quick":
+            self.payload_limit = 3  # Only 3 fast payloads
+            self.skip_time_based = True  # Skip sleep payloads
+        elif scan_depth == "balanced":
+            self.payload_limit = 10
+            self.skip_time_based = False
+        else:  # deep
+            self.payload_limit = len(self.PAYLOADS)
+            self.skip_time_based = False
 
     async def scan(self, endpoints: List[str]) -> List[Vulnerability]:
         """Scan for command injection vulnerabilities"""
@@ -120,7 +132,13 @@ class CommandInjectionScanner:
 
         # Test each parameter
         for param_name, original_value in params.items():
-            for payload in self.PAYLOADS[:15]:
+            # Filter payloads based on scan depth
+            payloads_to_test = self.PAYLOADS[:self.payload_limit]
+            if self.skip_time_based:
+                # Skip time-based payloads (sleep) in quick mode
+                payloads_to_test = [p for p in payloads_to_test if 'sleep' not in p.lower()]
+
+            for payload in payloads_to_test:
                 test_params = params.copy()
                 test_params[param_name] = original_value + payload
 
@@ -154,7 +172,12 @@ class CommandInjectionScanner:
         }
 
         for param_name, original_value in test_params.items():
-            for payload in self.PAYLOADS[:15]:
+            # Filter payloads based on scan depth
+            payloads_to_test = self.PAYLOADS[:self.payload_limit]
+            if self.skip_time_based:
+                payloads_to_test = [p for p in payloads_to_test if 'sleep' not in p.lower()]
+
+            for payload in payloads_to_test:
                 data = test_params.copy()
                 data[param_name] = original_value + payload
 

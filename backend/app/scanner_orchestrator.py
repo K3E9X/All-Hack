@@ -474,6 +474,12 @@ class ScanOrchestrator:
             logger.info(f"\n{'='*70}")
             logger.info(f"🔥 [PHASE 2] OWASP TOP 10 VULNERABILITY SCANNING (ADAPTIVE)")
             logger.info(f"📊 Testing {len(endpoint_urls_to_test)} priority endpoints (Mode: {scan_request.scan_depth})")
+            if scan_request.scan_depth == "quick":
+                logger.info(f"⚡ QUICK MODE: Testing ~3 payloads/endpoint, skipping time-based tests")
+            elif scan_request.scan_depth == "balanced":
+                logger.info(f"⚖️  BALANCED MODE: Testing ~10 payloads/endpoint, standard depth")
+            else:
+                logger.info(f"🔥 DEEP MODE: Testing all payloads, maximum coverage")
             logger.info(f"{'='*70}")
             scan_result.status = "owasp_scanning"
             self._record_event(scan_result, "phase_2", "OWASP Top 10 scanning started")
@@ -483,7 +489,7 @@ class ScanOrchestrator:
             if scan_request.enable_active_tests:
                 # SQL Injection
                 logger.info(f"🗃️  Testing for SQL Injection on {len(endpoint_urls_to_test)} endpoints...")
-                sql_scanner = SQLInjectionScanner(client)
+                sql_scanner = SQLInjectionScanner(client, scan_depth=scan_request.scan_depth)
                 sql_vulns = await self.robust_scanner.execute_batch_safe(
                     endpoint_urls_to_test,
                     lambda urls: sql_scanner.scan(urls),
@@ -494,7 +500,7 @@ class ScanOrchestrator:
 
                 # XSS
                 logger.info(f"🎨 Testing for Cross-Site Scripting (XSS) on {len(endpoint_urls_to_test)} endpoints...")
-                xss_scanner = XSSScanner(client)
+                xss_scanner = XSSScanner(client, scan_depth=scan_request.scan_depth)
                 xss_vulns = await self.robust_scanner.execute_batch_safe(
                     endpoint_urls_to_test,
                     lambda urls: xss_scanner.scan(urls),
@@ -505,7 +511,7 @@ class ScanOrchestrator:
 
                 # Command Injection
                 logger.info(f"💻 Testing for Command Injection on {len(endpoint_urls_to_test)} endpoints...")
-                cmd_scanner = CommandInjectionScanner(client)
+                cmd_scanner = CommandInjectionScanner(client, scan_depth=scan_request.scan_depth)
                 cmd_vulns = await self.robust_scanner.execute_batch_safe(
                     endpoint_urls_to_test,
                     lambda urls: cmd_scanner.scan(urls),
@@ -516,7 +522,7 @@ class ScanOrchestrator:
 
             # SSRF
             logger.info(f"🌐 Testing for SSRF on {len(endpoint_urls_to_test)} endpoints...")
-            ssrf_scanner = SSRFScanner(client)
+            ssrf_scanner = SSRFScanner(client, scan_depth=scan_request.scan_depth)
             ssrf_vulns = await self.robust_scanner.execute_with_retry(
                 ssrf_scanner.scan, endpoint_urls_to_test
             )

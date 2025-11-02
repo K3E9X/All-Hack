@@ -70,8 +70,17 @@ class SSRFScanner:
         "Network is unreachable",
     ]
 
-    def __init__(self, client: PentestHTTPClient):
+    def __init__(self, client: PentestHTTPClient, scan_depth: str = "balanced"):
         self.client = client
+        self.scan_depth = scan_depth
+
+        # Adjust payload limits based on scan depth
+        if scan_depth == "quick":
+            self.payload_limit = 5  # Test only top 5 payloads
+        elif scan_depth == "balanced":
+            self.payload_limit = 15
+        else:  # deep
+            self.payload_limit = len(self.PAYLOADS)
 
     async def scan(self, endpoints: List[str]) -> List[Vulnerability]:
         """Scan for SSRF vulnerabilities"""
@@ -126,7 +135,7 @@ class SSRFScanner:
                       for indicator in ['url', 'uri', 'link', 'href', 'host', 'domain', 'callback', 'redirect', 'fetch']):
                 continue
 
-            for payload in self.PAYLOADS[:10]:
+            for payload in self.PAYLOADS[:self.payload_limit]:
                 test_params = params.copy()
                 test_params[param_name] = payload
 
@@ -162,7 +171,7 @@ class SSRFScanner:
         }
 
         for param_name, original_value in test_params.items():
-            for payload in self.PAYLOADS[:10]:
+            for payload in self.PAYLOADS[:self.payload_limit]:
                 data = test_params.copy()
                 data[param_name] = payload
 
