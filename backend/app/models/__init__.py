@@ -9,7 +9,14 @@ from .scan import (
     TechnologyInfo,
     ScanProgress,
     SeverityLevel,
-    VulnerabilityCategory
+    VulnerabilityCategory,
+    TimelineEvent,
+    AttackChainStep,
+    ScanArtifact,
+    PlaybookTarget,
+    PlaybookRequest,
+    PlaybookRun,
+    StabilitySnapshot
 )
 
 __all__ = [
@@ -23,5 +30,12 @@ __all__ = [
     "TechnologyInfo",
     "ScanProgress",
     "SeverityLevel",
-    "VulnerabilityCategory"
+    "VulnerabilityCategory",
+    "TimelineEvent",
+    "AttackChainStep",
+    "ScanArtifact",
+    "PlaybookTarget",
+    "PlaybookRequest",
+    "PlaybookRun",
+    "StabilitySnapshot"
 ]

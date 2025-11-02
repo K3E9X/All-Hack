@@ -8,7 +8,7 @@ from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
 
 from app.config import settings
-from app.models import ScanRequest, ScanResult, ScanProgress, PlaybookRequest, PlaybookRun
+from app.models import ScanRequest, ScanResult, ScanProgress
 from app.scanner_orchestrator import ScanOrchestrator
 
 # Configure logging
@@ -140,19 +140,20 @@ async def get_scan_status(scan_id: str):
     }
 
 
-@app.post(f"{settings.API_PREFIX}/playbooks", response_model=PlaybookRun)
-async def create_playbook(playbook: PlaybookRequest):
-    """Start a playbook consisting of multiple scans."""
-    run = await orchestrator.start_playbook(playbook)
-    return run
-
-
-@app.get(f"{settings.API_PREFIX}/playbooks/{{playbook_id}}")
-async def get_playbook(playbook_id: str):
-    run = orchestrator.get_playbook(playbook_id)
-    if not run:
-        raise HTTPException(status_code=404, detail="Playbook not found")
-    return run
+# TODO: Playbook functionality not yet implemented
+# @app.post(f"{settings.API_PREFIX}/playbooks")
+# async def create_playbook(playbook: PlaybookRequest):
+#     """Start a playbook consisting of multiple scans."""
+#     run = await orchestrator.start_playbook(playbook)
+#     return run
+#
+#
+# @app.get(f"{settings.API_PREFIX}/playbooks/{{playbook_id}}")
+# async def get_playbook(playbook_id: str):
+#     run = orchestrator.get_playbook(playbook_id)
+#     if not run:
+#         raise HTTPException(status_code=404, detail="Playbook not found")
+#     return run
 
 
 @app.get(f"{settings.API_PREFIX}/scans/{{scan_id}}/report")
