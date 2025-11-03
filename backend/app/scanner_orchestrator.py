@@ -55,6 +55,12 @@ from app.scanners import (
     SubdomainScanner,
     SSLScanner
 )
+from app.scanners.api_security import (
+    JWTSecurityScanner,
+    GraphQLSecurityScanner,
+    NoSQLInjectionScanner,
+    FileUploadScanner
+)
 
 logger = logging.getLogger(__name__)
 
@@ -571,6 +577,80 @@ class ScanOrchestrator:
                     "scan_id": scan_id,
                     "target": target_url,
                     "vulnerability_count": len(vulnerabilities),
+                }
+            )
+
+            # Check if stop requested
+            if self._should_stop(scan_id):
+                logger.info(f"🛑 Scan {scan_id} stopped by user after Phase 2")
+                scan_result.status = "stopped"
+                self._record_event(scan_result, "scan_control", "Scan stopped by user after OWASP phase")
+                await self._finalize_scan(scan_id, scan_result, target_url, vulnerabilities, misconfigurations, scan_time)
+                return
+
+            # ===== PHASE 2.5: API SECURITY TESTING =====
+            logger.info(f"\n{'='*70}")
+            logger.info(f"🔐 [PHASE 2.5] API SECURITY TESTING (JWT, GraphQL, NoSQL)")
+            logger.info(f"{'='*70}")
+            scan_result.status = "api_security_testing"
+            self._record_event(scan_result, "phase_2.5", "API security testing started")
+            if scan_request.track_stability and settings.ENABLE_STABILITY_MONITORING:
+                self._snapshot_stability(scan_result, "phase_2.5_start")
+
+            # JWT Security Testing
+            logger.info(f"🔐 Testing JWT Security on {len(endpoint_urls_to_test)} endpoints...")
+            jwt_scanner = JWTSecurityScanner(client, scan_depth=scan_request.scan_depth, progress_callback=progress_callback)
+            jwt_vulns = await self.robust_scanner.execute_with_retry(
+                jwt_scanner.scan, endpoint_urls_to_test
+            )
+            vulnerabilities.extend(jwt_vulns or [])
+            logger.info(f"✅ JWT Security: Found {len(jwt_vulns or [])} vulnerabilities")
+
+            # GraphQL Security Testing
+            logger.info(f"🎨 Testing GraphQL Security on {len(endpoint_urls_to_test)} endpoints...")
+            graphql_scanner = GraphQLSecurityScanner(client, scan_depth=scan_request.scan_depth, progress_callback=progress_callback)
+            graphql_vulns = await self.robust_scanner.execute_with_retry(
+                graphql_scanner.scan, endpoint_urls_to_test
+            )
+            vulnerabilities.extend(graphql_vulns or [])
+            logger.info(f"✅ GraphQL Security: Found {len(graphql_vulns or [])} vulnerabilities")
+
+            # NoSQL Injection Testing
+            logger.info(f"🗄️  Testing NoSQL Injection on {len(endpoint_urls_to_test)} endpoints...")
+            nosql_scanner = NoSQLInjectionScanner(client, scan_depth=scan_request.scan_depth, progress_callback=progress_callback)
+            nosql_vulns = await self.robust_scanner.execute_with_retry(
+                nosql_scanner.scan, endpoint_urls_to_test
+            )
+            vulnerabilities.extend(nosql_vulns or [])
+            logger.info(f"✅ NoSQL Injection: Found {len(nosql_vulns or [])} vulnerabilities")
+
+            # File Upload Security Testing
+            logger.info(f"📤 Testing File Upload Security on {len(endpoint_urls_to_test)} endpoints...")
+            upload_scanner = FileUploadScanner(client, scan_depth=scan_request.scan_depth, progress_callback=progress_callback)
+            upload_vulns = await self.robust_scanner.execute_with_retry(
+                upload_scanner.scan, endpoint_urls_to_test
+            )
+            vulnerabilities.extend(upload_vulns or [])
+            logger.info(f"✅ File Upload Security: Found {len(upload_vulns or [])} vulnerabilities")
+
+            await self._auto_save(scan_id)
+            if scan_request.track_stability and settings.ENABLE_STABILITY_MONITORING:
+                self._snapshot_stability(scan_result, "phase_2.5_end")
+            self._record_event(
+                scan_result,
+                "phase_2.5",
+                "API security testing finished",
+                {"api_vulnerability_count": len(jwt_vulns or []) + len(graphql_vulns or []) + len(nosql_vulns or []) + len(upload_vulns or [])}
+            )
+            await self.hook_runner.run_phase_hooks(
+                "api_security",
+                {
+                    "scan_id": scan_id,
+                    "target": target_url,
+                    "jwt_vulns": len(jwt_vulns or []),
+                    "graphql_vulns": len(graphql_vulns or []),
+                    "nosql_vulns": len(nosql_vulns or []),
+                    "upload_vulns": len(upload_vulns or []),
                 }
             )
 

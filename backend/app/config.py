@@ -73,6 +73,28 @@ class Settings(BaseSettings):
     NUCLEI_PATH: Optional[str] = None
     NUCLEI_TEMPLATES: Optional[str] = None
 
+    # AI Agent Configuration
+    ANTHROPIC_API_KEY: Optional[str] = None
+    ENABLE_AI_AGENT: bool = False  # Enable autonomous AI agent
+    AI_AGENT_MAX_ITERATIONS: int = 10  # Max autonomous iterations
+
+    # Notification Configuration
+    # Email Notifications
+    SMTP_HOST: Optional[str] = None
+    SMTP_PORT: int = 587
+    SMTP_USERNAME: Optional[str] = None
+    SMTP_PASSWORD: Optional[str] = None
+    SMTP_USE_TLS: bool = True
+    NOTIFICATION_EMAIL_FROM: Optional[str] = None
+    NOTIFICATION_EMAIL_TO: Optional[str] = None  # Can be comma-separated list
+
+    # Webhook/Slack Notifications
+    NOTIFICATION_WEBHOOK_URL: Optional[str] = None
+    SLACK_WEBHOOK_URL: Optional[str] = None
+
+    # Frontend URL for email links
+    FRONTEND_URL: str = "http://localhost:5173"
+
     class Config:
         env_file = ".env"
         case_sensitive = True

@@ -33,6 +33,9 @@ publicsuffix2==2.20191221
 # Async support
 aiofiles==23.2.1
 
+# AI Agent - Autonomous pentesting with Claude
+anthropic==0.39.0
+
 # Optional: Browser-based crawling for dynamic SPA routes
 # Uncomment and run: playwright install chromium
 # playwright==1.40.0
