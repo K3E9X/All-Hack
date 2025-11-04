@@ -215,3 +215,85 @@ class EndpointDiscovery:
 
         logger.info(f"Fuzzing found {len(endpoints)} additional endpoints")
         return endpoints
+
+    async def discover_authenticated_endpoints(self) -> List[EndpointInfo]:
+        """
+        GREY BOX EXCLUSIVE: Discover authenticated endpoints
+
+        When we have authentication (grey_box mode), we can access user-specific
+        endpoints that are not visible in black_box mode. This dramatically
+        increases the attack surface.
+        """
+        logger.info("🔓 GREY BOX: Discovering authenticated endpoints")
+
+        # Authenticated endpoints to check
+        AUTHENTICATED_ENDPOINTS = [
+            # User profile & settings
+            '/profile', '/profile/edit', '/profile/settings', '/my-profile',
+            '/account', '/account/settings', '/account/profile', '/account/security',
+            '/settings', '/settings/profile', '/settings/privacy', '/settings/security',
+            '/user/profile', '/user/settings', '/user/account',
+            '/me', '/my-account', '/my-settings',
+
+            # Dashboard & Management
+            '/dashboard', '/dashboard/home', '/dashboard/overview', '/dashboard/stats',
+            '/panel', '/panel/home', '/control-panel',
+            '/home', '/user/home', '/user/dashboard',
+
+            # User-specific data
+            '/orders', '/my-orders', '/order-history', '/purchases',
+            '/documents', '/my-documents', '/files', '/my-files',
+            '/invoices', '/my-invoices', '/billing',
+            '/messages', '/my-messages', '/inbox', '/notifications',
+            '/favorites', '/bookmarks', '/saved',
+            '/history', '/activity', '/logs',
+
+            # Admin/Management (if user has admin role)
+            '/admin/users', '/admin/settings', '/admin/config',
+            '/manage/users', '/manage/settings',
+            '/moderator', '/staff', '/management',
+
+            # API endpoints for authenticated users
+            '/api/me', '/api/user', '/api/user/profile',
+            '/api/account', '/api/account/settings',
+            '/api/dashboard', '/api/dashboard/stats',
+            '/api/v1/me', '/api/v1/user', '/api/v1/profile',
+            '/api/v2/me', '/api/v2/user', '/api/v2/profile',
+
+            # Upload/File management
+            '/upload', '/file/upload', '/media/upload',
+            '/upload/profile', '/upload/document',
+
+            # Security & Auth management
+            '/auth/sessions', '/security/sessions', '/active-sessions',
+            '/auth/devices', '/security/devices', '/trusted-devices',
+            '/auth/2fa', '/security/2fa', '/two-factor',
+            '/api-keys', '/tokens', '/oauth/apps',
+
+            # Payments & Subscription (if applicable)
+            '/payment-methods', '/cards', '/wallet',
+            '/subscription', '/plan', '/billing/subscription',
+
+            # Social features
+            '/friends', '/followers', '/following',
+            '/posts', '/my-posts', '/content',
+        ]
+
+        endpoints = []
+
+        logger.info(f"Checking {len(AUTHENTICATED_ENDPOINTS)} potential authenticated endpoints...")
+
+        # Check all authenticated endpoints
+        tasks = [self._check_endpoint(path) for path in AUTHENTICATED_ENDPOINTS]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        for result in results:
+            if isinstance(result, EndpointInfo):
+                # In grey box, a 200 means we found an authenticated endpoint
+                if result.status_code == 200:
+                    endpoints.append(result)
+                    logger.info(f"✓ Found authenticated endpoint: {result.url}")
+
+        logger.info(f"🎯 Discovered {len(endpoints)} authenticated endpoints (GREY BOX)")
+
+        return endpoints

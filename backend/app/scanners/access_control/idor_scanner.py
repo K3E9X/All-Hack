@@ -27,7 +27,7 @@ class IDORScanner:
 
         Args:
             endpoints: List of discovered endpoints
-            authenticated: Whether we have authentication
+            authenticated: Whether we have authentication (grey_box mode)
             test_user_id: Current user's ID (for grey box testing)
         """
         vulnerabilities = []
@@ -35,14 +35,32 @@ class IDORScanner:
         # Extract endpoints with numeric IDs
         id_endpoints = self._find_id_endpoints(endpoints)
 
-        for endpoint in id_endpoints:
-            # Test horizontal IDOR (accessing other users' data)
-            vulns = await self._test_horizontal_idor(endpoint, test_user_id)
-            vulnerabilities.extend(vulns)
+        if not authenticated:
+            # BLACK BOX MODE: Limited tests on public endpoints only
+            logger.info(f"🔒 IDOR Scanner - BLACK BOX mode: Testing {len(id_endpoints)} public endpoints")
+            public_endpoints = [ep for ep in id_endpoints if not self._is_authenticated_endpoint(ep)]
 
-            # Test sequential ID enumeration
-            vulns = await self._test_id_enumeration(endpoint)
-            vulnerabilities.extend(vulns)
+            for endpoint in public_endpoints[:10]:  # Limit to 10 in black box
+                # Basic enumeration test only
+                vulns = await self._test_id_enumeration(endpoint)
+                vulnerabilities.extend(vulns)
+        else:
+            # GREY BOX MODE: Comprehensive tests with authentication
+            logger.info(f"🔓 IDOR Scanner - GREY BOX mode: Testing {len(id_endpoints)} authenticated endpoints")
+
+            for endpoint in id_endpoints:
+                # Test horizontal IDOR (accessing other users' data)
+                vulns = await self._test_horizontal_idor(endpoint, test_user_id)
+                vulnerabilities.extend(vulns)
+
+                # Test sequential ID enumeration
+                vulns = await self._test_id_enumeration(endpoint)
+                vulnerabilities.extend(vulns)
+
+                # Grey box exclusive: Test authenticated endpoints manipulation
+                if self._is_authenticated_endpoint(endpoint):
+                    vulns = await self._test_authenticated_endpoint_idor(endpoint, test_user_id)
+                    vulnerabilities.extend(vulns)
 
         return vulnerabilities
 
@@ -230,3 +248,151 @@ class IDORScanner:
             ]
         except ValueError:
             return ["1", "2", "999"]
+
+    def _is_authenticated_endpoint(self, endpoint: str) -> bool:
+        """
+        Determine if an endpoint requires authentication (Grey Box)
+
+        Authenticated endpoints typically include:
+        - User-specific resources (profile, settings, dashboard)
+        - Admin/management endpoints
+        - API endpoints for user data
+        """
+        authenticated_patterns = [
+            r'/profile',
+            r'/dashboard',
+            r'/settings',
+            r'/account',
+            r'/user/\d+',
+            r'/api/user',
+            r'/api/users/\d+',
+            r'/api/me',
+            r'/my',
+            r'/admin',
+            r'/manage',
+            r'/orders',
+            r'/purchases',
+            r'/documents',
+            r'/private',
+            r'/secure',
+        ]
+
+        endpoint_lower = endpoint.lower()
+        return any(re.search(pattern, endpoint_lower) for pattern in authenticated_patterns)
+
+    async def _test_authenticated_endpoint_idor(
+        self,
+        endpoint: str,
+        current_user_id: Optional[str]
+    ) -> List[Vulnerability]:
+        """
+        Grey Box Exclusive: Test IDOR on authenticated endpoints
+
+        This tests if the authenticated user can access/modify other users' resources
+        by manipulating IDs in authenticated endpoints (profile, orders, documents, etc.)
+        """
+        vulnerabilities = []
+
+        current_id = self._extract_id(endpoint)
+        if not current_id:
+            return vulnerabilities
+
+        # Get baseline with current user's ID
+        baseline_response = await self.client.get(endpoint)
+        if not baseline_response or baseline_response.status_code not in [200, 201]:
+            return vulnerabilities
+
+        baseline_content = baseline_response.text
+
+        # Test with other user IDs (attempting to access other users' data while authenticated)
+        test_ids = [
+            str(int(current_id) - 1),
+            str(int(current_id) + 1),
+            "1",  # First user
+            "2",  # Second user
+            "100",  # Random user
+        ]
+
+        for test_id in test_ids:
+            if test_id == current_id:
+                continue
+
+            modified_endpoint = self._replace_id(endpoint, test_id)
+
+            # Test GET access
+            response = await self.client.get(modified_endpoint)
+            if response and response.status_code == 200:
+                # Check if we got different user's data
+                if len(response.text) > 100 and response.text != baseline_content:
+                    vulnerabilities.append(Vulnerability(
+                        id=f"idor_auth_{hash(modified_endpoint)}",
+                        title="IDOR on Authenticated Endpoint - Data Exposure",
+                        description=f"Authenticated user can access other users' sensitive data by manipulating ID parameters",
+                        severity=SeverityLevel.CRITICAL,
+                        category=VulnerabilityCategory.IDOR,
+                        affected_url=endpoint,
+                        proof_of_concept=f"While authenticated, changing ID from {current_id} to {test_id} "
+                                       f"in endpoint {endpoint} allows unauthorized access to other users' data. "
+                                       f"This is a critical IDOR vulnerability in an authenticated context.",
+                        payload=f"Modified authenticated endpoint: {modified_endpoint}",
+                        remediation="CRITICAL: Implement server-side authorization checks. "
+                                  "Verify that the authenticated user owns or has permission to access the requested resource. "
+                                  "Use session user ID from the auth token, never trust client-provided IDs. "
+                                  "Example: SELECT * FROM users WHERE id = ? AND user_id = session.user_id",
+                        cwe_id="CWE-639",
+                        owasp_category="A01:2021 – Broken Access Control",
+                        references=[
+                            "https://owasp.org/www-community/attacks/Insecure_Direct_Object_Reference",
+                            "https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html"
+                        ]
+                    ))
+                    break
+
+            # Test PUT/PATCH modification (Grey box can test write operations)
+            # Test PUT
+            response = await self.client.put(modified_endpoint, json={"test": "idor_test"})
+            if response and response.status_code in [200, 201, 204]:
+                vulnerabilities.append(Vulnerability(
+                    id=f"idor_write_PUT_{hash(modified_endpoint)}",
+                    title=f"IDOR on Authenticated Endpoint - Unauthorized PUT",
+                    description=f"Authenticated user can modify other users' data via PUT requests",
+                    severity=SeverityLevel.CRITICAL,
+                    category=VulnerabilityCategory.IDOR,
+                    affected_url=endpoint,
+                    proof_of_concept=f"While authenticated, PUT request to {modified_endpoint} "
+                                   f"(other user's ID: {test_id}) was successful (HTTP {response.status_code}). "
+                                   f"This allows unauthorized modification of other users' resources.",
+                    payload=f"PUT {modified_endpoint}",
+                    remediation="CRITICAL: Implement proper authorization for write operations. "
+                              "Verify ownership before allowing updates. "
+                              "Use server-side session validation. "
+                              "Log all unauthorized access attempts.",
+                    cwe_id="CWE-639",
+                    owasp_category="A01:2021 – Broken Access Control"
+                ))
+                break
+
+            # Test PATCH
+            response = await self.client.patch(modified_endpoint, json={"test": "idor_test"})
+            if response and response.status_code in [200, 201, 204]:
+                vulnerabilities.append(Vulnerability(
+                    id=f"idor_write_PATCH_{hash(modified_endpoint)}",
+                    title=f"IDOR on Authenticated Endpoint - Unauthorized PATCH",
+                    description=f"Authenticated user can modify other users' data via PATCH requests",
+                    severity=SeverityLevel.CRITICAL,
+                    category=VulnerabilityCategory.IDOR,
+                    affected_url=endpoint,
+                    proof_of_concept=f"While authenticated, PATCH request to {modified_endpoint} "
+                                   f"(other user's ID: {test_id}) was successful (HTTP {response.status_code}). "
+                                   f"This allows unauthorized modification of other users' resources.",
+                    payload=f"PATCH {modified_endpoint}",
+                    remediation="CRITICAL: Implement proper authorization for write operations. "
+                              "Verify ownership before allowing updates. "
+                              "Use server-side session validation. "
+                              "Log all unauthorized access attempts.",
+                    cwe_id="CWE-639",
+                    owasp_category="A01:2021 – Broken Access Control"
+                ))
+                break
+
+        return vulnerabilities

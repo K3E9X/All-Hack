@@ -398,6 +398,28 @@ class ScanOrchestrator:
                 {"count": len(endpoints or [])}
             )
 
+            # GREY BOX MODE: Discover authenticated endpoints
+            if scan_request.mode == ScanMode.GREY_BOX and scan_request.auth_token:
+                logger.info("🔓 GREY BOX MODE: Discovering authenticated endpoints...")
+                auth_endpoints = await self.robust_scanner.execute_with_retry(
+                    endpoint_discovery.discover_authenticated_endpoints
+                )
+                if endpoints and auth_endpoints:
+                    endpoints.extend(auth_endpoints)
+                elif auth_endpoints:
+                    endpoints = auth_endpoints
+                logger.info(f"✅ GREY BOX: Discovered {len(auth_endpoints or [])} authenticated endpoints")
+                self._record_event(
+                    scan_result,
+                    "phase_1",
+                    "Authenticated endpoint discovery completed (GREY BOX)",
+                    {
+                        "count": len(auth_endpoints or []),
+                        "mode": "grey_box",
+                        "note": "These endpoints are only accessible with authentication"
+                    }
+                )
+
             if scan_request.browser_crawling and settings.ENABLE_BROWSER_CRAWLER:
                 logger.info("🧭 Launching browser-based crawler for dynamic routes...")
                 browser_crawler = BrowserCrawler(target_url)
@@ -488,7 +510,21 @@ class ScanOrchestrator:
             # ===== PHASE 2: OWASP TOP 10 - ADAPTIVE TESTING =====
             logger.info(f"\n{'='*70}")
             logger.info(f"🔥 [PHASE 2] OWASP TOP 10 VULNERABILITY SCANNING (ADAPTIVE)")
-            logger.info(f"📊 Testing {len(endpoint_urls_to_test)} priority endpoints (Mode: {scan_request.scan_depth})")
+            logger.info(f"📊 Testing {len(endpoint_urls_to_test)} priority endpoints (Depth: {scan_request.scan_depth})")
+
+            # MODE DIFFERENTIATION
+            if scan_request.mode == ScanMode.BLACK_BOX:
+                logger.info(f"🔒 BLACK BOX MODE: Testing public endpoints only (no authentication)")
+            else:  # GREY_BOX
+                logger.info(f"🔓 GREY BOX MODE: Testing public + authenticated endpoints")
+                auth_endpoint_count = sum(1 for ep in (endpoints or []) if any(
+                    pattern in ep.url.lower()
+                    for pattern in ['/profile', '/dashboard', '/settings', '/account', '/admin', '/my-', '/me']
+                ))
+                if auth_endpoint_count > 0:
+                    logger.info(f"   ✓ Including {auth_endpoint_count} authenticated endpoints in tests")
+                    logger.info(f"   ✓ IDOR & privilege escalation tests will be comprehensive")
+
             if scan_request.scan_depth == "quick":
                 logger.info(f"⚡ QUICK MODE: Testing ~3 payloads/endpoint, skipping time-based tests")
             elif scan_request.scan_depth == "balanced":
