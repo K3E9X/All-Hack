@@ -1,11 +1,50 @@
-# 🛡️ Advanced Pentest Tool
+<div align="center">
 
-**Professional-grade automated penetration testing tool** for web applications with AI-enhanced analysis, adaptive testing, and comprehensive vulnerability detection.
+```
+   █████╗ ██╗     ██╗          ██╗  ██╗ █████╗  ██████╗██╗  ██╗
+  ██╔══██╗██║     ██║          ██║  ██║██╔══██╗██╔════╝██║ ██╔╝
+  ███████║██║     ██║          ███████║███████║██║     █████╔╝
+  ██╔══██║██║     ██║          ██╔══██║██╔══██║██║     ██╔═██╗
+  ██║  ██║███████╗███████╗     ██║  ██║██║  ██║╚██████╗██║  ██╗
+  ╚═╝  ╚═╝╚══════╝╚══════╝     ╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝
+```
 
-![Version](https://img.shields.io/badge/version-1.0.0-blue)
-![Python](https://img.shields.io/badge/python-3.9--3.12-green)
-![React](https://img.shields.io/badge/react-18+-61dafb)
-![License](https://img.shields.io/badge/license-MIT-orange)
+### 🛡️ Advanced Penetration Testing Framework
+
+**Professional-grade automated security testing** with AI-enhanced analysis
+
+[![Version](https://img.shields.io/badge/version-1.0.0-blue)](https://github.com/K3E9X/All-Hack)
+[![Python](https://img.shields.io/badge/python-3.9--3.12-green)](https://www.python.org/)
+[![React](https://img.shields.io/badge/react-18+-61dafb)](https://reactjs.org/)
+[![License](https://img.shields.io/badge/license-MIT-orange)](./LICENSE)
+[![GitHub](https://img.shields.io/badge/by-K3E9X-black?logo=github)](https://github.com/K3E9X)
+
+---
+
+### 🎯 All-in-One Security Testing Solution
+
+**OWASP Top 10** • **API Security** • **AI-Powered** • **Grey Box Testing** • **100+ Vulnerabilities**
+
+<!--
+🎬 Demo GIF Coming Soon!
+Add your demo GIF at ./assets/demo.gif
+See assets/GIF_CREATION_GUIDE.md for instructions
+
+![Demo](./assets/demo.gif)
+-->
+
+</div>
+
+## 📋 Table of Contents
+
+- [⚠️ Legal Warning](#️-legal-warning)
+- [✨ Key Features](#-key-features)
+- [🚀 Quick Start](#-quick-start)
+- [📖 Usage](#-usage)
+- [🏗️ Architecture](#️-architecture)
+- [📊 Statistics & Coverage](#-statistics--coverage)
+- [🔒 Security & Best Practices](#-security--best-practices)
+- [📧 Contact](#-contact)
 
 ---
 
