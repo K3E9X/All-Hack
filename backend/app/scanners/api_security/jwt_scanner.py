@@ -25,7 +25,7 @@ except ImportError:
     logging.warning("cryptography library not available - RSA tests will be limited")
 
 from app.models.scan import Vulnerability, SeverityLevel, VulnerabilityCategory
-from app.http.client import PentestHTTPClient
+from app.utils.http_client import PentestHTTPClient
 
 logger = logging.getLogger(__name__)
 
