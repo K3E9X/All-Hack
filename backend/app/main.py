@@ -662,6 +662,194 @@ async def get_ai_status():
 
 # ========== END AI ENDPOINTS ==========
 
+# ========== POC VALIDATION ENDPOINTS ==========
+
+@app.post(f"{settings.API_PREFIX}/scans/{{scan_id}}/validate")
+async def validate_scan_vulnerabilities(scan_id: str):
+    """
+    ✅ Validate all vulnerabilities with PoC
+
+    Automatically validates vulnerabilities using Proof-of-Concept exploits.
+
+    **What it does:**
+    - SQL Injection: Extracts database version/data
+    - XSS: Executes JavaScript in headless browser
+    - SSRF: Detects out-of-band callbacks
+    - RCE: Executes safe commands and detects output
+
+    **Returns:**
+    - Validation status: CONFIRMED, LIKELY, UNCONFIRMED, FALSE_POSITIVE
+    - Confidence score: 0.0 to 1.0
+    - Evidence: Actual proof of exploitation
+
+    **Cost:** $0 (runs locally)
+    """
+    from app.validation import get_validation_orchestrator
+
+    result = orchestrator.get_scan_result(scan_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Scan not found")
+
+    # Get validation orchestrator
+    validator = get_validation_orchestrator()
+
+    # Validate all vulnerabilities
+    validation_results = await validator.validate_all(
+        vulnerabilities=result.vulnerabilities,
+        target_url=result.target_url
+    )
+
+    # Get statistics
+    stats = validator.get_statistics(validation_results)
+
+    # Format results
+    validated_vulnerabilities = []
+    for vuln in result.vulnerabilities:
+        if vuln.id in validation_results:
+            val_result = validation_results[vuln.id]
+            validated_vulnerabilities.append({
+                "vulnerability": vuln.dict(),
+                "validation": {
+                    "status": val_result.status.value,
+                    "confidence": val_result.confidence,
+                    "evidence": val_result.evidence,
+                    "validated_at": val_result.validated_at.isoformat(),
+                    "validator": val_result.validator_name,
+                    "details": val_result.details
+                }
+            })
+
+    return {
+        "scan_id": scan_id,
+        "validated": len(validated_vulnerabilities),
+        "statistics": stats,
+        "results": validated_vulnerabilities,
+        "note": "Validation powered by automated PoC testing"
+    }
+
+@app.post(f"{settings.API_PREFIX}/vulnerabilities/{{vuln_id}}/validate")
+async def validate_single_vulnerability(vuln_id: str, scan_id: str = Query(...)):
+    """
+    ✅ Validate a single vulnerability with PoC
+
+    Runs automated Proof-of-Concept testing on a specific vulnerability.
+    """
+    from app.validation import get_validation_orchestrator
+
+    result = orchestrator.get_scan_result(scan_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Scan not found")
+
+    # Find vulnerability
+    vuln = next((v for v in result.vulnerabilities if v.id == vuln_id), None)
+    if not vuln:
+        raise HTTPException(status_code=404, detail="Vulnerability not found")
+
+    # Get validation orchestrator
+    validator = get_validation_orchestrator()
+
+    # Validate
+    validation_result = await validator.validate_vulnerability(
+        vulnerability=vuln,
+        target_url=result.target_url
+    )
+
+    if not validation_result:
+        raise HTTPException(
+            status_code=400,
+            detail="No validator available for this vulnerability type"
+        )
+
+    return {
+        "vulnerability": vuln.dict(),
+        "validation": {
+            "status": validation_result.status.value,
+            "confidence": validation_result.confidence,
+            "evidence": validation_result.evidence,
+            "validated_at": validation_result.validated_at.isoformat(),
+            "validator": validation_result.validator_name,
+            "details": validation_result.details
+        }
+    }
+
+@app.get(f"{settings.API_PREFIX}/scans/{{scan_id}}/validation-stats")
+async def get_validation_statistics(scan_id: str):
+    """
+    📊 Get validation statistics for a scan
+
+    Returns aggregated statistics about validation results.
+    """
+    from app.validation import get_validation_orchestrator
+
+    result = orchestrator.get_scan_result(scan_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Scan not found")
+
+    # Get validation orchestrator
+    validator = get_validation_orchestrator()
+
+    # Validate all (if not already validated)
+    validation_results = await validator.validate_all(
+        vulnerabilities=result.vulnerabilities,
+        target_url=result.target_url
+    )
+
+    # Get statistics
+    stats = validator.get_statistics(validation_results)
+
+    return {
+        "scan_id": scan_id,
+        "validation_statistics": stats,
+        "note": "Statistics for PoC validation results"
+    }
+
+@app.get(f"{settings.API_PREFIX}/scans/{{scan_id}}/confirmed-vulnerabilities")
+async def get_confirmed_vulnerabilities(
+    scan_id: str,
+    min_confidence: float = Query(0.5, ge=0.0, le=1.0)
+):
+    """
+    ✅ Get only confirmed vulnerabilities
+
+    Returns vulnerabilities that have been validated with high confidence.
+    Filters out false positives and low-confidence findings.
+
+    **Parameters:**
+    - min_confidence: Minimum confidence threshold (0.0 to 1.0)
+    """
+    from app.validation import get_validation_orchestrator
+
+    result = orchestrator.get_scan_result(scan_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Scan not found")
+
+    # Get validation orchestrator
+    validator = get_validation_orchestrator()
+
+    # Validate all
+    validation_results = await validator.validate_all(
+        vulnerabilities=result.vulnerabilities,
+        target_url=result.target_url
+    )
+
+    # Filter confirmed vulnerabilities
+    confirmed = validator.filter_vulnerabilities(
+        vulnerabilities=result.vulnerabilities,
+        validation_results=validation_results,
+        min_confidence=min_confidence,
+        exclude_false_positives=True
+    )
+
+    return {
+        "scan_id": scan_id,
+        "total_vulnerabilities": len(result.vulnerabilities),
+        "confirmed_vulnerabilities": len(confirmed),
+        "min_confidence": min_confidence,
+        "vulnerabilities": [v.dict() for v in confirmed]
+    }
+
+# ========== END POC VALIDATION ENDPOINTS ==========
+
 @app.exception_handler(Exception)
 async def global_exception_handler(request, exc):
     """Global exception handler"""
