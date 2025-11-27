@@ -55,6 +55,14 @@ from app.scanners import (
     SubdomainScanner,
     SSLScanner
 )
+from app.scanners.owasp import (
+    CSRFScanner,
+    PathTraversalScanner,
+    XXEScanner
+)
+from app.scanners.misconfig import (
+    ClickjackingScanner
+)
 from app.scanners.api_security import (
     JWTSecurityScanner,
     GraphQLSecurityScanner,
@@ -576,6 +584,33 @@ class ScanOrchestrator:
                 vulnerabilities.extend([v for v in cmd_vulns if v])
                 logger.info(f"✅ Command Injection: Found {len([v for v in cmd_vulns if v])} vulnerabilities")
 
+                # CSRF
+                logger.info(f"🔒 Testing for CSRF on {len(endpoint_urls_to_test)} endpoints...")
+                csrf_scanner = CSRFScanner(client, scan_depth=scan_request.scan_depth, progress_callback=progress_callback)
+                csrf_vulns = await self.robust_scanner.execute_with_retry(
+                    csrf_scanner.scan, endpoint_urls_to_test
+                )
+                vulnerabilities.extend(csrf_vulns or [])
+                logger.info(f"✅ CSRF: Found {len(csrf_vulns or [])} vulnerabilities")
+
+                # Path Traversal / LFI
+                logger.info(f"📁 Testing for Path Traversal/LFI on {len(endpoint_urls_to_test)} endpoints...")
+                path_scanner = PathTraversalScanner(client, scan_depth=scan_request.scan_depth, progress_callback=progress_callback)
+                path_vulns = await self.robust_scanner.execute_with_retry(
+                    path_scanner.scan, endpoint_urls_to_test
+                )
+                vulnerabilities.extend(path_vulns or [])
+                logger.info(f"✅ Path Traversal: Found {len(path_vulns or [])} vulnerabilities")
+
+                # XXE (XML External Entity)
+                logger.info(f"🔥 Testing for XXE vulnerabilities on {len(endpoint_urls_to_test)} endpoints...")
+                xxe_scanner = XXEScanner(client, scan_depth=scan_request.scan_depth, progress_callback=progress_callback)
+                xxe_vulns = await self.robust_scanner.execute_with_retry(
+                    xxe_scanner.scan, endpoint_urls_to_test
+                )
+                vulnerabilities.extend(xxe_vulns or [])
+                logger.info(f"✅ XXE: Found {len(xxe_vulns or [])} vulnerabilities")
+
             # SSRF
             logger.info(f"🌐 Testing for SSRF on {len(endpoint_urls_to_test)} endpoints...")
             ssrf_scanner = SSRFScanner(client, scan_depth=scan_request.scan_depth, progress_callback=progress_callback)
@@ -762,6 +797,15 @@ class ScanOrchestrator:
             )
             misconfigurations.extend(cors_issues or [])
             logger.info(f"✅ CORS: Found {len(cors_issues or [])} issues")
+
+            # Clickjacking
+            logger.info(f"🖼️  Testing for Clickjacking vulnerabilities...")
+            clickjacking_scanner = ClickjackingScanner(client, scan_depth=scan_request.scan_depth, progress_callback=progress_callback)
+            clickjacking_issues = await self.robust_scanner.execute_with_retry(
+                clickjacking_scanner.scan, endpoint_urls
+            )
+            misconfigurations.extend(clickjacking_issues or [])
+            logger.info(f"✅ Clickjacking: Found {len(clickjacking_issues or [])} issues")
 
             if scan_request.track_stability and settings.ENABLE_STABILITY_MONITORING:
                 self._snapshot_stability(scan_result, "phase_4_end")
