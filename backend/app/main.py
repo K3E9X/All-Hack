@@ -850,6 +850,243 @@ async def get_confirmed_vulnerabilities(
 
 # ========== END POC VALIDATION ENDPOINTS ==========
 
+# ========== PHASE 2: MULTI-AGENT SYSTEM ENDPOINTS ==========
+
+@app.post(f"{settings.API_PREFIX}/agents/scan")
+async def start_multi_agent_scan(scan_request: ScanRequest):
+    """
+    🤖 Start Multi-Agent Scan (Phase 2)
+
+    Uses intelligent agent system for coordinated scanning:
+    - Orchestrator: Coordinates workflow
+    - Recon Agent: Intelligent enumeration
+    - Exploitation Agent: Adaptive payloads
+    - Analysis Agent: Vulnerability correlation
+    - Reporting Agent: Executive summaries
+
+    **Agents learn from previous scans stored in memory**
+
+    Cost: $0 (runs locally with Ollama)
+    """
+    from app.agents import get_agent_coordinator
+    from app.memory import get_scan_memory
+
+    # Get agent coordinator
+    coordinator = get_agent_coordinator()
+
+    # Check if we have similar scans in memory
+    memory = get_scan_memory()
+    similar_scans = memory.recall_similar_scans(
+        target_url=scan_request.target_url,
+        limit=3
+    )
+
+    # Start multi-agent workflow
+    scan_id = await orchestrator.start_scan(scan_request)
+
+    # Start agent workflow
+    workflow_result = await coordinator.start_scan_workflow(
+        scan_id=scan_id,
+        scan_request=scan_request
+    )
+
+    return {
+        "scan_id": scan_id,
+        "message": "Multi-agent scan started",
+        "workflow": workflow_result,
+        "similar_scans_found": len(similar_scans),
+        "learning_enabled": True,
+        "agents": {
+            "orchestrator": "coordinating",
+            "recon": "pending",
+            "exploitation": "pending",
+            "analysis": "pending",
+            "reporting": "pending"
+        }
+    }
+
+@app.get(f"{settings.API_PREFIX}/agents/scan/{{scan_id}}/workflow")
+async def get_agent_workflow_status(scan_id: str):
+    """
+    📊 Get Multi-Agent Workflow Status
+
+    Shows current state of agent workflow:
+    - Which phase is active
+    - Agent states
+    - Progress
+    - Findings so far
+    """
+    from app.agents import get_agent_coordinator
+
+    coordinator = get_agent_coordinator()
+
+    # Get workflow status
+    workflow = await coordinator.get_workflow_status(scan_id)
+
+    if not workflow:
+        raise HTTPException(status_code=404, detail=f"Workflow for scan {scan_id} not found")
+
+    # Get all agent states
+    agent_states = coordinator.get_all_agent_states()
+
+    return {
+        "scan_id": scan_id,
+        "workflow": workflow,
+        "agents": agent_states,
+        "message": "Multi-agent workflow status"
+    }
+
+@app.post(f"{settings.API_PREFIX}/agents/{{agent_id}}/task")
+async def execute_agent_task(agent_id: str, task: Dict[str, Any]):
+    """
+    🎯 Execute Task on Specific Agent
+
+    Run a task on a specific agent:
+    - recon: Reconnaissance tasks
+    - exploitation: Exploitation tasks
+    - analysis: Analysis tasks
+    - reporting: Reporting tasks
+    """
+    from app.agents import get_agent_coordinator
+
+    coordinator = get_agent_coordinator()
+
+    result = await coordinator.execute_agent_task(
+        agent_id=agent_id,
+        task=task
+    )
+
+    return {
+        "agent_id": agent_id,
+        "task_type": task.get("type"),
+        "result": result
+    }
+
+@app.get(f"{settings.API_PREFIX}/agents/status")
+async def get_all_agents_status():
+    """
+    🤖 Get All Agents Status
+
+    Returns status of all agents in the system.
+    """
+    from app.agents import get_agent_coordinator
+
+    coordinator = get_agent_coordinator()
+    states = coordinator.get_all_agent_states()
+
+    return {
+        "total_agents": len(states),
+        "agents": states,
+        "coordinator_active": True
+    }
+
+# ========== MEMORY SYSTEM ENDPOINTS ==========
+
+@app.get(f"{settings.API_PREFIX}/memory/stats")
+async def get_memory_statistics():
+    """
+    📚 Get Memory Statistics
+
+    Shows what the system has learned from previous scans.
+    """
+    from app.memory import get_scan_memory, get_vector_memory
+
+    scan_memory = get_scan_memory()
+    vector_memory = get_vector_memory()
+
+    return {
+        "scan_memory": scan_memory.get_statistics(),
+        "vector_memory": vector_memory.get_statistics(),
+        "learning_enabled": True
+    }
+
+@app.get(f"{settings.API_PREFIX}/memory/similar")
+async def find_similar_scans(target_url: str, limit: int = Query(5)):
+    """
+    🔍 Find Similar Scans
+
+    Search memory for similar previous scans.
+    Uses learned data to optimize current scan.
+    """
+    from app.memory import get_scan_memory
+
+    memory = get_scan_memory()
+
+    similar = memory.recall_similar_scans(
+        target_url=target_url,
+        limit=limit
+    )
+
+    return {
+        "target_url": target_url,
+        "similar_scans_found": len(similar),
+        "similar_scans": [
+            {
+                "scan_id": s.scan_id,
+                "target_domain": s.target_domain,
+                "technologies": s.technologies,
+                "vulnerabilities_found": s.vulnerabilities_found,
+                "timestamp": s.timestamp
+            }
+            for s in similar
+        ]
+    }
+
+@app.get(f"{settings.API_PREFIX}/memory/payloads/{{vuln_type}}")
+async def get_successful_payloads(vuln_type: str, technology: str = Query(None)):
+    """
+    💡 Get Successful Payloads
+
+    Retrieve successful payloads from memory for a vulnerability type.
+    Learns from past successful exploitations.
+    """
+    from app.memory import get_scan_memory
+
+    memory = get_scan_memory()
+
+    payloads = memory.get_successful_payloads(
+        vulnerability_type=vuln_type,
+        technology=technology
+    )
+
+    return {
+        "vulnerability_type": vuln_type,
+        "technology": technology,
+        "successful_payloads": payloads,
+        "count": len(payloads)
+    }
+
+@app.post(f"{settings.API_PREFIX}/memory/store/{{scan_id}}")
+async def store_scan_in_memory(scan_id: str):
+    """
+    💾 Store Scan in Memory
+
+    Save scan results to memory for future learning.
+    """
+    from app.memory import get_scan_memory
+
+    # Get scan result
+    result = orchestrator.get_scan_result(scan_id)
+
+    if not result:
+        raise HTTPException(status_code=404, detail="Scan not found")
+
+    # Store in memory
+    memory = get_scan_memory()
+    memory.store_scan(
+        scan_id=scan_id,
+        target_url=result.target_url,
+        scan_result=result.dict()
+    )
+
+    return {
+        "scan_id": scan_id,
+        "message": "Scan stored in memory",
+        "memory_enabled": True
+    }
+
+# ========== END PHASE 2 ENDPOINTS ==========
+
 @app.exception_handler(Exception)
 async def global_exception_handler(request, exc):
     """Global exception handler"""
