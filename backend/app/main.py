@@ -245,6 +245,225 @@ async def get_scan_summary(scan_id: str):
         }
     }
 
+# ========== AI-POWERED ANALYSIS ENDPOINTS ==========
+
+@app.post(f"{settings.API_PREFIX}/scans/{{scan_id}}/analyze")
+async def analyze_scan_with_ai(scan_id: str):
+    """
+    🧠 AI-Powered Analysis (NEW!)
+
+    Analyze all vulnerabilities with local LLM (Ollama).
+    Provides:
+    - Root cause analysis
+    - Exploitation complexity rating
+    - Business impact assessment
+    - Framework-specific remediation code
+    - Strategic scan summary
+    - Attack chain identification
+
+    Requires: Ollama running locally
+    Install: https://ollama.ai
+    Cost: $0 (runs locally)
+    """
+    from app.intelligence import get_llm_analyst
+
+    result = orchestrator.get_scan_result(scan_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Scan not found")
+
+    # Get LLM analyst
+    analyst = await get_llm_analyst()
+
+    if not analyst.available:
+        raise HTTPException(
+            status_code=503,
+            detail="LLM analyst not available. Install Ollama: https://ollama.ai"
+        )
+
+    # Analyze all vulnerabilities
+    analyses = []
+    for vuln in result.vulnerabilities:
+        analysis = await analyst.analyze_vulnerability(
+            vuln,
+            tech_stack=[t.dict() for t in result.detected_technologies]
+        )
+        if analysis:
+            analyses.append({
+                "vulnerability_id": vuln.id,
+                "vulnerability_title": vuln.title,
+                "analysis": {
+                    "root_cause": analysis.root_cause,
+                    "exploitation_complexity": analysis.exploitation_complexity,
+                    "business_impact": analysis.business_impact,
+                    "remediation_code": analysis.remediation_code,
+                    "next_steps": analysis.next_steps,
+                    "full_analysis": analysis.full_analysis
+                }
+            })
+
+    # Generate strategic summary
+    summary = await analyst.summarize_scan(result.vulnerabilities)
+
+    return {
+        "scan_id": scan_id,
+        "analyzed": len(analyses),
+        "vulnerability_analyses": analyses,
+        "strategic_summary": summary.dict() if summary else None,
+        "note": "Analysis powered by Ollama (local LLM)"
+    }
+
+@app.get(f"{settings.API_PREFIX}/vulnerabilities/{{vuln_id}}/analyze")
+async def analyze_single_vulnerability(vuln_id: str, scan_id: str = Query(...)):
+    """
+    🧠 Analyze a single vulnerability with AI
+
+    Provides detailed AI-powered analysis for one vulnerability.
+    """
+    from app.intelligence import get_llm_analyst
+
+    result = orchestrator.get_scan_result(scan_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Scan not found")
+
+    # Find vulnerability
+    vuln = next((v for v in result.vulnerabilities if v.id == vuln_id), None)
+    if not vuln:
+        raise HTTPException(status_code=404, detail="Vulnerability not found")
+
+    # Get LLM analyst
+    analyst = await get_llm_analyst()
+    if not analyst.available:
+        raise HTTPException(
+            status_code=503,
+            detail="LLM analyst not available. Install Ollama: https://ollama.ai"
+        )
+
+    # Analyze
+    analysis = await analyst.analyze_vulnerability(
+        vuln,
+        tech_stack=[t.dict() for t in result.detected_technologies]
+    )
+
+    if not analysis:
+        raise HTTPException(status_code=500, detail="Analysis failed")
+
+    return {
+        "vulnerability": vuln,
+        "ai_analysis": analysis.dict()
+    }
+
+@app.post(f"{settings.API_PREFIX}/vulnerabilities/{{vuln_id}}/exploit-guide")
+async def get_exploitation_guide(vuln_id: str, scan_id: str = Query(...), question: str = Query(...)):
+    """
+    🧠 Get AI-powered exploitation guidance
+
+    Ask questions like:
+    - "How do I exploit this vulnerability?"
+    - "What tools should I use?"
+    - "Show me step-by-step exploitation"
+    """
+    from app.intelligence import get_llm_analyst
+
+    result = orchestrator.get_scan_result(scan_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Scan not found")
+
+    vuln = next((v for v in result.vulnerabilities if v.id == vuln_id), None)
+    if not vuln:
+        raise HTTPException(status_code=404, detail="Vulnerability not found")
+
+    analyst = await get_llm_analyst()
+    if not analyst.available:
+        raise HTTPException(status_code=503, detail="LLM not available")
+
+    guide = await analyst.generate_exploitation_guide(vuln, question)
+
+    return {
+        "vulnerability_id": vuln_id,
+        "question": question,
+        "exploitation_guide": guide
+    }
+
+@app.post(f"{settings.API_PREFIX}/vulnerabilities/{{vuln_id}}/generate-fix")
+async def generate_code_fix(vuln_id: str, scan_id: str = Query(...)):
+    """
+    🛠️ Generate framework-specific code fix
+
+    AI generates ready-to-use code fixes in git diff format.
+    """
+    from app.intelligence import get_llm_analyst
+
+    result = orchestrator.get_scan_result(scan_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Scan not found")
+
+    vuln = next((v for v in result.vulnerabilities if v.id == vuln_id), None)
+    if not vuln:
+        raise HTTPException(status_code=404, detail="Vulnerability not found")
+
+    analyst = await get_llm_analyst()
+    if not analyst.available:
+        raise HTTPException(status_code=503, detail="LLM not available")
+
+    code_fix = await analyst.generate_remediation_code(
+        vuln,
+        tech_stack=[t.dict() for t in result.detected_technologies]
+    )
+
+    return {
+        "vulnerability_id": vuln_id,
+        "code_fix": code_fix,
+        "format": "git diff"
+    }
+
+@app.get(f"{settings.API_PREFIX}/scans/{{scan_id}}/attack-chains")
+async def identify_attack_chains(scan_id: str):
+    """
+    🎯 Identify potential attack chains
+
+    AI analyzes all vulnerabilities to find multi-step attack paths.
+    """
+    from app.intelligence import get_llm_analyst
+
+    result = orchestrator.get_scan_result(scan_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Scan not found")
+
+    analyst = await get_llm_analyst()
+    if not analyst.available:
+        raise HTTPException(status_code=503, detail="LLM not available")
+
+    chains = await analyst.identify_attack_chains(result.vulnerabilities)
+
+    return {
+        "scan_id": scan_id,
+        "attack_chains": chains or [],
+        "note": "Potential multi-step attack paths"
+    }
+
+@app.get(f"{settings.API_PREFIX}/ai/status")
+async def get_ai_status():
+    """
+    Check AI analyst availability
+
+    Returns status of Ollama and available models.
+    """
+    from app.intelligence import get_ollama_client
+
+    ollama = get_ollama_client()
+    available = await ollama.check_available()
+
+    return {
+        "available": available,
+        "provider": "Ollama (local)",
+        "model": ollama.config.model,
+        "endpoint": ollama.config.base_url,
+        "cost": "$0 (free)",
+        "install_instructions": "https://ollama.ai" if not available else None
+    }
+
+# ========== END AI ENDPOINTS ==========
+
 @app.exception_handler(Exception)
 async def global_exception_handler(request, exc):
     """Global exception handler"""

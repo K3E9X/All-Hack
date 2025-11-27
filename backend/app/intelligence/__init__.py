@@ -1,3 +1,26 @@
-from .scan_brain import ScanBrain, ScanIntelligence
+"""
+Intelligence Layer
 
-__all__ = ["ScanBrain", "ScanIntelligence"]
+AI-powered analysis and automation for vulnerability assessment.
+"""
+from app.intelligence.llm_analyst import (
+    LLMVulnerabilityAnalyst,
+    VulnerabilityAnalysis,
+    ScanSummary,
+    get_llm_analyst
+)
+from app.intelligence.ollama_client import (
+    OllamaClient,
+    OllamaConfig,
+    get_ollama_client
+)
+
+__all__ = [
+    "LLMVulnerabilityAnalyst",
+    "VulnerabilityAnalysis",
+    "ScanSummary",
+    "get_llm_analyst",
+    "OllamaClient",
+    "OllamaConfig",
+    "get_ollama_client",
+]
