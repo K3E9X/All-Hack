@@ -36,6 +36,11 @@ aiofiles==23.2.1
 # AI Agent - Autonomous pentesting with Claude
 anthropic==0.39.0
 
-# Optional: Browser-based crawling for dynamic SPA routes
-# Uncomment and run: playwright install chromium
-# playwright==1.40.0
+# Phase 1: AI-Powered Intelligence Layer
+# WebSocket support for real-time chat
+websockets==12.0
+
+# XSS Validation with headless browser
+playwright==1.40.0
+
+# Note: After installing playwright, run: python -m playwright install chromium
