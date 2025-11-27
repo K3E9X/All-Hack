@@ -2,7 +2,7 @@
 Advanced Pentest Tool - FastAPI Backend
 """
 import logging
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
@@ -244,6 +244,204 @@ async def get_scan_summary(scan_id: str):
             "vulnerabilities_by_severity": result.vulnerabilities_by_severity
         }
     }
+
+# ========== CHAT INTERFACE (WEBSOCKET) ==========
+
+@app.websocket("/ws/chat/{scan_id}")
+async def websocket_chat(websocket: WebSocket, scan_id: str):
+    """
+    💬 Real-time chat with scan results (WebSocket)
+
+    Connect to this endpoint to chat about scan results in real-time.
+
+    Example (JavaScript):
+    ```javascript
+    const ws = new WebSocket('ws://localhost:8000/ws/chat/scan_123');
+    ws.onmessage = (event) => console.log(event.data);
+    ws.send('What are the critical vulnerabilities?');
+    ```
+    """
+    from app.intelligence import get_chat_agent
+    import json
+
+    # Accept WebSocket connection
+    await websocket.accept()
+
+    try:
+        # Get scan result
+        scan_result = orchestrator.get_scan_result(scan_id)
+        if not scan_result:
+            await websocket.send_text(json.dumps({
+                "type": "error",
+                "content": f"Scan {scan_id} not found"
+            }))
+            await websocket.close()
+            return
+
+        # Get chat agent
+        agent = await get_chat_agent()
+        if not agent.available:
+            await websocket.send_text(json.dumps({
+                "type": "error",
+                "content": "Chat agent not available. Install Ollama: https://ollama.ai"
+            }))
+            await websocket.close()
+            return
+
+        # Create or get chat session
+        session = agent.get_session(scan_id)
+        if not session:
+            session = agent.create_session(scan_id, scan_result)
+
+        # Send welcome message
+        await websocket.send_text(json.dumps({
+            "type": "system",
+            "content": f"💬 Chat session started for scan {scan_id}\n\nAsk me anything about the scan results!"
+        }))
+
+        # Chat loop
+        while True:
+            # Receive message from client
+            data = await websocket.receive_text()
+
+            try:
+                message_data = json.loads(data)
+                user_message = message_data.get("message", "")
+            except json.JSONDecodeError:
+                # Plain text message
+                user_message = data
+
+            if not user_message:
+                continue
+
+            # Echo user message
+            await websocket.send_text(json.dumps({
+                "type": "user",
+                "content": user_message
+            }))
+
+            # Stream assistant response
+            async for chunk in agent.chat(scan_id, user_message, stream=True):
+                await websocket.send_text(json.dumps({
+                    "type": "assistant_chunk",
+                    "content": chunk
+                }))
+
+            # Send completion marker
+            await websocket.send_text(json.dumps({
+                "type": "assistant_complete"
+            }))
+
+    except WebSocketDisconnect:
+        logger.info(f"WebSocket disconnected for scan {scan_id}")
+    except Exception as e:
+        logger.error(f"WebSocket error: {e}")
+        try:
+            await websocket.send_text(json.dumps({
+                "type": "error",
+                "content": f"Error: {str(e)}"
+            }))
+        except:
+            pass
+    finally:
+        try:
+            await websocket.close()
+        except:
+            pass
+
+@app.post(f"{settings.API_PREFIX}/chat/{{scan_id}}/session")
+async def create_chat_session(scan_id: str):
+    """
+    Create a new chat session for a scan
+
+    Returns session info.
+    """
+    from app.intelligence import get_chat_agent
+
+    scan_result = orchestrator.get_scan_result(scan_id)
+    if not scan_result:
+        raise HTTPException(status_code=404, detail="Scan not found")
+
+    agent = await get_chat_agent()
+    if not agent.available:
+        raise HTTPException(
+            status_code=503,
+            detail="Chat agent not available. Install Ollama: https://ollama.ai"
+        )
+
+    # Create session
+    session = agent.create_session(scan_id, scan_result)
+
+    return {
+        "scan_id": scan_id,
+        "session_created": session.created_at.isoformat(),
+        "websocket_url": f"ws://localhost:8000/ws/chat/{scan_id}",
+        "note": "Connect to websocket_url to start chatting"
+    }
+
+@app.post(f"{settings.API_PREFIX}/chat/{{scan_id}}/message")
+async def send_chat_message(scan_id: str, message: str = Query(...)):
+    """
+    💬 Send a message (non-streaming, REST API)
+
+    For simple API calls without WebSocket.
+    Returns complete response.
+    """
+    from app.intelligence import get_chat_agent
+
+    scan_result = orchestrator.get_scan_result(scan_id)
+    if not scan_result:
+        raise HTTPException(status_code=404, detail="Scan not found")
+
+    agent = await get_chat_agent()
+    if not agent.available:
+        raise HTTPException(status_code=503, detail="Chat not available")
+
+    # Get or create session
+    session = agent.get_session(scan_id)
+    if not session:
+        session = agent.create_session(scan_id, scan_result)
+
+    # Get response
+    response = await agent.ask_quick(scan_id, message)
+
+    return {
+        "scan_id": scan_id,
+        "user_message": message,
+        "assistant_response": response
+    }
+
+@app.get(f"{settings.API_PREFIX}/chat/{{scan_id}}/history")
+async def get_chat_history(scan_id: str, limit: int = Query(20, ge=1, le=100)):
+    """Get chat history for a session"""
+    from app.intelligence import get_chat_agent
+
+    agent = await get_chat_agent()
+    history = agent.get_session_history(scan_id, limit)
+
+    return {
+        "scan_id": scan_id,
+        "message_count": len(history),
+        "messages": history
+    }
+
+@app.delete(f"{settings.API_PREFIX}/chat/{{scan_id}}")
+async def delete_chat_session(scan_id: str):
+    """Delete chat session and history"""
+    from app.intelligence import get_chat_agent
+
+    agent = await get_chat_agent()
+    deleted = agent.delete_session(scan_id)
+
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Chat session not found")
+
+    return {
+        "scan_id": scan_id,
+        "message": "Chat session deleted"
+    }
+
+# ========== END CHAT INTERFACE ==========
 
 # ========== AI-POWERED ANALYSIS ENDPOINTS ==========
 

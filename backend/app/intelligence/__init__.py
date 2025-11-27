@@ -14,6 +14,12 @@ from app.intelligence.ollama_client import (
     OllamaConfig,
     get_ollama_client
 )
+from app.intelligence.chat_agent import (
+    ChatAgent,
+    ChatSession,
+    ChatMessage,
+    get_chat_agent
+)
 
 __all__ = [
     "LLMVulnerabilityAnalyst",
@@ -23,4 +29,8 @@ __all__ = [
     "OllamaClient",
     "OllamaConfig",
     "get_ollama_client",
+    "ChatAgent",
+    "ChatSession",
+    "ChatMessage",
+    "get_chat_agent",
 ]
