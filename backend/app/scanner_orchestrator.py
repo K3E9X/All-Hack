@@ -69,6 +69,10 @@ from app.scanners.api_security import (
     NoSQLInjectionScanner,
     FileUploadScanner
 )
+from app.integrations import (
+    SQLMapIntegration,
+    NucleiIntegration
+)
 
 logger = logging.getLogger(__name__)
 
@@ -823,6 +827,77 @@ class ScanOrchestrator:
                     "misconfigurations": len(misconfigurations),
                 }
             )
+
+            # Check if stop requested
+            if self._should_stop(scan_id):
+                logger.info(f"🛑 Scan {scan_id} stopped by user after Phase 4")
+                scan_result.status = "stopped"
+                self._record_event(scan_result, "scan_control", "Scan stopped by user after misconfiguration phase")
+                await self._finalize_scan(scan_id, scan_result, target_url, vulnerabilities, misconfigurations, scan_time)
+                return
+
+            # ===== PHASE 5: EXTERNAL TOOL INTEGRATIONS =====
+            if scan_request.enable_external_tools:
+                logger.info(f"\\n{'='*70}")
+                logger.info(f"🔧 [PHASE 5] EXTERNAL TOOL INTEGRATIONS (SQLMap, Nuclei)")
+                logger.info(f"{'='*70}")
+                scan_result.status = "external_tools"
+                self._record_event(scan_result, "phase_5", "External tool integrations started")
+                if scan_request.track_stability and settings.ENABLE_STABILITY_MONITORING:
+                    self._snapshot_stability(scan_result, "phase_5_start")
+
+                # SQLMap Integration
+                logger.info(f"🗃️  Running SQLMap for advanced SQL injection testing...")
+                sqlmap = SQLMapIntegration(progress_callback=progress_callback)
+                if sqlmap.is_available():
+                    sqlmap_vulns = await self.robust_scanner.execute_with_retry(
+                        sqlmap.scan_urls,
+                        endpoint_urls_to_test,
+                        scan_request.scan_depth,
+                        scan_request.custom_headers,
+                        scan_request.cookies
+                    )
+                    vulnerabilities.extend(sqlmap_vulns or [])
+                    logger.info(f"✅ SQLMap: Found {len(sqlmap_vulns or [])} SQL injection vulnerabilities")
+                    sqlmap.cleanup()
+                else:
+                    logger.warning(f"⚠️  SQLMap not available, skipping")
+                    self._record_event(scan_result, "phase_5", "SQLMap not available - skipped")
+
+                # Nuclei Integration
+                logger.info(f"🔥 Running Nuclei for template-based vulnerability scanning...")
+                nuclei = NucleiIntegration(progress_callback=progress_callback)
+                if nuclei.is_available():
+                    nuclei_vulns, nuclei_misconfigs = await self.robust_scanner.execute_with_retry(
+                        nuclei.scan_target,
+                        target_url,
+                        scan_request.scan_depth
+                    )
+                    vulnerabilities.extend(nuclei_vulns or [])
+                    misconfigurations.extend(nuclei_misconfigs or [])
+                    logger.info(f"✅ Nuclei: Found {len(nuclei_vulns or [])} vulnerabilities, {len(nuclei_misconfigs or [])} misconfigurations")
+                    nuclei.cleanup()
+                else:
+                    logger.warning(f"⚠️  Nuclei not available, skipping")
+                    self._record_event(scan_result, "phase_5", "Nuclei not available - skipped")
+
+                if scan_request.track_stability and settings.ENABLE_STABILITY_MONITORING:
+                    self._snapshot_stability(scan_result, "phase_5_end")
+                self._record_event(
+                    scan_result,
+                    "phase_5",
+                    "External tool integrations finished",
+                    {"sqlmap_vulns": len(sqlmap_vulns or []), "nuclei_vulns": len(nuclei_vulns or [])}
+                )
+                await self.hook_runner.run_phase_hooks(
+                    "external_tools",
+                    {
+                        "scan_id": scan_id,
+                        "target": target_url,
+                        "sqlmap": len(sqlmap_vulns or []) if sqlmap.is_available() else 0,
+                        "nuclei": len(nuclei_vulns or []) if nuclei.is_available() else 0,
+                    }
+                )
 
             # ===== FINALIZATION =====
             scan_result.attack_chains = brain.plan_attack_chains(

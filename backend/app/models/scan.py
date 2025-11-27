@@ -24,12 +24,16 @@ class SeverityLevel(str, Enum):
 
 class VulnerabilityCategory(str, Enum):
     INJECTION = "injection"
+    SQL_INJECTION = "sql_injection"
+    COMMAND_INJECTION = "command_injection"
     BROKEN_AUTH = "broken_authentication"
     SENSITIVE_DATA = "sensitive_data_exposure"
     XXE = "xml_external_entities"
     BROKEN_ACCESS = "broken_access_control"
     SECURITY_MISCONFIG = "security_misconfiguration"
     XSS = "cross_site_scripting"
+    CSRF = "cross_site_request_forgery"
+    PATH_TRAVERSAL = "path_traversal"
     INSECURE_DESERIALIZATION = "insecure_deserialization"
     VULNERABLE_COMPONENTS = "vulnerable_components"
     INSUFFICIENT_LOGGING = "insufficient_logging"
@@ -62,10 +66,7 @@ class ScanRequest(BaseModel):
     # Scan options
     enable_active_tests: bool = Field(default=True, description="Enable active exploitation tests")
     enable_fuzzing: bool = Field(default=True, description="Enable endpoint fuzzing")
-    # TODO: Not implemented yet - Nuclei integration planned for future release
-    # enable_nuclei: bool = Field(default=False, description="Enable Nuclei template scanning")
-    # TODO: Not implemented yet - SQLMap integration planned for future release
-    # enable_sqlmap: bool = Field(default=False, description="Enable SQLMap for SQL injection")
+    enable_external_tools: bool = Field(default=False, description="Enable external tools (SQLMap, Nuclei)")
     browser_crawling: bool = Field(default=True, description="Use headless browser to discover SPA routes")
     collect_api_schemas: bool = Field(default=True, description="Attempt to download OpenAPI/GraphQL schemas")
     enrich_osint: bool = Field(default=True, description="Collect local OSINT data (DNS, certs, secrets)")
@@ -90,15 +91,22 @@ class Vulnerability(BaseModel):
     cwe_id: Optional[str] = None
     owasp_category: Optional[str] = None
     references: List[str] = Field(default_factory=list)
+    tool_output: Optional[str] = Field(None, description="Raw output from external tools (SQLMap, Nuclei, etc.)")
 
 class Misconfiguration(BaseModel):
+    id: Optional[str] = None
     title: str
     description: str
     severity: SeverityLevel
-    affected_component: str
+    affected_component: Optional[str] = None
+    affected_url: Optional[str] = None
     current_value: Optional[str] = None
     recommended_value: Optional[str] = None
-    remediation: str
+    remediation: Optional[str] = None
+    recommendation: Optional[str] = None  # Alias for remediation
+    proof_of_concept: Optional[str] = None
+    references: List[str] = Field(default_factory=list)
+    tool_output: Optional[str] = Field(None, description="Raw output from external tools")
 
 class EndpointInfo(BaseModel):
     url: str
