@@ -9,7 +9,7 @@
   ╚═╝  ╚═╝╚══════╝╚══════╝     ╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝
 ```
 
-### 🛡️ Advanced Penetration Testing Framework
+### Advanced Penetration Testing Framework
 
 **Professional-grade automated security testing** with AI-enhanced analysis
 
@@ -23,11 +23,11 @@
 
 ---
 
-### 🎯 All-in-One Security Testing Solution
+### All-in-One Security Testing Solution
 
 **OWASP Top 10** • **API Security** • **AI-Powered** • **Grey Box Testing** • **120+ Vulnerabilities** • **15,700+ Lines of Code**
 
-> **✅ v2.0.0 - Production Ready** | All AI features active | Phases 2 & 3 complete (100%)
+> **v2.0.0 - Production Ready** | All AI features active | Phases 2 & 3 complete (100%)
 
 <!--
 🎬 Demo GIF Coming Soon!
@@ -39,53 +39,53 @@ See assets/GIF_CREATION_GUIDE.md for instructions
 
 </div>
 
-## 📋 Table of Contents
+## Table of Contents
 
-- [⚠️ Legal Warning](#️-legal-warning)
-- [✨ Key Features](#-key-features)
-- [🚀 Quick Start](#-quick-start)
-- [📖 Usage](#-usage)
-- [🏗️ Architecture](#️-architecture)
-- [📊 Statistics & Coverage](#-statistics--coverage)
-- [🔒 Security & Best Practices](#-security--best-practices)
-- [📧 Contact](#-contact)
+- [Legal Warning](#legal-warning)
+- [Key Features](#key-features)
+- [Quick Start](#quick-start)
+- [Usage](#usage)
+- [Architecture](#architecture)
+- [Statistics & Coverage](#statistics--coverage)
+- [Security & Best Practices](#security--best-practices)
+- [Contact](#contact)
 
 ---
 
-## ⚠️ Legal Warning
+## Legal Warning
 
 **IMPORTANT:** This tool is designed for **authorized security testing and educational purposes only**.
 
-- ✅ Use on systems you own
-- ✅ Use with explicit written permission
-- ❌ Unauthorized penetration testing is **illegal**
-- ❌ Never use on production systems without approval
+- Use on systems you own
+- Use with explicit written permission
+- Unauthorized penetration testing is **illegal**
+- Never use on production systems without approval
 
 **You are responsible for your actions. Use ethically and legally.**
 
 ---
 
-## 🆕 What's New in v2.0.0
+## What's New in v2.0.0
 
-**✅ AI System Fully Operational** (Nov 2025)
-- 🧠 Memory system learns from every scan (40% faster on similar targets)
-- 🎯 AI-powered payload generation (10+ intelligent variants per vulnerability)
-- 🔗 Exploitation chain discovery (multi-step attack paths)
-- 📄 Professional report generation (4 types: executive, technical, remediation, risk)
-- 💬 Real-time chat interface (ask AI about scan results)
-- 🤖 Autonomous decision making during scans
+**AI System Fully Operational** (Nov 2025)
+- Memory system learns from every scan (40% faster on similar targets)
+- AI-powered payload generation (10+ intelligent variants per vulnerability)
+- Exploitation chain discovery (multi-step attack paths)
+- Professional report generation (4 types: executive, technical, remediation, risk)
+- Real-time chat interface (ask AI about scan results)
+- Autonomous decision making during scans
 
-**📊 Complete System**
-- ✅ Phase 1: Intelligence Layer (100%) - Ollama integration, chat, PoC validation
-- ✅ Phase 2: Multi-Agent System (100%) - 6 scanners, AI agent, memory, chains
-- ✅ Phase 3: Frontend (100%) - React UI, WebSocket chat, dashboard, 47 API endpoints
+**Complete System**
+- Phase 1: Intelligence Layer (100%) - Ollama integration, chat, PoC validation
+- Phase 2: Multi-Agent System (100%) - 6 scanners, AI agent, memory, chains
+- Phase 3: Frontend (100%) - React UI, WebSocket chat, dashboard, 47 API endpoints
 
-**📚 New Documentation**
+**New Documentation**
 - `AI_TESTING_GUIDE.md` - Complete guide to test all AI features (30+ pages)
 - `PHASE_2_3_VERIFICATION.md` - Full verification report
 - `test_ai_demo.py` - Interactive demo script (run immediately!)
 
-**🔧 Technical Improvements**
+**Technical Improvements**
 - AI Enhanced Orchestrator connected to main API
 - Real-time AI decisions during scans
 - Memory persistence across scans
@@ -94,16 +94,16 @@ See assets/GIF_CREATION_GUIDE.md for instructions
 
 ---
 
-## ✨ Key Features
+## Key Features
 
-### 🔥 OWASP Top 10 Coverage
+### OWASP Top 10 Coverage
 - **SQL Injection** - Time-based, boolean-based, error-based detection
 - **Cross-Site Scripting (XSS)** - Reflected, stored, DOM-based
 - **Command Injection** - OS command execution vulnerabilities
 - **Server-Side Request Forgery (SSRF)** - Internal network probing
 - **Security Misconfigurations** - Headers, CORS, SSL/TLS
 
-### 🔐 API Security Testing (NEW!)
+### API Security Testing (NEW!)
 - **JWT Security** - Algorithm confusion, weak secrets, claims manipulation (87 built-in secrets)
 - **GraphQL Security** - Schema introspection, batching attacks, nested queries
 - **NoSQL Injection** - MongoDB, CouchDB, Redis, Cassandra (blind injection + data extraction)
@@ -111,12 +111,12 @@ See assets/GIF_CREATION_GUIDE.md for instructions
 - **OAuth 2.0 Security** - CSRF, redirect_uri bypass, token leakage (13+ bypass techniques)
 - **SAML Security** - XXE, signature wrapping, assertion replay
 
-### 🎯 Access Control Testing
+### Access Control Testing
 - **IDOR Detection** - Horizontal & vertical, authenticated endpoint testing
 - **Privilege Escalation** - Vertical escalation, function-level access control
 - **Authorization Bypass** - Role manipulation, missing access checks
 
-### 🧠 AI-Powered Agent System ✅ **FULLY OPERATIONAL**
+### AI-Powered Agent System - FULLY OPERATIONAL
 - **Memory System** - Learns from every scan, 40% faster on similar targets ($0 with Ollama)
 - **Intelligent Payload Generation** - Context-aware payloads, WAF evasion, 10+ variants per vuln
 - **Exploitation Chain Builder** - Discovers multi-step attacks (XSS→CSRF→Account Takeover)
@@ -124,14 +124,14 @@ See assets/GIF_CREATION_GUIDE.md for instructions
 - **Real-Time Chat** - Ask AI questions about scan results via WebSocket
 - **Autonomous Decisions** - AI adapts testing strategy during scans
 
-### 🔒 Black Box vs 🔓 Grey Box Testing (NEW!)
+### Black Box vs Grey Box Testing (NEW!)
 - **Black Box Mode** - External testing without authentication (~50-100 endpoints)
 - **Grey Box Mode** - Authenticated testing with credentials (~150-300 endpoints)
 - **3-6x More Coverage** in grey box mode
 - **Critical IDOR & Privilege Escalation** testing in grey box
 - See [MODE_DIFFERENTIATION.md](./MODE_DIFFERENTIATION.md) for detailed comparison
 
-### 🕵️ Advanced Reconnaissance
+### Advanced Reconnaissance
 - **Technology Detection** - Wappalyzer-style fingerprinting
 - **Endpoint Discovery** - 250+ common endpoints + authenticated discovery (grey box)
 - **Directory Fuzzing** - Intelligent fuzzing with adaptive wordlists
@@ -139,13 +139,13 @@ See assets/GIF_CREATION_GUIDE.md for instructions
 - **Port Scanning** - 30+ critical ports with service detection
 - **SSL/TLS Analysis** - Certificate validation, cipher strength
 
-### 🧪 Intelligent & Adaptive
-- **Scan Depth Modes** - Quick (⚡), Balanced (⚖️), Deep (🔥)
+### Intelligent & Adaptive
+- **Scan Depth Modes** - Quick, Balanced, Deep
 - **Adaptive Testing** - Adjusts strategy based on findings
 - **Smart Endpoint Selection** - Prioritizes high-value targets
 - **Real-time Progress** - Live updates and timeline events
 
-### 💪 Robust & Reliable
+### Robust & Reliable
 - **Auto-retry** - Exponential backoff for network failures
 - **Auto-save** - Every 5 minutes with crash recovery
 - **Long-running Scans** - 12-hour timeout for comprehensive testing
@@ -154,7 +154,7 @@ See assets/GIF_CREATION_GUIDE.md for instructions
 
 ---
 
-## 📊 Statistics & Coverage
+## Statistics & Coverage
 
 ### Vulnerability Detection
 - **120+ vulnerability types** tested across all scanners
@@ -167,12 +167,12 @@ See assets/GIF_CREATION_GUIDE.md for instructions
 ### Testing Depth
 | Scan Mode | Endpoints | Payloads/Endpoint | Duration | Coverage |
 |-----------|-----------|-------------------|----------|----------|
-| Quick ⚡   | Priority  | ~3                | 30-60 min | 60% |
-| Balanced ⚖️ | Standard | ~10               | 2-4 hours | 85% |
-| Deep 🔥    | All       | Full              | 8-12 hours | 95%+ |
+| Quick   | Priority  | ~3                | 30-60 min | 60% |
+| Balanced | Standard | ~10               | 2-4 hours | 85% |
+| Deep    | All       | Full              | 8-12 hours | 95%+ |
 
 ### Black Box vs Grey Box
-| Aspect | Black Box 🔒 | Grey Box 🔓 | Improvement |
+| Aspect | Black Box | Grey Box | Improvement |
 |--------|-------------|------------|-------------|
 | Endpoints | 50-100 | 150-300 | **3-6x** |
 | IDOR Tests | Limited | Comprehensive | **10-30x** |
@@ -180,11 +180,11 @@ See assets/GIF_CREATION_GUIDE.md for instructions
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Prerequisites
 
-- **Python 3.9-3.12** (⚠️ 3.14+ not yet supported)
+- **Python 3.9-3.12** (WARNING: 3.14+ not yet supported)
 - **Node.js 16+**
 - **Git**
 
@@ -225,32 +225,32 @@ npm run dev
 
 Access the application at **http://localhost:5173**
 
-**✅ Look for this in backend console:**
+**Look for this in backend console:**
 ```
-🤖 AI-Enhanced Scanner Orchestrator initialized with AI Agent!
-   ├─ 🧠 Memory System: ACTIVE
-   ├─ 🎯 Payload Generator: ACTIVE
-   ├─ 🔗 Exploitation Chain Builder: ACTIVE
-   └─ 📄 Report Generator: ACTIVE
+AI-Enhanced Scanner Orchestrator initialized with AI Agent!
+   ├─ Memory System: ACTIVE
+   ├─ Payload Generator: ACTIVE
+   ├─ Exploitation Chain Builder: ACTIVE
+   └─ Report Generator: ACTIVE
 ```
 
 Press `Ctrl+C` to stop services.
 
 ---
 
-## 📖 Usage
+## Usage
 
 ### Basic Scan
 
 1. Open **http://localhost:5173**
 2. Enter target URL (e.g., `https://example.com`)
 3. Select **scan mode**:
-   - 🔒 **Black Box** - External testing (no credentials)
-   - 🔓 **Grey Box** - Authenticated testing (provide token)
+   - **Black Box** - External testing (no credentials)
+   - **Grey Box** - Authenticated testing (provide token)
 4. Choose **scan depth**:
-   - ⚡ **Quick** - Fast scan (~30-60 min)
-   - ⚖️ **Balanced** - Standard depth (~2-4 hours)
-   - 🔥 **Deep** - Maximum coverage (~8-12 hours)
+   - **Quick** - Fast scan (~30-60 min)
+   - **Balanced** - Standard depth (~2-4 hours)
+   - **Deep** - Maximum coverage (~8-12 hours)
 5. Click **Start Scan**
 
 ### Grey Box Testing (Recommended)
@@ -263,7 +263,7 @@ For comprehensive testing with authentication:
 4. Tool will discover **70+ authenticated endpoints** automatically
 5. **3-6x more coverage** than black box
 
-### 🤖 Enable AI Features (Optional - FREE!)
+### Enable AI Features (Optional - FREE!)
 
 **Option 1: Ollama (Local, $0 cost)** - Recommended for testing
 ```bash
@@ -320,7 +320,7 @@ ANTHROPIC_API_KEY=     # Optional: Claude API key
 
 ---
 
-## 🏗️ Architecture
+## Architecture
 
 ```
 devasc-study-team/
@@ -369,52 +369,52 @@ devasc-study-team/
 
 ---
 
-## 🎯 Scan Phases
+## Scan Phases
 
 ### Phase 1: Reconnaissance (20-30 min)
-- 🔍 Technology detection (Wappalyzer-style)
-- 🕷️ Endpoint discovery (crawling + fuzzing)
-- 🔓 **Grey Box**: Authenticated endpoint discovery (+70 endpoints)
-- 📘 API schema collection (Swagger, OpenAPI)
-- 🌐 Browser-based crawling (if enabled)
-- 🔬 Intelligence gathering
+- Technology detection (Wappalyzer-style)
+- Endpoint discovery (crawling + fuzzing)
+- **Grey Box**: Authenticated endpoint discovery (+70 endpoints)
+- API schema collection (Swagger, OpenAPI)
+- Browser-based crawling (if enabled)
+- Intelligence gathering
 
 ### Phase 2: OWASP Top 10 Scanning (2-8 hours)
-- 🗃️ SQL Injection (time-based, boolean, error-based)
-- 🎨 XSS (reflected, stored, DOM)
-- 💻 Command Injection
-- 🌐 SSRF
-- 🔐 **API Security** (JWT, GraphQL, NoSQL, File Upload, OAuth, SAML)
+- SQL Injection (time-based, boolean, error-based)
+- XSS (reflected, stored, DOM)
+- Command Injection
+- SSRF
+- **API Security** (JWT, GraphQL, NoSQL, File Upload, OAuth, SAML)
 
 ### Phase 3: Access Control Testing (30-60 min)
-- 🔑 IDOR detection
-  - 🔒 **Black Box**: 10 public endpoints
-  - 🔓 **Grey Box**: ALL endpoints + write operations
-- ⬆️ Privilege escalation (grey box exclusive)
+- IDOR detection
+  - **Black Box**: 10 public endpoints
+  - **Grey Box**: ALL endpoints + write operations
+- Privilege escalation (grey box exclusive)
 
 ### Phase 4: Security Misconfigurations (15-30 min)
-- 🛡️ Security headers
-- 🌍 CORS policies
-- 🔒 SSL/TLS analysis
-- 🔍 Port scanning
-- 📁 Directory fuzzing
+- Security headers
+- CORS policies
+- SSL/TLS analysis
+- Port scanning
+- Directory fuzzing
 
 ### Phase 5: Advanced (if enabled)
-- 🌐 Subdomain enumeration
-- 🧠 **AI Agent** analysis (if enabled)
-- 🔗 Exploitation chain discovery
-- 📊 Professional report generation
+- Subdomain enumeration
+- **AI Agent** analysis (if enabled)
+- Exploitation chain discovery
+- Professional report generation
 
 ---
 
-## 📱 Platform Support
+## Platform Support
 
 | Platform | Support | Notes |
 |----------|---------|-------|
-| **Linux** | ✅ Full | Recommended |
-| **macOS Intel** | ✅ Full | Requires Xcode CLI tools |
-| **macOS ARM (M1/M2/M3)** | ✅ Full | Native Apple Silicon support |
-| **Windows** | ⚠️ WSL2 | WSL2 recommended |
+| **Linux** | Full | Recommended |
+| **macOS Intel** | Full | Requires Xcode CLI tools |
+| **macOS ARM (M1/M2/M3)** | Full | Native Apple Silicon support |
+| **Windows** | WSL2 | WSL2 recommended |
 
 ### macOS Prerequisites
 
@@ -431,9 +431,9 @@ brew install python@3.11 node
 
 ---
 
-## 🔧 Optional Features
+## Optional Features
 
-### AI Agent System ✅ **FULLY OPERATIONAL**
+### AI Agent System - FULLY OPERATIONAL
 
 **FREE Option: Ollama (Recommended)**
 ```bash
@@ -451,12 +451,12 @@ ENABLE_AI_AGENT=true
 ```
 
 **What you get:**
-- 🧠 Memory system - 40% faster on similar targets
-- 🎯 Intelligent payloads - 10+ variants per vulnerability
-- 🔗 Exploitation chains - Multi-step attack discovery
-- 📄 Professional reports - 4 types (executive, technical, remediation, risk)
-- 💬 Real-time chat - Ask AI about scan results
-- 🤖 Autonomous decisions - AI adapts during scans
+- Memory system - 40% faster on similar targets
+- Intelligent payloads - 10+ variants per vulnerability
+- Exploitation chains - Multi-step attack discovery
+- Professional reports - 4 types (executive, technical, remediation, risk)
+- Real-time chat - Ask AI about scan results
+- Autonomous decisions - AI adapts during scans
 
 **See [AI_TESTING_GUIDE.md](./AI_TESTING_GUIDE.md) for complete setup!**
 
@@ -480,7 +480,7 @@ See `PROJECT_GAPS.md` for limitations.
 
 ---
 
-## 📚 Documentation
+## Documentation
 
 **Essential Guides:**
 - **[AI_TESTING_GUIDE.md](./AI_TESTING_GUIDE.md)** ⭐ - Complete AI features testing guide (30+ pages)
@@ -495,15 +495,15 @@ See `PROJECT_GAPS.md` for limitations.
 
 ---
 
-## 🔒 Security & Best Practices
+## Security & Best Practices
 
 ### Important Reminders
 
-- ✅ **Private Networks Only** - Never expose to the Internet
-- ✅ **Authorized Testing** - Always get written permission
-- ✅ **Confidential Results** - Keep scan results secure
-- ✅ **Responsible Disclosure** - Report findings responsibly
-- ⚠️ **Loud Testing** - This tool is **NOT stealthy** (many requests)
+- **Private Networks Only** - Never expose to the Internet
+- **Authorized Testing** - Always get written permission
+- **Confidential Results** - Keep scan results secure
+- **Responsible Disclosure** - Report findings responsibly
+- **WARNING: Loud Testing** - This tool is **NOT stealthy** (many requests)
 
 ### Scan Impact
 
@@ -516,30 +516,30 @@ See `PROJECT_GAPS.md` for limitations.
 
 ---
 
-## 🎓 Educational Use
+## Educational Use
 
 This tool is perfect for:
-- 🎓 **Security Training** - Learn penetration testing techniques
-- 🏫 **Academic Research** - Study web application security
-- 🔬 **Security Labs** - Practice in controlled environments
-- 📖 **OWASP Learning** - Understand vulnerability types
-- 🛠️ **Tool Development** - Build your own security tools
+- **Security Training** - Learn penetration testing techniques
+- **Academic Research** - Study web application security
+- **Security Labs** - Practice in controlled environments
+- **OWASP Learning** - Understand vulnerability types
+- **Tool Development** - Build your own security tools
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
 Contributions are welcome! Areas for improvement:
 
-- 🆕 New scanners (XXE, Deserialization, etc.)
-- 🧪 Test coverage
-- 📖 Documentation
-- 🎨 UI/UX enhancements
-- 🌍 Internationalization
+- New scanners (XXE, Deserialization, etc.)
+- Test coverage
+- Documentation
+- UI/UX enhancements
+- Internationalization
 
 ---
 
-## 📝 License
+## License
 
 **MIT License** - See [LICENSE](./LICENSE) for details
 
@@ -547,7 +547,7 @@ Contributions are welcome! Areas for improvement:
 
 ---
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
 - **OWASP** - Vulnerability classification and guidelines
 - **Anthropic** - Claude AI for intelligent payload generation
@@ -555,26 +555,26 @@ Contributions are welcome! Areas for improvement:
 
 ---
 
-## 📧 Contact
+## Contact
 
 - **GitHub**: [@K3E9X](https://github.com/K3E9X)
 - **Issues**: [GitHub Issues](https://github.com/K3E9X/devasc-study-team/issues)
 
 ---
 
-## ⭐ Show Your Support
+## Show Your Support
 
 If this tool helps you, please:
-- ⭐ Star the repository
-- 🍴 Fork and contribute
-- 🐛 Report issues
-- 📢 Share with others
+- Star the repository
+- Fork and contribute
+- Report issues
+- Share with others
 
 ---
 
 <div align="center">
 
-**Built with ❤️ for the security community**
+**Built for the security community**
 
 **Created by [K3E9X](https://github.com/K3E9X)**
 
