@@ -311,29 +311,35 @@ class SQLMapIntegration:
                            f"This vulnerability was confirmed by SQLMap, "
                            f"a professional SQL injection testing tool.",
             payload=payload[:500],
-            remediation="**Critical: SQL Injection Remediation**\\n\\n"
-                      "1. **Use Parameterized Queries (Prepared Statements)**\\n"
-                      "   - NEVER concatenate user input into SQL queries\\n"
-                      "   - Use placeholders for all user-controlled values\\n\\n"
-                      "2. **Code Examples**\\n\\n"
-                      "Python (SQLAlchemy):\\n"
-                      "```python\\n"
-                      "# BAD - Vulnerable to SQL injection\\n"
-                      "query = f\\"SELECT * FROM users WHERE id = {user_id}\\"\\n\\n"
-                      "# GOOD - Parameterized query\\n"
-                      "query = text(\\"SELECT * FROM users WHERE id = :id\\")\\n"
-                      "result = db.execute(query, {'id': user_id})\\n"
-                      "```\\n\\n"
-                      "3. **Additional Protections**\\n"
-                      "   - Input validation and sanitization\\n"
-                      "   - Least privilege database accounts\\n"
-                      "   - Web Application Firewall (WAF)\\n"
-                      "   - Regular security audits\\n\\n"
-                      "4. **Emergency Response**\\n"
-                      "   - Patch immediately (this is CRITICAL)\\n"
-                      "   - Review database logs for exploitation\\n"
-                      "   - Consider changing database credentials\\n"
-                      "   - Audit all sensitive data access",
+            remediation="""**Critical: SQL Injection Remediation**
+
+1. **Use Parameterized Queries (Prepared Statements)**
+   - NEVER concatenate user input into SQL queries
+   - Use placeholders for all user-controlled values
+
+2. **Code Examples**
+
+Python (SQLAlchemy):
+```python
+# BAD - Vulnerable to SQL injection
+query = f"SELECT * FROM users WHERE id = {user_id}"
+
+# GOOD - Parameterized query
+query = text("SELECT * FROM users WHERE id = :id")
+result = db.execute(query, {'id': user_id})
+```
+
+3. **Additional Protections**
+   - Input validation and sanitization
+   - Least privilege database accounts
+   - Web Application Firewall (WAF)
+   - Regular security audits
+
+4. **Emergency Response**
+   - Patch immediately (this is CRITICAL)
+   - Review database logs for exploitation
+   - Consider changing database credentials
+   - Audit all sensitive data access""",
             cwe_id="CWE-89",
             owasp_category="A03:2021 – Injection",
             references=[
