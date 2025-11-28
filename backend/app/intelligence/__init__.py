@@ -20,6 +20,7 @@ from app.intelligence.chat_agent import (
     ChatMessage,
     get_chat_agent
 )
+from app.intelligence.scan_brain import ScanBrain
 
 __all__ = [
     "LLMVulnerabilityAnalyst",
@@ -33,4 +34,5 @@ __all__ = [
     "ChatSession",
     "ChatMessage",
     "get_chat_agent",
+    "ScanBrain",
 ]
