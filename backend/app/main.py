@@ -9,7 +9,7 @@ from contextlib import asynccontextmanager
 
 from app.config import settings
 from app.models import ScanRequest, ScanResult, ScanProgress
-from app.scanner_orchestrator import ScanOrchestrator
+from app.ai_enhanced_orchestrator import AIEnhancedScanOrchestrator
 
 # Configure logging
 logging.basicConfig(
@@ -18,8 +18,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Global orchestrator instance
-orchestrator = ScanOrchestrator()
+# Global orchestrator instance (AI-Enhanced)
+orchestrator = AIEnhancedScanOrchestrator()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
