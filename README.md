@@ -192,8 +192,8 @@ See assets/GIF_CREATION_GUIDE.md for instructions
 
 ```bash
 # Clone the repository
-git clone https://github.com/K3E9X/devasc-study-team.git
-cd devasc-study-team
+git clone https://github.com/K3E9X/All-Hack.git
+cd All-Hack
 
 # Backend setup
 cd backend

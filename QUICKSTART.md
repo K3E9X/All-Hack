@@ -22,7 +22,7 @@ npm install
 ```bash
 ./start-backend.sh
 # Ou manuellement:
-# cd backend && source venv/bin/activate && uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+# cd backend && source venv/bin/activate && uvicorn app.main:app --reload --host 0.0.0.0 --port 8001
 ```
 
 **Terminal 2 - Frontend:**
@@ -89,7 +89,7 @@ SCAN_TIMEOUT=3600
 Modifiez `frontend/src/components/Scanner.jsx`:
 ```javascript
 // Ligne 4
-const API_URL = 'http://localhost:8000/api/v1'
+const API_URL = 'http://localhost:8001/api/v1'
 ```
 
 ## 📊 Comprendre les Résultats
@@ -127,18 +127,18 @@ const API_URL = 'http://localhost:8000/api/v1'
 
 ```bash
 # Vérifier que le backend tourne
-curl http://localhost:8000/health
+curl http://localhost:8001/health
 
 # Si non, redémarrer:
 cd backend
 source venv/bin/activate
-uvicorn app.main:app --reload
+uvicorn app.main:app --reload --port 8001
 ```
 
 ### "CORS error"
 
 Vérifiez que le frontend et le backend sont sur les bons ports:
-- Backend: http://localhost:8000
+- Backend: http://localhost:8001
 - Frontend: http://localhost:5173
 
 ### "Scan prend trop de temps"
@@ -179,7 +179,7 @@ max_depth: 3                // réduire à 1 ou 2 pour scan rapide
 ## 📚 Ressources
 
 - **OWASP Top 10:** https://owasp.org/www-project-top-ten/
-- **API Documentation:** http://localhost:8000/docs (quand backend actif)
+- **API Documentation:** http://localhost:8001/docs (quand backend actif)
 - **Bug Reports:** GitHub Issues
 
 ## ⚠️ Important
