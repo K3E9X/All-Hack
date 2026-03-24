@@ -13,7 +13,7 @@
 
 **Professional-grade automated security testing** with AI-enhanced analysis
 
-[![Version](https://img.shields.io/badge/version-2.0.0-blue)](https://github.com/K3E9X/All-Hack)
+[![Version](https://img.shields.io/badge/version-3.0.0-blue)](https://github.com/K3E9X/All-Hack)
 [![Status](https://img.shields.io/badge/status-production--ready-green)](https://github.com/K3E9X/All-Hack)
 [![AI](https://img.shields.io/badge/AI-100%25%20active-purple)](https://github.com/K3E9X/All-Hack)
 [![Python](https://img.shields.io/badge/python-3.9--3.12-green)](https://www.python.org/)
@@ -27,7 +27,7 @@
 
 **OWASP Top 10** • **API Security** • **AI-Powered** • **Grey Box Testing** • **120+ Vulnerabilities** • **15,700+ Lines of Code**
 
-> **v2.0.0 - Production Ready** | All AI features active | Phases 2 & 3 complete (100%)
+> **v3.0.0 - Autonomous Pentest** | Intelligent Agent | Zero False Positives | Auto-Enrichment
 
 <!--
 🎬 Demo GIF Coming Soon!
@@ -65,31 +65,34 @@ See assets/GIF_CREATION_GUIDE.md for instructions
 
 ---
 
-## What's New in v2.0.0
+## What's New in v3.0.0
 
-**AI System Fully Operational** (Nov 2025)
-- Memory system learns from every scan (40% faster on similar targets)
-- AI-powered payload generation (10+ intelligent variants per vulnerability)
-- Exploitation chain discovery (multi-step attack paths)
-- Professional report generation (4 types: executive, technical, remediation, risk)
-- Real-time chat interface (ask AI about scan results)
-- Autonomous decision making during scans
+**Unified Architecture** (Mar 2026)
+- Single endpoint: Frontend + Backend on port 8001
+- No more separate servers - one command to start everything
+- Production-ready deployment
 
-**Complete System**
-- Phase 1: Intelligence Layer (100%) - Ollama integration, chat, PoC validation
-- Phase 2: Multi-Agent System (100%) - 6 scanners, AI agent, memory, chains
-- Phase 3: Frontend (100%) - React UI, WebSocket chat, dashboard, 47 API endpoints
+**Intelligent Pentest Agent** (NEW!)
+- Chain-of-thought reasoning for every finding
+- Multi-stage validation - zero false positives
+- Evidence-based reporting - no hallucinations
+- Confidence scoring: Confirmed > High > Medium > Low
+- Learns from past scans to improve accuracy
+- Supports: SQLi, XSS, RCE, LFI, SSRF, IDOR, Auth Bypass
 
-**New Documentation**
-- `AI_TESTING_GUIDE.md` - Complete guide to test all AI features (30+ pages)
-- `PHASE_2_3_VERIFICATION.md` - Full verification report
-- `test_ai_demo.py` - Interactive demo script (run immediately!)
+**Vulnerability Enrichment System** (NEW!)
+- Auto-updates from NVD (National Vulnerability Database)
+- Searches GitHub for public POCs automatically
+- Fetches Nuclei detection templates
+- Links exploits to CVEs
+- Background updates - always current
 
-**Technical Improvements**
-- AI Enhanced Orchestrator connected to main API
-- Real-time AI decisions during scans
-- Memory persistence across scans
-- WebSocket streaming for chat
+**Previous Features (v2.0.0)**
+- Memory system learns from every scan (40% faster)
+- AI-powered payload generation (10+ variants per vuln)
+- Exploitation chain discovery (multi-step attacks)
+- Professional reports (executive, technical, remediation, risk)
+- Real-time chat interface
 - 15,700+ lines of production-ready code
 
 ---
@@ -115,6 +118,21 @@ See assets/GIF_CREATION_GUIDE.md for instructions
 - **IDOR Detection** - Horizontal & vertical, authenticated endpoint testing
 - **Privilege Escalation** - Vertical escalation, function-level access control
 - **Authorization Bypass** - Role manipulation, missing access checks
+
+### Intelligent Pentest Agent - ZERO FALSE POSITIVES
+- **Chain-of-Thought Reasoning** - Every finding validated with explicit reasoning
+- **Multi-Stage Validation** - Detects → Validates → Confirms with evidence
+- **Confidence Scoring** - Confirmed > High > Medium > Low (no guessing!)
+- **Evidence Collection** - Proof for every vulnerability reported
+- **Learning System** - Improves accuracy from past scans
+- **No Hallucinations** - Only reports what can be proven
+
+### Vulnerability Enrichment System - AUTO-UPDATES
+- **NVD Integration** - Latest CVEs fetched automatically
+- **GitHub POC Search** - Finds public exploits for each CVE
+- **Nuclei Templates** - Detection templates auto-downloaded
+- **CVE-Exploit Linking** - Automatic correlation
+- **Background Updates** - Always current, never outdated
 
 ### AI-Powered Agent System - FULLY OPERATIONAL
 - **Memory System** - Learns from every scan, 40% faster on similar targets ($0 with Ollama)
@@ -161,8 +179,9 @@ See assets/GIF_CREATION_GUIDE.md for instructions
 - **20+ CWE classifications** covered
 - **OWASP Top 10 2021** complete coverage
 - **API Security OWASP Top 10** complete coverage
-- **15,700+ lines** of production-ready code
-- **47 API endpoints** (33 REST + 1 WebSocket + 13 specialized)
+- **17,000+ lines** of production-ready code
+- **55+ API endpoints** (REST + WebSocket + Intelligence + Enrichment)
+- **Zero false positives** with intelligent validation
 
 ### Testing Depth
 | Scan Mode | Endpoints | Payloads/Endpoint | Duration | Coverage |
@@ -178,6 +197,20 @@ See assets/GIF_CREATION_GUIDE.md for instructions
 | IDOR Tests | Limited | Comprehensive | **10-30x** |
 | Critical Vulns | 0-2 | 5-15 | **5-10x** |
 
+### New API Endpoints (v3.0.0)
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/v1/intelligent/analyze` | POST | Analyze with chain-of-thought reasoning |
+| `/api/v1/intelligent/reasoning` | GET | View reasoning chain |
+| `/api/v1/intelligent/findings` | GET | Get validated findings |
+| `/api/v1/vulns/update` | POST | Update vulnerability database |
+| `/api/v1/vulns/search` | GET | Search vulnerabilities |
+| `/api/v1/vulns/stats` | GET | Database statistics |
+| `/api/v1/vulns/{id}` | GET | Vulnerability details |
+| `/api/v1/vulns/search-pocs` | POST | Search GitHub POCs |
+| `/api/v1/vulns/{id}/enrich` | POST | Enrich specific CVE |
+
 ---
 
 ## Quick Start
@@ -185,69 +218,93 @@ See assets/GIF_CREATION_GUIDE.md for instructions
 ### Prerequisites
 
 - **Python 3.9-3.12** (WARNING: 3.14+ not yet supported)
-- **Node.js 16+**
+- **Node.js 18+**
 - **Git**
 
-### Installation
+### Installation (One-Time Setup)
 
 ```bash
 # Clone the repository
 git clone https://github.com/K3E9X/All-Hack.git
 cd All-Hack
 
-# Backend setup
+# Run the setup script (does everything!)
+./setup.sh
+
+# OR manual setup:
+
+# Backend
 cd backend
 python3 -m venv venv
 source venv/bin/activate  # Windows: venv\Scripts\activate
 pip install --upgrade pip
 pip install -r requirements.txt
+cp .env.example .env
 
-# Frontend setup
+# Frontend (build for production)
 cd ../frontend
 npm install
-
-# Create frontend .env file
 cp .env.example .env
+npm run build
 ```
 
-### Launch
+### Launch (Single Command!)
 
 ```bash
-# Start backend
+# Start everything on port 8001
 cd backend
 source venv/bin/activate
+uvicorn app.main:app --host 0.0.0.0 --port 8001
+```
+
+**That's it!** Access the application at **http://localhost:8001**
+
+**Console output:**
+```
+IntelligentPentestAgent initialized
+VulnerabilityEnrichmentSystem initialized
+AI-Enhanced Scanner Orchestrator initialized with AI Agent!
+   ├─ Memory System: ACTIVE
+   ├─ Intelligent Agent: ACTIVE (Zero False Positives)
+   ├─ Vulnerability Enrichment: ACTIVE (NVD + GitHub POCs)
+   └─ Report Generator: ACTIVE
+```
+
+Press `Ctrl+C` to stop.
+
+### Development Mode (Optional)
+
+If you want hot-reload for frontend development:
+
+```bash
+# Terminal 1: Backend
+cd backend && source venv/bin/activate
 uvicorn app.main:app --reload --port 8001
 
-# In another terminal, start frontend
+# Terminal 2: Frontend dev server
 cd frontend
 npm run dev
 ```
 
-Access the application at **http://localhost:5173**
+Access dev frontend at **http://localhost:5173**
 
-For Linux/Ubuntu :
-# 1. Installer prérequis
+### Linux/Ubuntu Quick Setup
+
+```bash
+# 1. Install prerequisites
 sudo apt update && sudo apt install python3 python3-venv nodejs npm git
 
-# 2. Setup
+# 2. Clone and setup
+git clone https://github.com/K3E9X/All-Hack.git
 cd All-Hack
-cd backend && python3 -m venv venv && source venv/bin/activate && pip install -r requirements.txt
-cd ../frontend && npm install && cp .env.example .env
+./setup.sh
 
-# 3. Lancer
-cd .. && ./start.sh
-
-
-**Look for this in backend console:**
-```
-AI-Enhanced Scanner Orchestrator initialized with AI Agent!
-   ├─ Memory System: ACTIVE
-   ├─ Payload Generator: ACTIVE
-   ├─ Exploitation Chain Builder: ACTIVE
-   └─ Report Generator: ACTIVE
+# 3. Launch
+cd backend && source venv/bin/activate
+uvicorn app.main:app --host 0.0.0.0 --port 8001
 ```
 
-Press `Ctrl+C` to stop services.
+Open **http://localhost:8001**
 
 ---
 
@@ -336,17 +393,19 @@ ANTHROPIC_API_KEY=     # Optional: Claude API key
 ## Architecture
 
 ```
-devasc-study-team/
+All-Hack/
 ├── backend/
 │   ├── app/
-│   │   ├── main.py                    # FastAPI application
+│   │   ├── main.py                    # FastAPI + Static frontend serving
+│   │   ├── intelligent_agent.py       # Zero-FP validation (NEW!)
+│   │   ├── vuln_enrichment.py         # CVE/POC auto-updates (NEW!)
 │   │   ├── scanner_orchestrator.py    # Main scan coordinator
-│   │   ├── ai_enhanced_orchestrator.py # AI-powered scanning (NEW)
+│   │   ├── ai_enhanced_orchestrator.py # AI-powered scanning
 │   │   ├── config.py                  # Configuration
 │   │   ├── models/                    # Data models
 │   │   ├── scanners/
 │   │   │   ├── owasp/                 # OWASP Top 10 scanners
-│   │   │   ├── api_security/          # API security scanners (NEW)
+│   │   │   ├── api_security/          # API security scanners
 │   │   │   │   ├── jwt_scanner.py
 │   │   │   │   ├── graphql_scanner.py
 │   │   │   │   ├── nosql_injection.py
@@ -357,7 +416,7 @@ devasc-study-team/
 │   │   │   ├── reconnaissance/        # Tech detection, endpoint discovery
 │   │   │   ├── advanced/              # Port scan, subdomain enum
 │   │   │   └── misconfig/             # Security headers, CORS
-│   │   ├── ai_agent/                  # AI Agent System (NEW)
+│   │   ├── ai_agent/                  # AI Agent System
 │   │   │   ├── memory_system.py       # Persistent learning
 │   │   │   ├── payload_generator.py   # AI payload generation
 │   │   │   ├── exploitation_chains.py # Chain discovery
@@ -368,6 +427,7 @@ devasc-study-team/
 │   │   └── persistence/               # Auto-save & resume
 │   └── requirements.txt
 ├── frontend/
+│   ├── dist/                          # Production build (served by backend)
 │   ├── src/
 │   │   ├── App.jsx                    # Main application
 │   │   ├── components/
@@ -375,8 +435,7 @@ devasc-study-team/
 │   │   │   └── Results.jsx            # Results display
 │   │   └── main.jsx
 │   └── package.json
-├── MODE_DIFFERENTIATION.md            # Black Box vs Grey Box guide
-├── MARATHON_SESSION_SUMMARY.md        # Development session log
+├── setup.sh                           # One-command setup script
 └── README.md                          # This file
 ```
 
@@ -571,7 +630,7 @@ Contributions are welcome! Areas for improvement:
 ## Contact
 
 - **GitHub**: [@K3E9X](https://github.com/K3E9X)
-- **Issues**: [GitHub Issues](https://github.com/K3E9X/devasc-study-team/issues)
+- **Issues**: [GitHub Issues](https://github.com/K3E9X/All-Hack/issues)
 
 ---
 
@@ -593,6 +652,6 @@ If this tool helps you, please:
 
 ![GitHub](https://img.shields.io/badge/github-%23121011.svg?style=for-the-badge&logo=github&logoColor=white)
 
-*2024 - For authorized testing only*
+*2024-2026 - For authorized testing only*
 
 </div>
