@@ -13,6 +13,7 @@ from contextlib import asynccontextmanager
 from app.config import settings
 from app.intelligent_agent import IntelligentPentestAgent, ConfidenceLevel
 from app.vuln_enrichment import VulnerabilityEnrichmentSystem
+from app.autonomous_exploiter import get_exploiter, AutonomousExploiter
 from app.models import ScanRequest, ScanResult, ScanProgress
 from app.ai_enhanced_orchestrator import AIEnhancedScanOrchestrator
 
@@ -1281,6 +1282,187 @@ async def search_github_pocs(
     return {
         "exploits": [e.to_dict() for e in exploits],
         "total": len(exploits)
+    }
+
+# ========== AUTONOMOUS EXPLOITATION ENDPOINTS ==========
+
+@app.post(f"{settings.API_PREFIX}/exploit/auto")
+async def autonomous_exploit(
+    target_url: str = Query(..., description="Target URL to exploit"),
+    parameters: Optional[List[str]] = Query(None, description="Specific parameters to test"),
+    extract_data: bool = Query(True, description="Extract data after finding vulns"),
+    max_rows: int = Query(100, le=1000, description="Max rows to extract")
+):
+    """
+    🎯 Autonomous Exploitation
+
+    Automatically detect and exploit vulnerabilities:
+    - SQL Injection (Union, Error, Time-based, Boolean)
+    - Local File Inclusion (LFI)
+    - Extracts data with proof-of-concept
+
+    Uses Ollama for intelligent reasoning (FREE, local).
+    """
+    exploiter = get_exploiter()
+    await exploiter.initialize()
+
+    session = await exploiter.exploit_target(
+        target_url=target_url,
+        parameters=parameters,
+        extract_data=extract_data,
+        max_extraction_rows=max_rows
+    )
+
+    return {
+        "session_id": session.session_id,
+        "status": session.status.value,
+        "vulnerabilities_found": len(session.vulnerabilities_found),
+        "extractions": len(session.extractions),
+        "reasoning_chain": session.reasoning_chain,
+        "details": session.to_dict()
+    }
+
+@app.get(f"{settings.API_PREFIX}/exploit/session/{{session_id}}")
+async def get_exploit_session(session_id: str):
+    """
+    📋 Get Exploitation Session
+
+    Retrieve details of an exploitation session.
+    """
+    exploiter = get_exploiter()
+    session = exploiter.get_session(session_id)
+
+    if not session:
+        raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
+
+    return session.to_dict()
+
+@app.get(f"{settings.API_PREFIX}/exploit/sessions")
+async def list_exploit_sessions():
+    """
+    📊 List All Exploitation Sessions
+
+    Get all exploitation sessions with their status.
+    """
+    exploiter = get_exploiter()
+    sessions = exploiter.get_all_sessions()
+
+    return {
+        "total": len(sessions),
+        "sessions": sessions
+    }
+
+@app.post(f"{settings.API_PREFIX}/exploit/sqli")
+async def exploit_sqli(
+    target_url: str = Query(..., description="Target URL"),
+    parameter: str = Query(..., description="Vulnerable parameter"),
+    max_rows: int = Query(100, le=1000)
+):
+    """
+    💉 SQL Injection Exploitation
+
+    Specifically exploit SQL injection:
+    - Detect injection type
+    - Extract database structure
+    - Dump table data
+    - Generate PoC
+    """
+    exploiter = get_exploiter()
+    await exploiter.initialize()
+
+    session = await exploiter.exploit_target(
+        target_url=target_url,
+        parameters=[parameter],
+        extract_data=True,
+        max_extraction_rows=max_rows
+    )
+
+    sqli_extractions = [
+        e for e in session.extractions
+        if 'sqli' in e.exploit_type.value
+    ]
+
+    return {
+        "session_id": session.session_id,
+        "sqli_found": len(sqli_extractions) > 0,
+        "extractions": [
+            {
+                "type": e.exploit_type.value,
+                "data": e.data_extracted,
+                "poc": e.proof_of_concept,
+                "success": e.success
+            }
+            for e in sqli_extractions
+        ]
+    }
+
+@app.post(f"{settings.API_PREFIX}/exploit/lfi")
+async def exploit_lfi(
+    target_url: str = Query(..., description="Target URL"),
+    parameter: str = Query(..., description="Vulnerable parameter")
+):
+    """
+    📁 Local File Inclusion Exploitation
+
+    Exploit LFI to extract files:
+    - /etc/passwd, /etc/shadow
+    - Configuration files
+    - Source code
+    - Log files
+    """
+    exploiter = get_exploiter()
+    await exploiter.initialize()
+
+    session = await exploiter.exploit_target(
+        target_url=target_url,
+        parameters=[parameter],
+        extract_data=True
+    )
+
+    lfi_extractions = [
+        e for e in session.extractions
+        if e.exploit_type.value == 'lfi'
+    ]
+
+    return {
+        "session_id": session.session_id,
+        "lfi_found": len(lfi_extractions) > 0,
+        "files_extracted": [
+            {
+                "files": list(e.data_extracted.get("files_extracted", {}).keys()),
+                "poc": e.proof_of_concept,
+                "success": e.success
+            }
+            for e in lfi_extractions
+        ]
+    }
+
+@app.get(f"{settings.API_PREFIX}/exploit/poc/{{session_id}}")
+async def get_proof_of_concept(session_id: str):
+    """
+    📝 Get Proof of Concept
+
+    Get the PoC for all exploits in a session.
+    """
+    exploiter = get_exploiter()
+    session = exploiter.get_session(session_id)
+
+    if not session:
+        raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
+
+    pocs = []
+    for extraction in session.extractions:
+        pocs.append({
+            "type": extraction.exploit_type.value,
+            "parameter": extraction.parameter,
+            "poc": extraction.proof_of_concept,
+            "success": extraction.success
+        })
+
+    return {
+        "session_id": session_id,
+        "target": session.target_url,
+        "proofs_of_concept": pocs
     }
 
 # ========== STATIC FRONTEND SERVING ==========
