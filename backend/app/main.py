@@ -2,6 +2,7 @@
 Advanced Pentest Tool - FastAPI Backend
 """
 import logging
+from typing import Dict, Any, List, Optional
 from fastapi import FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
