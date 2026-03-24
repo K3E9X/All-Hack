@@ -2,12 +2,17 @@
 Advanced Pentest Tool - FastAPI Backend
 """
 import logging
-from fastapi import FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect
+from typing import Dict, Any, List, Optional
+from pathlib import Path
+from fastapi import FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 
 from app.config import settings
+from app.intelligent_agent import IntelligentPentestAgent, ConfidenceLevel
+from app.vuln_enrichment import VulnerabilityEnrichmentSystem
 from app.models import ScanRequest, ScanResult, ScanProgress
 from app.ai_enhanced_orchestrator import AIEnhancedScanOrchestrator
 
@@ -20,6 +25,15 @@ logger = logging.getLogger(__name__)
 
 # Global orchestrator instance (AI-Enhanced)
 orchestrator = AIEnhancedScanOrchestrator()
+
+# Intelligent Pentest Agent
+intelligent_agent = IntelligentPentestAgent()
+
+# Vulnerability Enrichment System
+vuln_enrichment = VulnerabilityEnrichmentSystem()
+
+# Frontend static files path
+FRONTEND_DIST = Path(__file__).parent.parent.parent / "frontend" / "dist"
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -45,9 +59,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.get("/")
-async def root():
-    """Root endpoint"""
+@app.get("/api")
+async def api_info():
+    """API info endpoint"""
     return {
         "message": "Advanced Pentest Tool API",
         "version": settings.API_VERSION,
@@ -1086,6 +1100,212 @@ async def store_scan_in_memory(scan_id: str):
     }
 
 # ========== END PHASE 2 ENDPOINTS ==========
+
+# ========== INTELLIGENT AGENT ENDPOINTS ==========
+
+@app.post(f"{settings.API_PREFIX}/intelligent/analyze")
+async def intelligent_analyze(
+    scan_results: Dict[str, Any],
+    target: str = Query(..., description="Target URL or domain")
+):
+    """
+    🧠 Intelligent Analysis with Reasoning
+
+    Analyzes scan results using chain-of-thought reasoning to:
+    - Filter out false positives
+    - Validate vulnerabilities with evidence
+    - Provide confidence scores
+    """
+    findings = await intelligent_agent.analyze_with_reasoning(
+        target=target,
+        scan_results=scan_results
+    )
+
+    return {
+        "target": target,
+        "validated_findings": [f.to_dict() for f in findings],
+        "total_validated": len(findings),
+        "reasoning_summary": intelligent_agent.get_reasoning_summary()
+    }
+
+@app.get(f"{settings.API_PREFIX}/intelligent/reasoning")
+async def get_reasoning_history():
+    """
+    📊 Get Reasoning History
+
+    Returns the reasoning chain used for vulnerability validation.
+    """
+    return intelligent_agent.get_reasoning_summary()
+
+@app.get(f"{settings.API_PREFIX}/intelligent/findings")
+async def get_validated_findings(
+    confidence: Optional[str] = Query(None, description="Filter by confidence level"),
+    limit: int = Query(50, le=200)
+):
+    """
+    📋 Get Validated Findings
+
+    Returns all validated vulnerability findings.
+    """
+    findings = intelligent_agent.findings
+
+    if confidence:
+        try:
+            conf_level = ConfidenceLevel(confidence)
+            findings = [f for f in findings if f.confidence == conf_level]
+        except ValueError:
+            pass
+
+    return {
+        "findings": [f.to_dict() for f in findings[:limit]],
+        "total": len(findings)
+    }
+
+# ========== VULNERABILITY ENRICHMENT ENDPOINTS ==========
+
+@app.post(f"{settings.API_PREFIX}/vulns/update")
+async def update_vulnerability_database(
+    background_tasks: BackgroundTasks,
+    keywords: Optional[List[str]] = Query(None, description="Keywords to search"),
+    days_back: int = Query(7, le=30, description="Days to look back")
+):
+    """
+    🔄 Update Vulnerability Database
+
+    Fetches latest CVEs and POCs from:
+    - NVD (National Vulnerability Database)
+    - GitHub POCs
+    - Nuclei Templates
+    """
+    async def do_update():
+        await vuln_enrichment.update_from_nvd(keywords=keywords, days_back=days_back)
+        await vuln_enrichment.fetch_nuclei_templates()
+        await vuln_enrichment._save_database()
+
+    background_tasks.add_task(do_update)
+
+    return {
+        "status": "update_started",
+        "message": "Database update started in background"
+    }
+
+@app.get(f"{settings.API_PREFIX}/vulns/search")
+async def search_vulnerabilities(
+    query: Optional[str] = Query(None, description="Search query"),
+    severity: Optional[str] = Query(None, description="Filter by severity"),
+    tags: Optional[str] = Query(None, description="Comma-separated tags"),
+    has_exploit: Optional[bool] = Query(None, description="Filter by exploit availability"),
+    limit: int = Query(50, le=200)
+):
+    """
+    🔍 Search Vulnerabilities
+
+    Search the vulnerability database with filters.
+    """
+    tag_list = tags.split(',') if tags else None
+
+    results = vuln_enrichment.search_vulnerabilities(
+        query=query,
+        severity=severity,
+        tags=tag_list,
+        has_exploit=has_exploit,
+        limit=limit
+    )
+
+    return {
+        "results": [v.to_dict() for v in results],
+        "total": len(results)
+    }
+
+@app.get(f"{settings.API_PREFIX}/vulns/stats")
+async def get_vulnerability_stats():
+    """
+    📈 Get Vulnerability Database Stats
+
+    Returns statistics about the vulnerability database.
+    """
+    return vuln_enrichment.get_stats()
+
+@app.get(f"{settings.API_PREFIX}/vulns/{{vuln_id}}")
+async def get_vulnerability_details(vuln_id: str):
+    """
+    📄 Get Vulnerability Details
+
+    Get full details of a specific vulnerability including exploits.
+    """
+    vuln = vuln_enrichment.vulnerabilities.get(vuln_id.upper())
+    if not vuln:
+        raise HTTPException(status_code=404, detail=f"Vulnerability {vuln_id} not found")
+
+    exploits = vuln_enrichment.get_exploits_for_vulnerability(vuln_id.upper())
+
+    return {
+        "vulnerability": vuln.to_dict(),
+        "exploits": [e.to_dict() for e in exploits]
+    }
+
+@app.post(f"{settings.API_PREFIX}/vulns/{{vuln_id}}/enrich")
+async def enrich_vulnerability(vuln_id: str, background_tasks: BackgroundTasks):
+    """
+    🔬 Enrich Specific Vulnerability
+
+    Fully enriches a CVE with all available data and POCs.
+    """
+    async def do_enrich():
+        await vuln_enrichment.enrich_vulnerability(vuln_id.upper())
+
+    background_tasks.add_task(do_enrich)
+
+    return {
+        "status": "enrichment_started",
+        "vuln_id": vuln_id.upper()
+    }
+
+@app.post(f"{settings.API_PREFIX}/vulns/search-pocs")
+async def search_github_pocs(
+    cve_id: Optional[str] = Query(None, description="CVE ID to search"),
+    keywords: Optional[List[str]] = Query(None, description="Keywords to search"),
+    max_results: int = Query(10, le=50)
+):
+    """
+    🔎 Search GitHub for POCs
+
+    Searches GitHub for proof-of-concept exploits.
+    """
+    exploits = await vuln_enrichment.search_github_pocs(
+        cve_id=cve_id,
+        keywords=keywords,
+        max_results=max_results
+    )
+
+    return {
+        "exploits": [e.to_dict() for e in exploits],
+        "total": len(exploits)
+    }
+
+# ========== STATIC FRONTEND SERVING ==========
+
+# Mount static files if frontend is built
+if FRONTEND_DIST.exists():
+    app.mount("/assets", StaticFiles(directory=FRONTEND_DIST / "assets"), name="assets")
+
+    @app.get("/", response_class=FileResponse, include_in_schema=False)
+    async def serve_frontend():
+        """Serve frontend index.html"""
+        return FileResponse(FRONTEND_DIST / "index.html")
+
+    @app.get("/{path:path}", include_in_schema=False)
+    async def serve_spa(path: str):
+        """Serve SPA routes - fallback to index.html for client-side routing"""
+        # Don't intercept API routes
+        if path.startswith("api/") or path.startswith("docs") or path.startswith("openapi") or path == "health":
+            raise HTTPException(status_code=404, detail="Not found")
+
+        file_path = FRONTEND_DIST / path
+        if file_path.exists() and file_path.is_file():
+            return FileResponse(file_path)
+        # Fallback to index.html for SPA routing
+        return FileResponse(FRONTEND_DIST / "index.html")
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request, exc):
