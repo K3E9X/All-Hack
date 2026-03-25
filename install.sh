@@ -155,12 +155,10 @@ cd "$ROOT_DIR"
 header "Configuration"
 if [ ! -f "$ROOT_DIR/backend/.env" ]; then
     cat > "$ROOT_DIR/backend/.env" << EOF
+# All-Hack Configuration
 API_HOST=0.0.0.0
 API_PORT=8001
-OLLAMA_HOST=http://localhost:11434
-OLLAMA_MODEL=llama3.2
-DEFAULT_TIMEOUT=30
-MAX_CONCURRENT_REQUESTS=20
+ALLOWED_ORIGINS=http://localhost:8001,http://localhost:5173
 EOF
     log "Created backend/.env"
 else
