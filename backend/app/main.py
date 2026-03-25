@@ -1465,6 +1465,345 @@ async def get_proof_of_concept(session_id: str):
         "proofs_of_concept": pocs
     }
 
+# ========== ADVANCED EXPLOITATION ENDPOINTS ==========
+
+@app.post(f"{settings.API_PREFIX}/exploit/ssti")
+async def exploit_ssti(
+    target_url: str = Query(..., description="Target URL with parameter"),
+    parameter: str = Query(..., description="Parameter to test")
+):
+    """
+    🔥 SSTI (Server-Side Template Injection)
+
+    Detect and exploit template injection:
+    - Jinja2, Twig, Freemarker, Mako, ERB, EJS, Pug
+    - Configuration disclosure
+    - Remote code execution
+    """
+    from app.advanced_exploiter import get_advanced_exploiter
+
+    exploiter = get_advanced_exploiter()
+    await exploiter.initialize()
+
+    result = await exploiter.detect_ssti(target_url, parameter)
+
+    return {
+        "vulnerable": result is not None,
+        "details": {
+            "vuln_type": result.vuln_type.value if result else None,
+            "payload": result.payload if result else None,
+            "evidence": result.evidence if result else None,
+            "severity": result.severity if result else None,
+            "poc": result.poc if result else None,
+            "engine": result.details.get("engine") if result else None
+        } if result else None
+    }
+
+
+@app.post(f"{settings.API_PREFIX}/exploit/xxe")
+async def exploit_xxe(
+    target_url: str = Query(..., description="Target URL accepting XML"),
+    content_type: str = Query("application/xml", description="Content-Type header")
+):
+    """
+    📄 XXE (XML External Entity)
+
+    Detect and exploit XXE:
+    - File disclosure (/etc/passwd, config files)
+    - SSRF via XXE
+    - Out-of-band exfiltration
+    """
+    from app.advanced_exploiter import get_advanced_exploiter
+
+    exploiter = get_advanced_exploiter()
+    await exploiter.initialize()
+
+    result = await exploiter.detect_xxe(target_url, content_type)
+
+    return {
+        "vulnerable": result is not None,
+        "details": {
+            "vuln_type": result.vuln_type.value if result else None,
+            "payload": result.payload if result else None,
+            "evidence": result.evidence if result else None,
+            "extracted_content": result.details.get("extracted_content") if result else None,
+            "severity": result.severity if result else None,
+            "poc": result.poc if result else None
+        } if result else None
+    }
+
+
+@app.post(f"{settings.API_PREFIX}/exploit/nosql")
+async def exploit_nosql(
+    target_url: str = Query(..., description="Target URL"),
+    parameter: str = Query(..., description="Parameter to test")
+):
+    """
+    🍃 NoSQL Injection
+
+    Detect and exploit NoSQL injection:
+    - MongoDB, CouchDB, Redis
+    - Authentication bypass
+    - Data extraction
+    """
+    from app.advanced_exploiter import get_advanced_exploiter
+
+    exploiter = get_advanced_exploiter()
+    await exploiter.initialize()
+
+    result = await exploiter.detect_nosql(target_url, parameter)
+
+    return {
+        "vulnerable": result is not None,
+        "details": {
+            "vuln_type": result.vuln_type.value if result else None,
+            "payload": result.payload if result else None,
+            "evidence": result.evidence if result else None,
+            "severity": result.severity if result else None,
+            "poc": result.poc if result else None
+        } if result else None
+    }
+
+
+@app.post(f"{settings.API_PREFIX}/exploit/jwt")
+async def exploit_jwt(
+    token: str = Query(..., description="JWT token to test"),
+    protected_url: str = Query(..., description="URL protected by JWT")
+):
+    """
+    🔑 JWT Attacks
+
+    Test JWT for vulnerabilities:
+    - Algorithm:none attack
+    - Weak secret bruteforce
+    - Algorithm confusion (RS256 to HS256)
+    """
+    from app.advanced_exploiter import get_advanced_exploiter
+
+    exploiter = get_advanced_exploiter()
+    await exploiter.initialize()
+
+    results = await exploiter.attack_jwt(token, protected_url)
+
+    return {
+        "vulnerable": len(results) > 0,
+        "attacks_successful": len(results),
+        "details": [
+            {
+                "attack_type": r.evidence,
+                "forged_token": r.payload,
+                "severity": r.severity,
+                "poc": r.poc
+            }
+            for r in results
+        ]
+    }
+
+
+@app.post(f"{settings.API_PREFIX}/exploit/graphql")
+async def exploit_graphql(
+    target_url: str = Query(..., description="GraphQL endpoint URL")
+):
+    """
+    📊 GraphQL Exploitation
+
+    Test GraphQL for:
+    - Introspection enabled
+    - SQL injection via arguments
+    - DoS via nested queries
+    - Information disclosure
+    """
+    from app.advanced_exploiter import get_advanced_exploiter
+
+    exploiter = get_advanced_exploiter()
+    await exploiter.initialize()
+
+    results = await exploiter.exploit_graphql(target_url)
+
+    return {
+        "vulnerable": len(results) > 0,
+        "findings": len(results),
+        "details": [
+            {
+                "type": r.evidence,
+                "severity": r.severity,
+                "poc": r.poc,
+                "schema": r.details.get("schema") if "schema" in r.details else None
+            }
+            for r in results
+        ]
+    }
+
+
+@app.post(f"{settings.API_PREFIX}/exploit/ssrf")
+async def exploit_ssrf(
+    target_url: str = Query(..., description="Target URL"),
+    parameter: str = Query(..., description="Parameter to test")
+):
+    """
+    🌐 SSRF (Server-Side Request Forgery)
+
+    Detect and exploit SSRF:
+    - Cloud metadata (AWS, GCP, Azure)
+    - Internal network scanning
+    - Bypass techniques
+    """
+    from app.advanced_exploiter import get_advanced_exploiter
+
+    exploiter = get_advanced_exploiter()
+    await exploiter.initialize()
+
+    results = await exploiter.detect_ssrf(target_url, parameter)
+
+    return {
+        "vulnerable": len(results) > 0,
+        "findings": len(results),
+        "details": [
+            {
+                "type": r.evidence,
+                "payload": r.payload,
+                "cloud_provider": r.details.get("cloud"),
+                "data_exposed": r.details.get("data", "")[:500],
+                "severity": r.severity,
+                "poc": r.poc
+            }
+            for r in results
+        ]
+    }
+
+
+@app.post(f"{settings.API_PREFIX}/exploit/deserialization")
+async def exploit_deserialization(
+    target_url: str = Query(..., description="Target URL"),
+    parameter: str = Query(..., description="Parameter to test")
+):
+    """
+    💣 Insecure Deserialization
+
+    Detect deserialization vulnerabilities:
+    - Java (ysoserial gadgets)
+    - PHP (phpggc)
+    - Python (pickle)
+    - Ruby (Marshal)
+    - .NET (BinaryFormatter)
+    """
+    from app.advanced_exploiter import get_advanced_exploiter
+
+    exploiter = get_advanced_exploiter()
+    await exploiter.initialize()
+
+    result = await exploiter.detect_deserialization(target_url, parameter)
+
+    return {
+        "vulnerable": result is not None,
+        "details": {
+            "language": result.details.get("language") if result else None,
+            "payload": result.payload if result else None,
+            "evidence": result.evidence if result else None,
+            "severity": result.severity if result else None,
+            "poc": result.poc if result else None
+        } if result else None
+    }
+
+
+@app.post(f"{settings.API_PREFIX}/exploit/full-scan")
+async def full_advanced_scan(
+    target_url: str = Query(..., description="Target URL"),
+    parameters: Optional[List[str]] = Query(None, description="Parameters to test")
+):
+    """
+    🚀 Full Advanced Scan
+
+    Run ALL exploit modules:
+    - SSTI, XXE, NoSQL, SSRF, Deserialization
+    - GraphQL (if endpoint detected)
+    - Generates comprehensive PoCs
+    """
+    from app.advanced_exploiter import get_advanced_exploiter
+
+    exploiter = get_advanced_exploiter()
+    results = await exploiter.full_scan(target_url, parameters)
+
+    return {
+        "target": target_url,
+        "total_vulnerabilities": len(results),
+        "findings": [
+            {
+                "type": r.vuln_type.value,
+                "severity": r.severity,
+                "evidence": r.evidence,
+                "payload": r.payload[:200] if len(r.payload) > 200 else r.payload,
+                "poc": r.poc
+            }
+            for r in results
+        ],
+        "severity_summary": {
+            "critical": len([r for r in results if r.severity == "critical"]),
+            "high": len([r for r in results if r.severity == "high"]),
+            "medium": len([r for r in results if r.severity == "medium"]),
+            "low": len([r for r in results if r.severity == "low"])
+        }
+    }
+
+
+@app.get(f"{settings.API_PREFIX}/payloads/{{vuln_type}}")
+async def get_payloads(
+    vuln_type: str,
+    category: Optional[str] = Query(None, description="Payload category"),
+    limit: int = Query(50, le=500)
+):
+    """
+    📦 Get Payloads
+
+    Retrieve payloads for a specific vulnerability type:
+    - sqli, xss, ssti, xxe, nosql, lfi, rce, ssrf
+    - Optional category filter
+    """
+    from app.payloads import (
+        SQLI_PAYLOADS, XSS_PAYLOADS, SSTI_PAYLOADS,
+        XXE_PAYLOADS, NOSQL_PAYLOADS, LFI_PAYLOADS,
+        RCE_PAYLOADS, SSRF_PAYLOADS
+    )
+
+    payload_map = {
+        "sqli": SQLI_PAYLOADS,
+        "xss": XSS_PAYLOADS,
+        "ssti": SSTI_PAYLOADS,
+        "xxe": XXE_PAYLOADS,
+        "nosql": NOSQL_PAYLOADS,
+        "lfi": LFI_PAYLOADS,
+        "rce": RCE_PAYLOADS,
+        "ssrf": SSRF_PAYLOADS,
+    }
+
+    if vuln_type not in payload_map:
+        raise HTTPException(status_code=400, detail=f"Unknown vuln_type: {vuln_type}")
+
+    payloads = payload_map[vuln_type]
+
+    if category and category in payloads:
+        result = payloads[category]
+    else:
+        result = payloads
+
+    # Flatten if nested dict
+    if isinstance(result, dict):
+        flat = []
+        for k, v in result.items():
+            if isinstance(v, list):
+                flat.extend(v[:limit // len(result)])
+        result = flat[:limit]
+    elif isinstance(result, list):
+        result = result[:limit]
+
+    return {
+        "vuln_type": vuln_type,
+        "category": category,
+        "count": len(result) if isinstance(result, list) else "dict",
+        "payloads": result
+    }
+
+
 # ========== STATIC FRONTEND SERVING ==========
 
 # Mount static files if frontend is built
