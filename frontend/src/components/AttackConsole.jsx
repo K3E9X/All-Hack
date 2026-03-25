@@ -12,6 +12,8 @@ function AttackConsole() {
   const [results, setResults] = useState(null)
   const [events, setEvents] = useState([])
   const [error, setError] = useState(null)
+  const [selectedFinding, setSelectedFinding] = useState(null)
+  const [copiedIndex, setCopiedIndex] = useState(null)
   const consoleRef = useRef(null)
   const pollRef = useRef(null)
 
@@ -40,6 +42,28 @@ function AttackConsole() {
     setEvents(prev => [...prev.slice(-200), event])
   }
 
+  const copyToClipboard = async (text, index) => {
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopiedIndex(index)
+      setTimeout(() => setCopiedIndex(null), 2000)
+    } catch (err) {
+      console.error('Copy failed:', err)
+    }
+  }
+
+  const generateCurlCommand = (finding) => {
+    const url = finding.url || ''
+    const param = finding.parameter || ''
+    const payload = finding.payload || ''
+
+    if (param && payload) {
+      const encodedPayload = encodeURIComponent(payload)
+      return `curl -s "${url}?${param}=${encodedPayload}"`
+    }
+    return `curl -s "${url}"`
+  }
+
   const startAttack = async () => {
     if (!target) {
       setError('Enter a target URL')
@@ -50,10 +74,10 @@ function AttackConsole() {
     setRunning(true)
     setResults(null)
     setEvents([])
+    setSelectedFinding(null)
     addEvent('init', `Starting attack on ${target}`)
 
     try {
-      // Start async scan
       const response = await axios.post(`${API_URL}/attack/async`, null, {
         params: { target_url: target, max_pages: maxPages }
       })
@@ -62,7 +86,6 @@ function AttackConsole() {
       setScanId(id)
       addEvent('init', `Scan ID: ${id}`)
 
-      // Poll for status
       pollRef.current = setInterval(async () => {
         try {
           const statusRes = await axios.get(`${API_URL}/attack/${id}/status`)
@@ -70,7 +93,6 @@ function AttackConsole() {
 
           setStatus(data)
 
-          // Add new events
           if (data.events && Array.isArray(data.events)) {
             data.events.forEach(e => {
               setEvents(prev => {
@@ -88,12 +110,10 @@ function AttackConsole() {
             })
           }
 
-          // Check completion
           if (data.phase === 'complete' || data.phase === 'failed') {
             clearInterval(pollRef.current)
             pollRef.current = null
 
-            // Get full results
             const resultsRes = await axios.get(`${API_URL}/attack/${id}`)
             setResults(resultsRes.data)
             setRunning(false)
@@ -125,7 +145,6 @@ function AttackConsole() {
         pollRef.current = null
       }
 
-      // Get partial results
       setTimeout(async () => {
         try {
           const resultsRes = await axios.get(`${API_URL}/attack/${scanId}`)
@@ -140,13 +159,24 @@ function AttackConsole() {
 
   const getSeverityColor = (severity) => {
     const colors = {
-      critical: 'text-red-400',
-      high: 'text-orange-400',
-      medium: 'text-yellow-400',
-      low: 'text-blue-400',
-      info: 'text-gray-400'
+      critical: 'text-red-400 bg-red-500/10 border-red-500/30',
+      high: 'text-orange-400 bg-orange-500/10 border-orange-500/30',
+      medium: 'text-yellow-400 bg-yellow-500/10 border-yellow-500/30',
+      low: 'text-blue-400 bg-blue-500/10 border-blue-500/30',
+      info: 'text-gray-400 bg-gray-500/10 border-gray-500/30'
     }
-    return colors[severity] || 'text-gray-400'
+    return colors[severity] || colors.info
+  }
+
+  const getSeverityBadge = (severity) => {
+    const colors = {
+      critical: 'bg-red-500',
+      high: 'bg-orange-500',
+      medium: 'bg-yellow-500',
+      low: 'bg-blue-500',
+      info: 'bg-gray-500'
+    }
+    return colors[severity] || colors.info
   }
 
   const getEventColor = (type) => {
@@ -156,19 +186,18 @@ function AttackConsole() {
   }
 
   return (
-    <div className="min-h-screen bg-neutral-950 text-gray-100 p-6">
+    <div className="min-h-screen bg-neutral-950 text-gray-100">
       {/* Header */}
-      <header className="mb-8">
-        <h1 className="text-3xl font-light tracking-wide text-white">all-hack</h1>
-        <p className="text-sm text-gray-500 mt-1">automated security assessment</p>
+      <header className="border-b border-neutral-800 px-6 py-4">
+        <h1 className="text-xl font-light tracking-wide text-white">all-hack</h1>
       </header>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="flex h-[calc(100vh-57px)]">
         {/* Left Panel - Controls */}
-        <div className="lg:col-span-1 space-y-6">
+        <div className="w-80 border-r border-neutral-800 p-4 space-y-4 overflow-y-auto">
           {/* Target Input */}
-          <div className="bg-neutral-900 border border-neutral-800 rounded-lg p-5">
-            <label className="block text-xs uppercase tracking-wider text-gray-500 mb-3">
+          <div>
+            <label className="block text-xs uppercase tracking-wider text-gray-500 mb-2">
               Target
             </label>
             <input
@@ -177,11 +206,13 @@ function AttackConsole() {
               onChange={(e) => setTarget(e.target.value)}
               placeholder="https://target.com"
               disabled={running}
-              className="w-full bg-neutral-950 border border-neutral-700 rounded px-4 py-3 text-sm font-mono focus:outline-none focus:border-gray-500 disabled:opacity-50"
+              className="w-full bg-neutral-900 border border-neutral-700 rounded px-3 py-2 text-sm font-mono focus:outline-none focus:border-neutral-500 disabled:opacity-50"
             />
+          </div>
 
-            <label className="block text-xs uppercase tracking-wider text-gray-500 mt-4 mb-2">
-              Max Pages
+          <div>
+            <label className="block text-xs uppercase tracking-wider text-gray-500 mb-2">
+              Depth
             </label>
             <input
               type="number"
@@ -190,192 +221,228 @@ function AttackConsole() {
               min={10}
               max={200}
               disabled={running}
-              className="w-full bg-neutral-950 border border-neutral-700 rounded px-4 py-2 text-sm font-mono focus:outline-none focus:border-gray-500 disabled:opacity-50"
+              className="w-full bg-neutral-900 border border-neutral-700 rounded px-3 py-2 text-sm font-mono focus:outline-none focus:border-neutral-500 disabled:opacity-50"
             />
+          </div>
 
-            {error && (
-              <p className="text-red-400 text-xs mt-3">{error}</p>
-            )}
+          {error && (
+            <p className="text-red-400 text-xs">{error}</p>
+          )}
 
-            <div className="flex gap-3 mt-5">
+          <div className="flex gap-2">
+            <button
+              onClick={startAttack}
+              disabled={running || !target}
+              className="flex-1 bg-white text-black font-medium py-2.5 rounded text-sm hover:bg-gray-200 transition disabled:opacity-30 disabled:cursor-not-allowed"
+            >
+              {running ? 'Running...' : 'Start'}
+            </button>
+            {running && (
               <button
-                onClick={startAttack}
-                disabled={running || !target}
-                className="flex-1 bg-white text-black font-medium py-3 rounded text-sm hover:bg-gray-200 transition disabled:opacity-30 disabled:cursor-not-allowed"
+                onClick={stopAttack}
+                className="px-4 py-2.5 border border-red-500/50 text-red-400 rounded text-sm hover:bg-red-500/10 transition"
               >
-                {running ? 'Running...' : 'Start Attack'}
+                Stop
               </button>
-              {running && (
-                <button
-                  onClick={stopAttack}
-                  className="px-5 py-3 border border-red-500 text-red-400 rounded text-sm hover:bg-red-500/10 transition"
-                >
-                  Stop
-                </button>
-              )}
-            </div>
+            )}
           </div>
 
           {/* Status */}
           {status && (
-            <div className="bg-neutral-900 border border-neutral-800 rounded-lg p-5">
-              <h3 className="text-xs uppercase tracking-wider text-gray-500 mb-4">Status</h3>
-
-              <div className="space-y-3 text-sm">
+            <div className="pt-4 border-t border-neutral-800">
+              <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span className="text-gray-500">Phase</span>
-                  <span className="font-mono">{status.phase}</span>
+                  <span className="font-mono text-xs">{status.phase}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-500">Progress</span>
                   <span className="font-mono">{status.progress}%</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-500">Findings</span>
+                  <span className="text-gray-500">Vulns</span>
                   <span className={`font-mono ${status.findings_count > 0 ? 'text-red-400' : ''}`}>
                     {status.findings_count}
                   </span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Requests</span>
-                  <span className="font-mono">{status.requests}</span>
-                </div>
               </div>
-
-              {/* Progress bar */}
-              <div className="mt-4 h-1 bg-neutral-800 rounded overflow-hidden">
+              <div className="mt-3 h-1 bg-neutral-800 rounded overflow-hidden">
                 <div
-                  className="h-full bg-gray-400 transition-all duration-300"
+                  className="h-full bg-white/50 transition-all duration-300"
                   style={{ width: `${status.progress}%` }}
                 />
               </div>
             </div>
           )}
 
-          {/* Results Summary */}
-          {results && (
-            <div className="bg-neutral-900 border border-neutral-800 rounded-lg p-5">
-              <h3 className="text-xs uppercase tracking-wider text-gray-500 mb-4">Results</h3>
-
-              <div className="space-y-3 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Endpoints</span>
-                  <span className="font-mono">{results.endpoints_discovered}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Technologies</span>
-                  <span className="font-mono text-right text-xs">
-                    {results.technologies?.join(', ') || 'None'}
-                  </span>
-                </div>
-              </div>
-
-              {results.severity_summary && (
-                <div className="mt-4 pt-4 border-t border-neutral-800">
-                  <div className="grid grid-cols-5 gap-2 text-center text-xs">
-                    <div>
-                      <div className="text-red-400 font-mono text-lg">{results.severity_summary.critical}</div>
-                      <div className="text-gray-600">crit</div>
+          {/* Severity Summary */}
+          {results?.severity_summary && (
+            <div className="pt-4 border-t border-neutral-800">
+              <div className="grid grid-cols-5 gap-1 text-center text-xs">
+                {['critical', 'high', 'medium', 'low', 'info'].map(sev => (
+                  <div key={sev}>
+                    <div className={`font-mono text-lg ${
+                      sev === 'critical' ? 'text-red-400' :
+                      sev === 'high' ? 'text-orange-400' :
+                      sev === 'medium' ? 'text-yellow-400' :
+                      sev === 'low' ? 'text-blue-400' : 'text-gray-400'
+                    }`}>
+                      {results.severity_summary[sev] || 0}
                     </div>
-                    <div>
-                      <div className="text-orange-400 font-mono text-lg">{results.severity_summary.high}</div>
-                      <div className="text-gray-600">high</div>
-                    </div>
-                    <div>
-                      <div className="text-yellow-400 font-mono text-lg">{results.severity_summary.medium}</div>
-                      <div className="text-gray-600">med</div>
-                    </div>
-                    <div>
-                      <div className="text-blue-400 font-mono text-lg">{results.severity_summary.low}</div>
-                      <div className="text-gray-600">low</div>
-                    </div>
-                    <div>
-                      <div className="text-gray-400 font-mono text-lg">{results.severity_summary.info}</div>
-                      <div className="text-gray-600">info</div>
-                    </div>
+                    <div className="text-gray-600 text-[10px]">{sev.slice(0, 4)}</div>
                   </div>
-                </div>
-              )}
+                ))}
+              </div>
             </div>
           )}
         </div>
 
-        {/* Right Panel - Console & Findings */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* Console Output */}
-          <div className="bg-neutral-900 border border-neutral-800 rounded-lg">
-            <div className="px-4 py-3 border-b border-neutral-800 flex items-center justify-between">
-              <span className="text-xs uppercase tracking-wider text-gray-500">Console</span>
-              {running && (
-                <span className="flex items-center gap-2 text-xs text-gray-500">
-                  <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-                  live
-                </span>
-              )}
-            </div>
-            <div
-              ref={consoleRef}
-              className="h-80 overflow-y-auto p-4 font-mono text-xs space-y-1"
-            >
-              {events.length === 0 ? (
-                <div className="text-gray-600 text-center py-8">
-                  Waiting for scan...
+        {/* Center Panel - Console */}
+        <div className="flex-1 flex flex-col border-r border-neutral-800">
+          <div className="px-4 py-2 border-b border-neutral-800 flex items-center justify-between">
+            <span className="text-xs uppercase tracking-wider text-gray-500">Console</span>
+            {running && (
+              <span className="flex items-center gap-2 text-xs text-gray-500">
+                <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span>
+                live
+              </span>
+            )}
+          </div>
+          <div
+            ref={consoleRef}
+            className="flex-1 overflow-y-auto p-3 font-mono text-xs space-y-0.5"
+          >
+            {events.length === 0 ? (
+              <div className="text-gray-600 text-center py-8">
+                Waiting for scan...
+              </div>
+            ) : (
+              events.map(event => (
+                <div key={event.id} className={`flex gap-2 py-0.5 ${event.type === 'vuln' ? 'bg-red-500/5' : ''}`}>
+                  <span className="text-gray-600 flex-shrink-0 w-16">{event.time}</span>
+                  <span className="text-gray-500 flex-shrink-0 w-20 truncate">[{event.phase}]</span>
+                  <span className={getEventColor(event.type)}>{event.message}</span>
                 </div>
-              ) : (
-                events.map(event => (
-                  <div key={event.id} className="flex gap-3">
-                    <span className="text-gray-600 flex-shrink-0">{event.time}</span>
-                    <span className="text-gray-500 flex-shrink-0 w-24 truncate">[{event.phase}]</span>
-                    <span className={getEventColor(event.type)}>{event.message}</span>
-                  </div>
-                ))
-              )}
-            </div>
+              ))
+            )}
+          </div>
+        </div>
+
+        {/* Right Panel - Findings Detail */}
+        <div className="w-[480px] flex flex-col">
+          <div className="px-4 py-2 border-b border-neutral-800">
+            <span className="text-xs uppercase tracking-wider text-gray-500">
+              Findings {results?.findings?.length ? `(${results.findings.length})` : ''}
+            </span>
           </div>
 
-          {/* Findings */}
-          {results && results.findings && results.findings.length > 0 && (
-            <div className="bg-neutral-900 border border-neutral-800 rounded-lg">
-              <div className="px-4 py-3 border-b border-neutral-800">
-                <span className="text-xs uppercase tracking-wider text-gray-500">
-                  Findings ({results.findings.length})
-                </span>
-              </div>
-              <div className="divide-y divide-neutral-800 max-h-96 overflow-y-auto">
-                {results.findings.map((finding, idx) => (
-                  <div key={finding.id || idx} className="p-4">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-3">
-                          <span className={`text-xs uppercase font-medium ${getSeverityColor(finding.severity)}`}>
-                            {finding.severity}
-                          </span>
-                          <span className="text-sm font-medium text-white">{finding.vuln_type}</span>
-                        </div>
-                        <p className="text-xs text-gray-500 mt-1 truncate font-mono">{finding.url}</p>
-                        {finding.parameter && (
-                          <p className="text-xs text-gray-600 mt-1">param: {finding.parameter}</p>
-                        )}
-                      </div>
+          {results?.findings?.length > 0 ? (
+            <div className="flex-1 overflow-y-auto">
+              {results.findings.map((finding, idx) => (
+                <div
+                  key={finding.id || idx}
+                  className={`border-b border-neutral-800 ${selectedFinding === idx ? 'bg-neutral-900' : ''}`}
+                >
+                  {/* Finding Header - Clickable */}
+                  <div
+                    onClick={() => setSelectedFinding(selectedFinding === idx ? null : idx)}
+                    className="p-3 cursor-pointer hover:bg-neutral-900/50 transition"
+                  >
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className={`w-2 h-2 rounded-full ${getSeverityBadge(finding.severity)}`}></span>
+                      <span className="text-sm font-medium text-white">{finding.vuln_type}</span>
+                      <span className={`text-[10px] uppercase px-1.5 py-0.5 rounded border ${getSeverityColor(finding.severity)}`}>
+                        {finding.severity}
+                      </span>
                     </div>
-
-                    <div className="mt-3">
-                      <p className="text-xs text-gray-400">{finding.evidence}</p>
-                    </div>
-
-                    {finding.poc && (
-                      <details className="mt-3">
-                        <summary className="text-xs text-gray-500 cursor-pointer hover:text-gray-400">
-                          View PoC
-                        </summary>
-                        <pre className="mt-2 text-xs bg-neutral-950 p-3 rounded overflow-x-auto text-gray-400">
-                          {finding.poc}
-                        </pre>
-                      </details>
+                    <p className="text-xs text-gray-500 font-mono truncate">{finding.url}</p>
+                    {finding.parameter && (
+                      <p className="text-xs text-gray-600 mt-0.5">
+                        param: <span className="text-gray-400">{finding.parameter}</span>
+                      </p>
                     )}
                   </div>
-                ))}
-              </div>
+
+                  {/* Finding Detail - Expanded */}
+                  {selectedFinding === idx && (
+                    <div className="px-3 pb-3 space-y-3">
+                      {/* Evidence */}
+                      <div>
+                        <div className="text-[10px] uppercase text-gray-500 mb-1">Evidence</div>
+                        <div className="text-xs text-gray-300 bg-neutral-950 rounded p-2">
+                          {finding.evidence}
+                        </div>
+                      </div>
+
+                      {/* Payload */}
+                      {finding.payload && (
+                        <div>
+                          <div className="text-[10px] uppercase text-gray-500 mb-1">Payload</div>
+                          <div className="relative">
+                            <pre className="text-xs text-red-400 bg-neutral-950 rounded p-2 overflow-x-auto font-mono">
+                              {finding.payload}
+                            </pre>
+                            <button
+                              onClick={() => copyToClipboard(finding.payload, `payload-${idx}`)}
+                              className="absolute top-1 right-1 text-[10px] px-2 py-0.5 bg-neutral-800 hover:bg-neutral-700 rounded text-gray-400 transition"
+                            >
+                              {copiedIndex === `payload-${idx}` ? 'copied' : 'copy'}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Curl Command */}
+                      <div>
+                        <div className="text-[10px] uppercase text-gray-500 mb-1">Reproduce</div>
+                        <div className="relative">
+                          <pre className="text-xs text-green-400 bg-neutral-950 rounded p-2 overflow-x-auto font-mono whitespace-pre-wrap break-all">
+                            {generateCurlCommand(finding)}
+                          </pre>
+                          <button
+                            onClick={() => copyToClipboard(generateCurlCommand(finding), `curl-${idx}`)}
+                            className="absolute top-1 right-1 text-[10px] px-2 py-0.5 bg-neutral-800 hover:bg-neutral-700 rounded text-gray-400 transition"
+                          >
+                            {copiedIndex === `curl-${idx}` ? 'copied' : 'copy'}
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Full PoC */}
+                      {finding.poc && (
+                        <div>
+                          <div className="text-[10px] uppercase text-gray-500 mb-1">Full PoC</div>
+                          <div className="relative">
+                            <pre className="text-xs text-gray-400 bg-neutral-950 rounded p-2 overflow-x-auto font-mono whitespace-pre-wrap max-h-48">
+                              {finding.poc}
+                            </pre>
+                            <button
+                              onClick={() => copyToClipboard(finding.poc, `poc-${idx}`)}
+                              className="absolute top-1 right-1 text-[10px] px-2 py-0.5 bg-neutral-800 hover:bg-neutral-700 rounded text-gray-400 transition"
+                            >
+                              {copiedIndex === `poc-${idx}` ? 'copied' : 'copy'}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Extracted Data */}
+                      {finding.extracted_data && Object.keys(finding.extracted_data).length > 0 && (
+                        <div>
+                          <div className="text-[10px] uppercase text-gray-500 mb-1">Extracted Data</div>
+                          <pre className="text-xs text-yellow-400 bg-neutral-950 rounded p-2 overflow-x-auto font-mono whitespace-pre-wrap max-h-32">
+                            {JSON.stringify(finding.extracted_data, null, 2)}
+                          </pre>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="flex-1 flex items-center justify-center text-gray-600 text-sm">
+              {running ? 'Scanning...' : 'No findings yet'}
             </div>
           )}
         </div>
