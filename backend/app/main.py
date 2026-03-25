@@ -1920,6 +1920,267 @@ async def stop_attack(scan_id: str):
     return {"status": "stop_requested", "scan_id": scan_id}
 
 
+# ========== ADVANCED MODULES ENDPOINTS ==========
+
+@app.post(f"{settings.API_PREFIX}/recon")
+async def run_recon(target: str = Query(..., description="Target domain or URL")):
+    """
+    Automated Reconnaissance
+
+    Runs comprehensive recon:
+    - Subdomain enumeration
+    - Port scanning
+    - Technology detection
+    - Wayback URLs
+    - Directory bruteforce
+    - Email harvesting
+    - Sensitive file discovery
+    """
+    from app.modules import ReconScanner
+
+    scanner = ReconScanner()
+    result = await scanner.full_recon(target)
+
+    return {
+        "domain": result.domain,
+        "subdomains": result.subdomains,
+        "open_ports": result.open_ports,
+        "technologies": result.technologies,
+        "wayback_urls": result.wayback_urls[:50],
+        "directories": result.directories,
+        "emails": result.emails,
+        "interesting_files": result.interesting_files
+    }
+
+
+@app.post(f"{settings.API_PREFIX}/crawl")
+async def run_crawler(
+    target: str = Query(..., description="Target URL"),
+    max_pages: int = Query(100, le=500),
+    max_depth: int = Query(5, le=10)
+):
+    """
+    Intelligent Web Crawler
+
+    Smart crawling with:
+    - Form detection
+    - API endpoint discovery
+    - Parameter extraction
+    - Technology detection
+    - Sitemap/robots.txt parsing
+    """
+    from app.modules import IntelligentCrawler
+
+    crawler = IntelligentCrawler(max_pages=max_pages, max_depth=max_depth)
+    result = await crawler.crawl(target)
+
+    return {
+        "base_url": result.base_url,
+        "pages_crawled": result.pages_crawled,
+        "endpoints": result.endpoints[:100],
+        "forms": [{"action": f.action, "method": f.method, "inputs": f.inputs} for f in result.forms],
+        "parameters": list(result.parameters),
+        "api_endpoints": result.api_endpoints,
+        "technologies": result.technologies
+    }
+
+
+@app.post(f"{settings.API_PREFIX}/fuzz")
+async def run_fuzzer(
+    target: str = Query(..., description="Target URL"),
+    params: Optional[List[str]] = Query(None, description="Parameters to fuzz")
+):
+    """
+    Advanced Fuzzing
+
+    Smart fuzzing with:
+    - Mutation-based payloads
+    - Format string attacks
+    - Buffer overflow detection
+    - Injection payloads
+    - Anomaly detection
+    """
+    from app.modules import AdvancedFuzzer
+
+    fuzzer = AdvancedFuzzer()
+    anomalies = await fuzzer.full_fuzz(target, params)
+
+    return {
+        "target": target,
+        "total_requests": len(fuzzer.results),
+        "anomalies_found": len(anomalies),
+        "anomalies": [
+            {
+                "payload": a.payload,
+                "status": a.status,
+                "anomaly_type": a.anomaly_type,
+                "response_preview": a.response_preview
+            }
+            for a in anomalies
+        ]
+    }
+
+
+@app.post(f"{settings.API_PREFIX}/auth-test")
+async def run_auth_test(
+    target: str = Query(..., description="Base URL"),
+    login_url: Optional[str] = Query(None),
+    reset_url: Optional[str] = Query(None),
+    oauth_url: Optional[str] = Query(None),
+    verify_url: Optional[str] = Query(None)
+):
+    """
+    Authentication Security Testing
+
+    Tests for:
+    - Session fixation
+    - Password reset poisoning
+    - OAuth misconfigurations
+    - 2FA bypass
+    - Cookie security
+    """
+    from app.modules import AuthTester
+
+    tester = AuthTester()
+    findings = await tester.full_test(
+        base_url=target,
+        login_url=login_url,
+        reset_url=reset_url,
+        oauth_url=oauth_url,
+        verify_url=verify_url
+    )
+
+    return {
+        "target": target,
+        "findings_count": len(findings),
+        "findings": [
+            {
+                "type": f.vuln_type,
+                "severity": f.severity,
+                "description": f.description,
+                "evidence": f.evidence,
+                "poc": f.poc
+            }
+            for f in findings
+        ]
+    }
+
+
+@app.post(f"{settings.API_PREFIX}/api-test")
+async def run_api_test(
+    target: str = Query(..., description="API base URL"),
+    auth_token: Optional[str] = Query(None, description="Authorization token")
+):
+    """
+    API Security Testing
+
+    Tests for:
+    - OpenAPI schema discovery
+    - BOLA (Broken Object Level Authorization)
+    - Mass assignment
+    - Rate limiting
+    - Excessive data exposure
+    """
+    from app.modules import APISecurityTester
+
+    tester = APISecurityTester()
+    headers = {"Authorization": f"Bearer {auth_token}"} if auth_token else None
+    findings = await tester.full_test(target, headers)
+
+    return {
+        "target": target,
+        "endpoints_discovered": len(tester.endpoints),
+        "findings_count": len(findings),
+        "findings": [
+            {
+                "type": f.vuln_type,
+                "severity": f.severity,
+                "endpoint": f.endpoint,
+                "method": f.method,
+                "description": f.description,
+                "poc": f.poc
+            }
+            for f in findings
+        ]
+    }
+
+
+@app.post(f"{settings.API_PREFIX}/websocket-test")
+async def run_websocket_test(
+    target: str = Query(..., description="Base URL to discover WebSocket endpoints")
+):
+    """
+    WebSocket Security Testing
+
+    Tests for:
+    - Authentication bypass
+    - CORS bypass (CSWSH)
+    - Message injection
+    - Race conditions
+    - DoS vulnerabilities
+    """
+    from app.modules import WebSocketTester
+
+    tester = WebSocketTester()
+    findings = await tester.full_test(target)
+
+    return {
+        "target": target,
+        "findings_count": len(findings),
+        "findings": [
+            {
+                "type": f.vuln_type,
+                "severity": f.severity,
+                "url": f.url,
+                "description": f.description,
+                "evidence": f.evidence,
+                "poc": f.poc
+            }
+            for f in findings
+        ]
+    }
+
+
+@app.post(f"{settings.API_PREFIX}/chain-exploit")
+async def run_chain_exploit(
+    target: str = Query(..., description="Target URL"),
+    param: str = Query("id", description="Parameter to test")
+):
+    """
+    Chained Exploitation
+
+    Attempts to chain vulnerabilities:
+    - SSRF -> Redis -> RCE
+    - LFI -> Log Poisoning -> RCE
+    - XXE -> SSRF -> Cloud Metadata
+    - SQLi -> File Write -> Webshell
+    """
+    from app.modules import ChainExploiter
+
+    exploiter = ChainExploiter()
+    chains = await exploiter.run_all_chains(target, param)
+
+    return {
+        "target": target,
+        "chains_attempted": len(chains),
+        "successful_chains": len([c for c in chains if c.success]),
+        "chains": [
+            {
+                "name": c.name,
+                "severity": c.severity,
+                "success": c.success,
+                "impact": c.final_impact,
+                "steps": [
+                    {"name": s.name, "success": s.success, "result": s.result}
+                    for s in c.steps
+                ],
+                "poc": c.poc if c.success else None
+            }
+            for c in chains
+        ]
+    }
+
+
 # ========== STATIC FRONTEND SERVING ==========
 
 # Mount static files if frontend is built
