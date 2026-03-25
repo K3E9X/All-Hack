@@ -58,13 +58,23 @@ fi
 if [ "$NEED_NODE" = true ]; then
     log "Installing Node.js 20..."
     if [ "$OS" == "ubuntu" ] || [ "$OS" == "debian" ]; then
-        curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-        sudo apt-get install -y nodejs
+        if [ "$EUID" -eq 0 ]; then
+            curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+            apt-get install -y nodejs
+        else
+            curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+            sudo apt-get install -y nodejs
+        fi
     elif [ "$OS" == "macos" ]; then
         brew install node@20
     elif [ "$OS" == "fedora" ] || [ "$OS" == "rhel" ] || [ "$OS" == "centos" ]; then
-        curl -fsSL https://rpm.nodesource.com/setup_20.x | sudo bash -
-        sudo dnf install -y nodejs
+        if [ "$EUID" -eq 0 ]; then
+            curl -fsSL https://rpm.nodesource.com/setup_20.x | bash -
+            dnf install -y nodejs
+        else
+            curl -fsSL https://rpm.nodesource.com/setup_20.x | sudo bash -
+            sudo dnf install -y nodejs
+        fi
     else
         error "Install Node.js 20+ manually: https://nodejs.org/"
     fi
@@ -90,8 +100,13 @@ if ! pgrep -x "ollama" > /dev/null 2>&1; then
     if [ "$OS" == "macos" ]; then
         brew services start ollama 2>/dev/null || ollama serve &
     else
-        sudo systemctl enable ollama 2>/dev/null || true
-        sudo systemctl start ollama 2>/dev/null || ollama serve &
+        if [ "$EUID" -eq 0 ]; then
+            systemctl enable ollama 2>/dev/null || true
+            systemctl start ollama 2>/dev/null || ollama serve &
+        else
+            sudo systemctl enable ollama 2>/dev/null || true
+            sudo systemctl start ollama 2>/dev/null || ollama serve &
+        fi
     fi
     sleep 2
 fi
