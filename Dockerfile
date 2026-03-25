@@ -1,35 +1,41 @@
-# All-Hack Dockerfile
 FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install system dependencies
+# System dependencies
 RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Node.js for frontend build
+# Node.js 20
 RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
     && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy backend requirements first for caching
+# Python dependencies
 COPY backend/requirements.txt ./backend/
 RUN pip install --no-cache-dir -r backend/requirements.txt
 
-# Copy and build frontend
-COPY frontend/package*.json ./frontend/
-WORKDIR /app/frontend
-RUN npm ci
+# Playwright for screenshots
+RUN pip install playwright==1.40.0 \
+    && playwright install chromium \
+    && playwright install-deps chromium \
+    || true
 
+# Frontend build
+COPY frontend/package.json frontend/package-lock.json* ./frontend/
+WORKDIR /app/frontend
+RUN npm ci || npm install
 COPY frontend/ ./
 RUN npm run build
 
-# Copy backend
+# Backend
 WORKDIR /app
 COPY backend/ ./backend/
 
-# Environment
+# Screenshots directory
+RUN mkdir -p /app/backend/screenshots
+
 ENV PYTHONUNBUFFERED=1
 ENV API_HOST=0.0.0.0
 ENV API_PORT=8001
