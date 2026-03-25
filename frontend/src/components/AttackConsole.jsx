@@ -435,6 +435,123 @@ function AttackConsole() {
                           </pre>
                         </div>
                       )}
+
+                      {/* Exploitation Timeline */}
+                      {finding.timeline && finding.timeline.length > 0 && (
+                        <div>
+                          <div className="text-[10px] uppercase text-gray-500 mb-1">Exploitation Timeline</div>
+                          <div className="bg-neutral-950 rounded p-2 space-y-2 max-h-64 overflow-y-auto">
+                            {finding.timeline.map((step, stepIdx) => (
+                              <div
+                                key={stepIdx}
+                                className={`text-xs border-l-2 pl-2 ${
+                                  step.success ? 'border-green-500' : 'border-neutral-700'
+                                }`}
+                              >
+                                <div className="flex items-center gap-2">
+                                  <span className="text-gray-500 font-mono">#{step.step}</span>
+                                  <span className={step.success ? 'text-green-400' : 'text-gray-400'}>
+                                    {step.action}
+                                  </span>
+                                </div>
+                                {step.response_status && (
+                                  <div className="text-gray-600 mt-0.5">
+                                    Status: <span className={
+                                      step.response_status >= 200 && step.response_status < 300
+                                        ? 'text-green-400'
+                                        : step.response_status >= 400
+                                          ? 'text-red-400'
+                                          : 'text-yellow-400'
+                                    }>{step.response_status}</span>
+                                  </div>
+                                )}
+                                {step.note && (
+                                  <div className="text-green-400 mt-0.5">{step.note}</div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* HTTP Captures */}
+                      {finding.http_captures && finding.http_captures.length > 0 && (
+                        <div>
+                          <div className="text-[10px] uppercase text-gray-500 mb-1">HTTP Captures</div>
+                          <div className="space-y-2">
+                            {finding.http_captures.slice(-3).map((capture, capIdx) => (
+                              <div key={capIdx} className="bg-neutral-950 rounded overflow-hidden">
+                                <div
+                                  className="px-2 py-1 bg-neutral-900 text-[10px] flex justify-between cursor-pointer"
+                                  onClick={() => {
+                                    const el = document.getElementById(`capture-${idx}-${capIdx}`)
+                                    if (el) el.classList.toggle('hidden')
+                                  }}
+                                >
+                                  <span className="text-blue-400 font-mono">
+                                    {capture.request?.method} {capture.request?.url?.slice(0, 50)}...
+                                  </span>
+                                  <span className={
+                                    capture.response?.status >= 200 && capture.response?.status < 300
+                                      ? 'text-green-400'
+                                      : capture.response?.status >= 400
+                                        ? 'text-red-400'
+                                        : 'text-yellow-400'
+                                  }>
+                                    {capture.response?.status} ({capture.response?.time?.toFixed(2)}s)
+                                  </span>
+                                </div>
+                                <div id={`capture-${idx}-${capIdx}`} className="hidden p-2 text-xs font-mono space-y-2">
+                                  <div>
+                                    <div className="text-gray-500 text-[10px] mb-1">REQUEST</div>
+                                    <div className="text-blue-400">
+                                      {capture.request?.method} {capture.request?.url}
+                                    </div>
+                                    {capture.request?.headers && (
+                                      <div className="text-gray-500 mt-1">
+                                        {Object.entries(capture.request.headers).map(([k, v]) => (
+                                          <div key={k}>{k}: {v}</div>
+                                        ))}
+                                      </div>
+                                    )}
+                                    {capture.request?.body && (
+                                      <pre className="text-gray-400 mt-1 whitespace-pre-wrap">
+                                        {capture.request.body}
+                                      </pre>
+                                    )}
+                                  </div>
+                                  <div>
+                                    <div className="text-gray-500 text-[10px] mb-1">RESPONSE</div>
+                                    <pre className="text-gray-400 whitespace-pre-wrap max-h-32 overflow-y-auto">
+                                      {capture.response?.body?.slice(0, 500)}
+                                      {capture.response?.body?.length > 500 && '...'}
+                                    </pre>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Screenshot */}
+                      {finding.screenshot_path && (
+                        <div>
+                          <div className="text-[10px] uppercase text-gray-500 mb-1">Screenshot</div>
+                          <div className="bg-neutral-950 rounded p-2">
+                            <img
+                              src={`${API_URL.replace('/api/v1', '')}/screenshots/${finding.screenshot_path.split('/').pop()}`}
+                              alt="Vulnerability screenshot"
+                              className="w-full rounded border border-neutral-700"
+                              onError={(e) => {
+                                e.target.style.display = 'none'
+                                e.target.nextSibling.style.display = 'block'
+                              }}
+                            />
+                            <p className="text-gray-500 text-xs hidden">Screenshot unavailable</p>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

