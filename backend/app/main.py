@@ -2181,6 +2181,14 @@ async def run_chain_exploit(
     }
 
 
+# ========== SCREENSHOTS SERVING ==========
+
+# Mount screenshots directory
+SCREENSHOTS_DIR = Path(__file__).parent.parent / "screenshots"
+SCREENSHOTS_DIR.mkdir(exist_ok=True)
+app.mount("/screenshots", StaticFiles(directory=SCREENSHOTS_DIR), name="screenshots")
+
+
 # ========== STATIC FRONTEND SERVING ==========
 
 # Mount static files if frontend is built
