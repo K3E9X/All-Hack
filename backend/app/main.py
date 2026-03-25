@@ -14,6 +14,7 @@ from app.config import settings
 from app.intelligent_agent import IntelligentPentestAgent, ConfidenceLevel
 from app.vuln_enrichment import VulnerabilityEnrichmentSystem
 from app.autonomous_exploiter import get_exploiter, AutonomousExploiter
+from app.unified_scanner import get_unified_scanner, UnifiedScanner
 from app.models import ScanRequest, ScanResult, ScanProgress
 from app.ai_enhanced_orchestrator import AIEnhancedScanOrchestrator
 
@@ -1802,6 +1803,121 @@ async def get_payloads(
         "count": len(result) if isinstance(result, list) else "dict",
         "payloads": result
     }
+
+
+# ========== UNIFIED SCANNER ENDPOINTS ==========
+
+@app.post(f"{settings.API_PREFIX}/attack")
+async def start_unified_attack(
+    target_url: str = Query(..., description="Target URL"),
+    max_pages: int = Query(50, description="Max pages to crawl", le=200),
+    background_tasks: BackgroundTasks = None
+):
+    """
+    Full Attack - All-in-One Security Assessment
+
+    Runs complete security scan including:
+    - Reconnaissance and crawling
+    - Technology detection
+    - SQL Injection testing
+    - XSS testing
+    - LFI/Path traversal
+    - SSTI detection
+    - SSRF testing
+    - Command injection
+    - XXE testing
+    - NoSQL injection
+    - GraphQL exploitation
+    """
+    scanner = get_unified_scanner()
+    session = await scanner.full_scan(target_url, max_pages)
+
+    return {
+        "scan_id": session.scan_id,
+        "target": session.target_url,
+        "status": session.phase.value,
+        "progress": session.progress,
+        "findings_count": len(session.findings),
+        "endpoints_discovered": len(session.endpoints_discovered),
+        "technologies": session.technologies,
+        "findings": [f.to_dict() for f in session.findings],
+        "severity_summary": session._count_severities(),
+        "total_requests": session.total_requests
+    }
+
+
+@app.post(f"{settings.API_PREFIX}/attack/async")
+async def start_async_attack(
+    target_url: str = Query(..., description="Target URL"),
+    max_pages: int = Query(50, description="Max pages to crawl", le=200),
+    background_tasks: BackgroundTasks = None
+):
+    """
+    Start Async Attack - Returns immediately with scan_id
+
+    Poll /attack/{scan_id}/status for progress
+    """
+    import asyncio
+
+    scanner = get_unified_scanner()
+    scan_id = scanner._generate_id()
+
+    # Create initial session
+    from app.unified_scanner import ScanSession, ScanPhase
+    from datetime import datetime
+
+    session = ScanSession(
+        scan_id=scan_id,
+        target_url=target_url,
+        start_time=datetime.now().isoformat(),
+        phase=ScanPhase.INIT
+    )
+    scanner.sessions[scan_id] = session
+
+    # Run scan in background
+    async def run_scan():
+        await scanner.full_scan(target_url, max_pages)
+
+    asyncio.create_task(run_scan())
+
+    return {
+        "scan_id": scan_id,
+        "status": "started",
+        "message": "Scan started. Poll /attack/{scan_id}/status for progress"
+    }
+
+
+@app.get(f"{settings.API_PREFIX}/attack/{{scan_id}}/status")
+async def get_attack_status(scan_id: str):
+    """Get attack scan status and recent events"""
+    scanner = get_unified_scanner()
+    status = scanner.get_session_status(scan_id)
+
+    if not status:
+        raise HTTPException(status_code=404, detail="Scan not found")
+
+    return status
+
+
+@app.get(f"{settings.API_PREFIX}/attack/{{scan_id}}")
+async def get_attack_results(scan_id: str):
+    """Get full attack results"""
+    scanner = get_unified_scanner()
+    session = scanner.get_session(scan_id)
+
+    if not session:
+        raise HTTPException(status_code=404, detail="Scan not found")
+
+    return session.to_dict()
+
+
+@app.post(f"{settings.API_PREFIX}/attack/{{scan_id}}/stop")
+async def stop_attack(scan_id: str):
+    """Stop running attack"""
+    scanner = get_unified_scanner()
+    scanner.stop_scan(scan_id)
+
+    return {"status": "stop_requested", "scan_id": scan_id}
 
 
 # ========== STATIC FRONTEND SERVING ==========
