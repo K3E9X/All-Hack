@@ -1,657 +1,83 @@
-<div align="center">
+# All-Hack
 
-```
-   █████╗ ██╗     ██╗          ██╗  ██╗ █████╗  ██████╗██╗  ██╗
-  ██╔══██╗██║     ██║          ██║  ██║██╔══██╗██╔════╝██║ ██╔╝
-  ███████║██║     ██║          ███████║███████║██║     █████╔╝
-  ██╔══██║██║     ██║          ██╔══██║██╔══██║██║     ██╔═██╗
-  ██║  ██║███████╗███████╗     ██║  ██║██║  ██║╚██████╗██║  ██╗
-  ╚═╝  ╚═╝╚══════╝╚══════╝     ╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝
-```
+Automated penetration testing tool.
 
-### Advanced Penetration Testing Framework
+## Features
 
-**Professional-grade automated security testing** with AI-enhanced analysis
+- **Vulnerability Scanning**: SQLi, XSS, LFI, RCE, SSRF, SSTI, XXE, NoSQL, JWT, GraphQL
+- **API Security**: BOLA, BFLA, Mass Assignment, Rate Limiting
+- **WebSocket Testing**: Auth bypass, injection, race conditions
+- **Recon**: Crawling, tech detection, subdomain enum, port scan
+- **Fuzzing**: Mutation-based, format strings, buffer overflow
+- **Exploitation Timeline**: Step-by-step tracking with HTTP captures
+- **Screenshots**: Automatic capture for critical findings
 
-[![Version](https://img.shields.io/badge/version-3.0.0-blue)](https://github.com/K3E9X/All-Hack)
-[![Status](https://img.shields.io/badge/status-production--ready-green)](https://github.com/K3E9X/All-Hack)
-[![AI](https://img.shields.io/badge/AI-100%25%20active-purple)](https://github.com/K3E9X/All-Hack)
-[![Python](https://img.shields.io/badge/python-3.9--3.12-green)](https://www.python.org/)
-[![React](https://img.shields.io/badge/react-18+-61dafb)](https://reactjs.org/)
-[![License](https://img.shields.io/badge/license-MIT-orange)](./LICENSE)
-[![GitHub](https://img.shields.io/badge/by-K3E9X-black?logo=github)](https://github.com/K3E9X)
+## Requirements
 
----
+- Python 3.9+
+- Node.js 18+
 
-### All-in-One Security Testing Solution
-
-**OWASP Top 10** • **API Security** • **AI-Powered** • **Grey Box Testing** • **120+ Vulnerabilities** • **15,700+ Lines of Code**
-
-> **v3.0.0 - Autonomous Pentest** | Intelligent Agent | Zero False Positives | Auto-Enrichment
-
-<!--
-🎬 Demo GIF Coming Soon!
-Add your demo GIF at ./assets/demo.gif
-See assets/GIF_CREATION_GUIDE.md for instructions
-
-![Demo](./assets/demo.gif)
--->
-
-</div>
-
-## Table of Contents
-
-- [Legal Warning](#legal-warning)
-- [Key Features](#key-features)
-- [Quick Start](#quick-start)
-- [Usage](#usage)
-- [Architecture](#architecture)
-- [Statistics & Coverage](#statistics--coverage)
-- [Security & Best Practices](#security--best-practices)
-- [Contact](#contact)
-
----
-
-## Legal Warning
-
-**IMPORTANT:** This tool is designed for **authorized security testing and educational purposes only**.
-
-- Use on systems you own
-- Use with explicit written permission
-- Unauthorized penetration testing is **illegal**
-- Never use on production systems without approval
-
-**You are responsible for your actions. Use ethically and legally.**
-
----
-
-## What's New in v3.0.0
-
-**Unified Architecture** (Mar 2026)
-- Single endpoint: Frontend + Backend on port 8001
-- No more separate servers - one command to start everything
-- Production-ready deployment
-
-**Intelligent Pentest Agent** (NEW!)
-- Chain-of-thought reasoning for every finding
-- Multi-stage validation - zero false positives
-- Evidence-based reporting - no hallucinations
-- Confidence scoring: Confirmed > High > Medium > Low
-- Learns from past scans to improve accuracy
-- Supports: SQLi, XSS, RCE, LFI, SSRF, IDOR, Auth Bypass
-
-**Vulnerability Enrichment System** (NEW!)
-- Auto-updates from NVD (National Vulnerability Database)
-- Searches GitHub for public POCs automatically
-- Fetches Nuclei detection templates
-- Links exploits to CVEs
-- Background updates - always current
-
-**Previous Features (v2.0.0)**
-- Memory system learns from every scan (40% faster)
-- AI-powered payload generation (10+ variants per vuln)
-- Exploitation chain discovery (multi-step attacks)
-- Professional reports (executive, technical, remediation, risk)
-- Real-time chat interface
-- 15,700+ lines of production-ready code
-
----
-
-## Key Features
-
-### OWASP Top 10 Coverage
-- **SQL Injection** - Time-based, boolean-based, error-based detection
-- **Cross-Site Scripting (XSS)** - Reflected, stored, DOM-based
-- **Command Injection** - OS command execution vulnerabilities
-- **Server-Side Request Forgery (SSRF)** - Internal network probing
-- **Security Misconfigurations** - Headers, CORS, SSL/TLS
-
-### API Security Testing (NEW!)
-- **JWT Security** - Algorithm confusion, weak secrets, claims manipulation (87 built-in secrets)
-- **GraphQL Security** - Schema introspection, batching attacks, nested queries
-- **NoSQL Injection** - MongoDB, CouchDB, Redis, Cassandra (blind injection + data extraction)
-- **File Upload Vulnerabilities** - 10 attack vectors including polyglot files, XXE, ZIP slip
-- **OAuth 2.0 Security** - CSRF, redirect_uri bypass, token leakage (13+ bypass techniques)
-- **SAML Security** - XXE, signature wrapping, assertion replay
-
-### Access Control Testing
-- **IDOR Detection** - Horizontal & vertical, authenticated endpoint testing
-- **Privilege Escalation** - Vertical escalation, function-level access control
-- **Authorization Bypass** - Role manipulation, missing access checks
-
-### Intelligent Pentest Agent - ZERO FALSE POSITIVES
-- **Chain-of-Thought Reasoning** - Every finding validated with explicit reasoning
-- **Multi-Stage Validation** - Detects → Validates → Confirms with evidence
-- **Confidence Scoring** - Confirmed > High > Medium > Low (no guessing!)
-- **Evidence Collection** - Proof for every vulnerability reported
-- **Learning System** - Improves accuracy from past scans
-- **No Hallucinations** - Only reports what can be proven
-
-### Vulnerability Enrichment System - AUTO-UPDATES
-- **NVD Integration** - Latest CVEs fetched automatically
-- **GitHub POC Search** - Finds public exploits for each CVE
-- **Nuclei Templates** - Detection templates auto-downloaded
-- **CVE-Exploit Linking** - Automatic correlation
-- **Background Updates** - Always current, never outdated
-
-### AI-Powered Agent System - FULLY OPERATIONAL
-- **Memory System** - Learns from every scan, 40% faster on similar targets ($0 with Ollama)
-- **Intelligent Payload Generation** - Context-aware payloads, WAF evasion, 10+ variants per vuln
-- **Exploitation Chain Builder** - Discovers multi-step attacks (XSS→CSRF→Account Takeover)
-- **Professional Report Generator** - 4 report types (executive, technical, remediation, risk)
-- **Real-Time Chat** - Ask AI questions about scan results via WebSocket
-- **Autonomous Decisions** - AI adapts testing strategy during scans
-
-### Black Box vs Grey Box Testing (NEW!)
-- **Black Box Mode** - External testing without authentication (~50-100 endpoints)
-- **Grey Box Mode** - Authenticated testing with credentials (~150-300 endpoints)
-- **3-6x More Coverage** in grey box mode
-- **Critical IDOR & Privilege Escalation** testing in grey box
-- See [MODE_DIFFERENTIATION.md](./MODE_DIFFERENTIATION.md) for detailed comparison
-
-### Advanced Reconnaissance
-- **Technology Detection** - Wappalyzer-style fingerprinting
-- **Endpoint Discovery** - 250+ common endpoints + authenticated discovery (grey box)
-- **Directory Fuzzing** - Intelligent fuzzing with adaptive wordlists
-- **Subdomain Enumeration** - Comprehensive subdomain discovery
-- **Port Scanning** - 30+ critical ports with service detection
-- **SSL/TLS Analysis** - Certificate validation, cipher strength
-
-### Intelligent & Adaptive
-- **Scan Depth Modes** - Quick, Balanced, Deep
-- **Adaptive Testing** - Adjusts strategy based on findings
-- **Smart Endpoint Selection** - Prioritizes high-value targets
-- **Real-time Progress** - Live updates and timeline events
-
-### Robust & Reliable
-- **Auto-retry** - Exponential backoff for network failures
-- **Auto-save** - Every 5 minutes with crash recovery
-- **Long-running Scans** - 12-hour timeout for comprehensive testing
-- **Stability Monitoring** - Tracks target stability during scans
-- **IP Address Support** - URLs, domains, and IP addresses
-
----
-
-## Statistics & Coverage
-
-### Vulnerability Detection
-- **120+ vulnerability types** tested across all scanners
-- **20+ CWE classifications** covered
-- **OWASP Top 10 2021** complete coverage
-- **API Security OWASP Top 10** complete coverage
-- **17,000+ lines** of production-ready code
-- **55+ API endpoints** (REST + WebSocket + Intelligence + Enrichment)
-- **Zero false positives** with intelligent validation
-
-### Testing Depth
-| Scan Mode | Endpoints | Payloads/Endpoint | Duration | Coverage |
-|-----------|-----------|-------------------|----------|----------|
-| Quick   | Priority  | ~3                | 30-60 min | 60% |
-| Balanced | Standard | ~10               | 2-4 hours | 85% |
-| Deep    | All       | Full              | 8-12 hours | 95%+ |
-
-### Black Box vs Grey Box
-| Aspect | Black Box | Grey Box | Improvement |
-|--------|-------------|------------|-------------|
-| Endpoints | 50-100 | 150-300 | **3-6x** |
-| IDOR Tests | Limited | Comprehensive | **10-30x** |
-| Critical Vulns | 0-2 | 5-15 | **5-10x** |
-
-### New API Endpoints (v3.0.0)
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/v1/intelligent/analyze` | POST | Analyze with chain-of-thought reasoning |
-| `/api/v1/intelligent/reasoning` | GET | View reasoning chain |
-| `/api/v1/intelligent/findings` | GET | Get validated findings |
-| `/api/v1/vulns/update` | POST | Update vulnerability database |
-| `/api/v1/vulns/search` | GET | Search vulnerabilities |
-| `/api/v1/vulns/stats` | GET | Database statistics |
-| `/api/v1/vulns/{id}` | GET | Vulnerability details |
-| `/api/v1/vulns/search-pocs` | POST | Search GitHub POCs |
-| `/api/v1/vulns/{id}/enrich` | POST | Enrich specific CVE |
-
----
-
-## Quick Start
-
-### Prerequisites
-
-- **Python 3.9-3.12** (WARNING: 3.14+ not yet supported)
-- **Node.js 18+**
-- **Git**
-
-### Installation (One-Time Setup)
+## Installation
 
 ```bash
-# Clone the repository
 git clone https://github.com/K3E9X/All-Hack.git
 cd All-Hack
+chmod +x install.sh && ./install.sh
+```
 
-# Run the setup script (does everything!)
-./setup.sh
+Or manually:
 
-# OR manual setup:
-
+```bash
 # Backend
 cd backend
 python3 -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
-pip install --upgrade pip
+source venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env
+playwright install chromium
 
-# Frontend (build for production)
+# Frontend
 cd ../frontend
 npm install
-cp .env.example .env
 npm run build
 ```
 
-### Launch (Single Command!)
-
-```bash
-# Start everything on port 8001
-cd backend
-source venv/bin/activate
-uvicorn app.main:app --host 0.0.0.0 --port 8001
-```
-
-**That's it!** Access the application at **http://localhost:8001**
-
-**Console output:**
-```
-IntelligentPentestAgent initialized
-VulnerabilityEnrichmentSystem initialized
-AI-Enhanced Scanner Orchestrator initialized with AI Agent!
-   ├─ Memory System: ACTIVE
-   ├─ Intelligent Agent: ACTIVE (Zero False Positives)
-   ├─ Vulnerability Enrichment: ACTIVE (NVD + GitHub POCs)
-   └─ Report Generator: ACTIVE
-```
-
-Press `Ctrl+C` to stop.
-
-### Development Mode (Optional)
-
-If you want hot-reload for frontend development:
-
-```bash
-# Terminal 1: Backend
-cd backend && source venv/bin/activate
-uvicorn app.main:app --reload --port 8001
-
-# Terminal 2: Frontend dev server
-cd frontend
-npm run dev
-```
-
-Access dev frontend at **http://localhost:5173**
-
-### Linux/Ubuntu Quick Setup
-
-```bash
-# 1. Install prerequisites
-sudo apt update && sudo apt install python3 python3-venv nodejs npm git
-
-# 2. Clone and setup
-git clone https://github.com/K3E9X/All-Hack.git
-cd All-Hack
-./setup.sh
-
-# 3. Launch
-cd backend && source venv/bin/activate
-uvicorn app.main:app --host 0.0.0.0 --port 8001
-```
-
-Open **http://localhost:8001**
-
----
-
 ## Usage
 
-### Basic Scan
-
-1. Open **http://localhost:5173**
-2. Enter target URL (e.g., `https://example.com`)
-3. Select **scan mode**:
-   - **Black Box** - External testing (no credentials)
-   - **Grey Box** - Authenticated testing (provide token)
-4. Choose **scan depth**:
-   - **Quick** - Fast scan (~30-60 min)
-   - **Balanced** - Standard depth (~2-4 hours)
-   - **Deep** - Maximum coverage (~8-12 hours)
-5. Click **Start Scan**
-
-### Grey Box Testing (Recommended)
-
-For comprehensive testing with authentication:
-
-1. Select **Grey Box** mode
-2. Provide **auth token** (JWT/Bearer token)
-3. Optionally provide **authentication sequence** for complex login flows
-4. Tool will discover **70+ authenticated endpoints** automatically
-5. **3-6x more coverage** than black box
-
-### Enable AI Features (Optional - FREE!)
-
-**Option 1: Ollama (Local, $0 cost)** - Recommended for testing
-```bash
-# Install Ollama
-curl -fsSL https://ollama.com/install.sh | sh
-
-# Start Ollama & download model (~4GB)
-ollama serve &
-ollama pull llama3.2
-
-# Enable in backend/.env
-ENABLE_AI_AGENT=true  # Change to true!
-```
-
-**Option 2: Claude API (Paid, better quality)**
-```bash
-# In backend/.env
-ANTHROPIC_API_KEY=sk-ant-your-key-here
-ENABLE_AI_AGENT=true
-```
-
-**Test AI features:**
-```bash
-# Run demo (no LLM needed)
-python3 test_ai_demo.py
-
-# See full guide
-cat AI_TESTING_GUIDE.md
-```
-
-### Advanced Configuration
-
-```bash
-cd backend
-cp .env.example .env
-# Edit .env to customize settings
-```
-
-**Key Settings:**
-```bash
-# API Configuration
-API_PORT=8001
-ALLOWED_ORIGINS=http://localhost:5173
-
-# Scan Configuration
-MAX_CONCURRENT_SCANS=5
-SCAN_TIMEOUT=43200  # 12 hours
-REQUEST_TIMEOUT=60
-
-# AI Agent (see section above for setup)
-ENABLE_AI_AGENT=false  # Set to true after Ollama setup
-ANTHROPIC_API_KEY=     # Optional: Claude API key
-```
-
----
-
-## Architecture
-
-```
-All-Hack/
-├── backend/
-│   ├── app/
-│   │   ├── main.py                    # FastAPI + Static frontend serving
-│   │   ├── intelligent_agent.py       # Zero-FP validation (NEW!)
-│   │   ├── vuln_enrichment.py         # CVE/POC auto-updates (NEW!)
-│   │   ├── scanner_orchestrator.py    # Main scan coordinator
-│   │   ├── ai_enhanced_orchestrator.py # AI-powered scanning
-│   │   ├── config.py                  # Configuration
-│   │   ├── models/                    # Data models
-│   │   ├── scanners/
-│   │   │   ├── owasp/                 # OWASP Top 10 scanners
-│   │   │   ├── api_security/          # API security scanners
-│   │   │   │   ├── jwt_scanner.py
-│   │   │   │   ├── graphql_scanner.py
-│   │   │   │   ├── nosql_injection.py
-│   │   │   │   ├── file_upload_scanner.py
-│   │   │   │   ├── oauth_scanner.py
-│   │   │   │   └── saml_scanner.py
-│   │   │   ├── access_control/        # IDOR, privilege escalation
-│   │   │   ├── reconnaissance/        # Tech detection, endpoint discovery
-│   │   │   ├── advanced/              # Port scan, subdomain enum
-│   │   │   └── misconfig/             # Security headers, CORS
-│   │   ├── ai_agent/                  # AI Agent System
-│   │   │   ├── memory_system.py       # Persistent learning
-│   │   │   ├── payload_generator.py   # AI payload generation
-│   │   │   ├── exploitation_chains.py # Chain discovery
-│   │   │   ├── report_generator.py    # Professional reports
-│   │   │   └── enhanced_autonomous_agent.py
-│   │   ├── intelligence/              # Scan brain & analysis
-│   │   ├── utils/                     # HTTP client, validators
-│   │   └── persistence/               # Auto-save & resume
-│   └── requirements.txt
-├── frontend/
-│   ├── dist/                          # Production build (served by backend)
-│   ├── src/
-│   │   ├── App.jsx                    # Main application
-│   │   ├── components/
-│   │   │   ├── Scanner.jsx            # Scan configuration
-│   │   │   └── Results.jsx            # Results display
-│   │   └── main.jsx
-│   └── package.json
-├── setup.sh                           # One-command setup script
-└── README.md                          # This file
-```
-
----
-
-## Scan Phases
-
-### Phase 1: Reconnaissance (20-30 min)
-- Technology detection (Wappalyzer-style)
-- Endpoint discovery (crawling + fuzzing)
-- **Grey Box**: Authenticated endpoint discovery (+70 endpoints)
-- API schema collection (Swagger, OpenAPI)
-- Browser-based crawling (if enabled)
-- Intelligence gathering
-
-### Phase 2: OWASP Top 10 Scanning (2-8 hours)
-- SQL Injection (time-based, boolean, error-based)
-- XSS (reflected, stored, DOM)
-- Command Injection
-- SSRF
-- **API Security** (JWT, GraphQL, NoSQL, File Upload, OAuth, SAML)
-
-### Phase 3: Access Control Testing (30-60 min)
-- IDOR detection
-  - **Black Box**: 10 public endpoints
-  - **Grey Box**: ALL endpoints + write operations
-- Privilege escalation (grey box exclusive)
-
-### Phase 4: Security Misconfigurations (15-30 min)
-- Security headers
-- CORS policies
-- SSL/TLS analysis
-- Port scanning
-- Directory fuzzing
-
-### Phase 5: Advanced (if enabled)
-- Subdomain enumeration
-- **AI Agent** analysis (if enabled)
-- Exploitation chain discovery
-- Professional report generation
-
----
-
-## Platform Support
-
-| Platform | Support | Notes |
-|----------|---------|-------|
-| **Linux** | Full | Recommended |
-| **macOS Intel** | Full | Requires Xcode CLI tools |
-| **macOS ARM (M1/M2/M3)** | Full | Native Apple Silicon support |
-| **Windows** | WSL2 | WSL2 recommended |
-
-### macOS Prerequisites
-
-```bash
-# Install Xcode Command Line Tools (required)
-xcode-select --install
-
-# Install Homebrew
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-
-# Install Python 3.11 or 3.12 and Node.js
-brew install python@3.11 node
-```
-
----
-
-## Optional Features
-
-### AI Agent System - FULLY OPERATIONAL
-
-**FREE Option: Ollama (Recommended)**
-```bash
-curl -fsSL https://ollama.com/install.sh | sh
-ollama serve &
-ollama pull llama3.2
-# Set ENABLE_AI_AGENT=true in backend/.env
-```
-
-**Paid Option: Claude API**
-```bash
-# In backend/.env
-ANTHROPIC_API_KEY=sk-ant-your-key-here
-ENABLE_AI_AGENT=true
-```
-
-**What you get:**
-- Memory system - 40% faster on similar targets
-- Intelligent payloads - 10+ variants per vulnerability
-- Exploitation chains - Multi-step attack discovery
-- Professional reports - 4 types (executive, technical, remediation, risk)
-- Real-time chat - Ask AI about scan results
-- Autonomous decisions - AI adapts during scans
-
-**See [AI_TESTING_GUIDE.md](./AI_TESTING_GUIDE.md) for complete setup!**
-
-### Browser-Based Crawling (Playwright)
-
-For dynamic SPAs (React/Vue/Angular):
-
 ```bash
 cd backend
 source venv/bin/activate
-pip install playwright==1.40.0
-playwright install chromium
+uvicorn app.main:app --host 0.0.0.0 --port 8001
 ```
 
-### External Tools (Not Yet Implemented)
+Open http://localhost:8001
 
-- **SQLMap** - Advanced SQL injection
-- **Nuclei** - Community templates
+1. Enter target URL
+2. Click Start
+3. View findings with payloads, timeline, and curl commands
 
-See `PROJECT_GAPS.md` for limitations.
+## API
 
----
+```bash
+# Start scan
+curl -X POST "http://localhost:8001/api/v1/attack/async?target_url=https://target.com"
 
-## Documentation
+# Get status
+curl "http://localhost:8001/api/v1/attack/{scan_id}/status"
 
-**Essential Guides:**
-- **[AI_TESTING_GUIDE.md](./AI_TESTING_GUIDE.md)** ⭐ - Complete AI features testing guide (30+ pages)
-- **[PHASE_2_3_VERIFICATION.md](./PHASE_2_3_VERIFICATION.md)** - Phase 2 & 3 verification report (100% complete)
-- **[MODE_DIFFERENTIATION.md](./MODE_DIFFERENTIATION.md)** - Black Box vs Grey Box detailed guide
-- **[test_ai_demo.py](./test_ai_demo.py)** - Interactive demo script (run immediately!)
+# Get results
+curl "http://localhost:8001/api/v1/attack/{scan_id}"
+```
 
-**Development Logs:**
-- **[MARATHON_SESSION_SUMMARY.md](./MARATHON_SESSION_SUMMARY.md)** - Development session log
-- **[AI_ROADMAP.md](./AI_ROADMAP.md)** - AI features roadmap
-- **[PROJECT_GAPS.md](./PROJECT_GAPS.md)** - Known limitations
+## Docker
 
----
+```bash
+docker-compose up -d
+```
 
-## Security & Best Practices
+## Legal
 
-### Important Reminders
-
-- **Private Networks Only** - Never expose to the Internet
-- **Authorized Testing** - Always get written permission
-- **Confidential Results** - Keep scan results secure
-- **Responsible Disclosure** - Report findings responsibly
-- **WARNING: Loud Testing** - This tool is **NOT stealthy** (many requests)
-
-### Scan Impact
-
-- **Request Volume**: 1,000-10,000+ requests per scan
-- **Server Load**: Moderate to high
-- **Network Traffic**: Significant bandwidth usage
-- **Detection**: Easily detectable by WAF/IDS
-
-**Recommendation**: Run during maintenance windows or on staging environments.
-
----
-
-## Educational Use
-
-This tool is perfect for:
-- **Security Training** - Learn penetration testing techniques
-- **Academic Research** - Study web application security
-- **Security Labs** - Practice in controlled environments
-- **OWASP Learning** - Understand vulnerability types
-- **Tool Development** - Build your own security tools
-
----
-
-## Contributing
-
-Contributions are welcome! Areas for improvement:
-
-- New scanners (XXE, Deserialization, etc.)
-- Test coverage
-- Documentation
-- UI/UX enhancements
-- Internationalization
-
----
+For authorized testing only. You are responsible for your actions.
 
 ## License
 
-**MIT License** - See [LICENSE](./LICENSE) for details
-
-**For educational and authorized security testing only.**
-
----
-
-## Acknowledgments
-
-- **OWASP** - Vulnerability classification and guidelines
-- **Anthropic** - Claude AI for intelligent payload generation
-- **Community** - Security researchers and ethical hackers
-
----
-
-## Contact
-
-- **GitHub**: [@K3E9X](https://github.com/K3E9X)
-- **Issues**: [GitHub Issues](https://github.com/K3E9X/All-Hack/issues)
-
----
-
-## Show Your Support
-
-If this tool helps you, please:
-- Star the repository
-- Fork and contribute
-- Report issues
-- Share with others
-
----
-
-<div align="center">
-
-**Built for the security community**
-
-**Created by [K3E9X](https://github.com/K3E9X)**
-
-![GitHub](https://img.shields.io/badge/github-%23121011.svg?style=for-the-badge&logo=github&logoColor=white)
-
-*2024-2026 - For authorized testing only*
-
-</div>
+MIT
