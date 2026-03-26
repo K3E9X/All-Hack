@@ -1860,6 +1860,8 @@ async def start_async_attack(
     import asyncio
 
     scanner = get_unified_scanner()
+    await scanner.initialize()
+
     scan_id = scanner._generate_id()
 
     # Create initial session
@@ -1873,10 +1875,11 @@ async def start_async_attack(
         phase=ScanPhase.INIT
     )
     scanner.sessions[scan_id] = session
+    scanner.stop_requested[scan_id] = False
 
-    # Run scan in background
+    # Run scan in background using the existing session
     async def run_scan():
-        await scanner.full_scan(target_url, max_pages)
+        await scanner._run_full_scan(session, max_pages)
 
     asyncio.create_task(run_scan())
 
