@@ -340,6 +340,95 @@ class UnifiedScanner:
                 return None, 0, {}, None
             return None, 0, {}
 
+    def _is_login_or_error_page(self, response: str) -> bool:
+        """Check if response is a login page or error page (not authenticated)"""
+        if not response:
+            return True
+        resp_lower = response.lower()
+
+        # Login page indicators
+        login_indicators = [
+            "login", "log in", "sign in", "signin", "authenticate",
+            "password", "username", "forgot password", "reset password",
+            "create account", "register", "inscription"
+        ]
+
+        # Error page indicators
+        error_indicators = [
+            "error", "denied", "forbidden", "unauthorized", "not found",
+            "access denied", "permission denied", "invalid", "failed"
+        ]
+
+        # Count login/error indicators
+        login_count = sum(1 for ind in login_indicators if ind in resp_lower)
+        error_count = sum(1 for ind in error_indicators if ind in resp_lower)
+
+        # If many login/error indicators, it's probably not a bypass
+        return login_count >= 2 or error_count >= 2
+
+    def _is_authenticated_content(self, response: str, baseline: str = None) -> bool:
+        """Check if response shows authenticated content"""
+        if not response:
+            return False
+        resp_lower = response.lower()
+
+        # Must have authenticated indicators
+        auth_indicators = [
+            "logout", "log out", "sign out", "signout", "disconnect",
+            "my account", "my profile", "dashboard", "admin panel",
+            "settings", "preferences", "welcome back", "hello,",
+            "inbox", "messages", "notifications"
+        ]
+
+        # Must NOT have login form indicators
+        login_form_indicators = [
+            'type="password"', "type='password'",
+            'name="_pass"', 'name="password"', 'name="pass"',
+            'id="login', 'class="login', 'action="login'
+        ]
+
+        has_auth = any(ind in resp_lower for ind in auth_indicators)
+        has_login_form = any(ind in response.lower() for ind in login_form_indicators)
+
+        # If baseline provided, check if response is significantly different
+        if baseline and has_auth:
+            # Response should be different from baseline (before injection)
+            baseline_len = len(baseline)
+            response_len = len(response)
+            # Significant length difference suggests different page
+            if abs(response_len - baseline_len) < 100:
+                return False
+
+        return has_auth and not has_login_form
+
+    def _validate_ssrf(self, response: str, payload: str) -> tuple:
+        """Validate SSRF - check for actual internal data exposure"""
+        if not response:
+            return False, None
+
+        resp_lower = response.lower()
+
+        # AWS metadata specific indicators
+        if "169.254.169.254" in payload:
+            aws_indicators = ["ami-", "instance-id", "local-ipv4", "security-credentials", "iam"]
+            for ind in aws_indicators:
+                if ind in resp_lower:
+                    return True, f"AWS metadata exposed: {ind}"
+
+        # Localhost/internal indicators - must show ACTUAL internal content
+        internal_content = [
+            "root:", "/etc/passwd", "localhost",
+            "internal server", "apache", "nginx",
+            "phpinfo", "server_addr", "document_root"
+        ]
+
+        # Exclude if it's just the payload reflected
+        for ind in internal_content:
+            if ind in resp_lower and payload.lower() not in resp_lower[:500]:
+                return True, f"Internal content exposed: {ind}"
+
+        return False, None
+
     # ==================== RECONNAISSANCE ====================
 
     async def _crawl(self, session: ScanSession, base_url: str, max_pages: int = 50):
@@ -536,28 +625,54 @@ class UnifiedScanner:
             step.response_status = status
             step.response_preview = resp[:200] if resp else None
 
-            if resp and (test_payload in resp or marker in resp):
-                step.success = True
-                step.note = "Payload reflected without encoding"
-                timeline.append(step)
-                if http_capture:
-                    captures.append(http_capture)
+            if resp:
+                # Check if payload is reflected in executable context
+                # Not just in input value or URL
+                is_reflected = test_payload in resp or marker in resp
 
-                finding = Finding(
-                    id=self._generate_id(),
-                    vuln_type="Cross-Site Scripting (XSS)",
-                    severity=Severity.HIGH,
-                    url=url,
-                    parameter=param,
-                    payload=test_payload,
-                    evidence="Payload reflected in response without encoding",
-                    description="XSS allows attackers to inject malicious scripts",
-                    poc=self._gen_xss_poc(url, param, test_payload),
-                    timeline=timeline,
-                    http_captures=captures
-                )
-                await self._add_finding(session, finding, test_url, "xss")
-                return
+                # Check it's not just reflected in an attribute (encoded)
+                encoded_markers = [
+                    f'value="{test_payload}',
+                    f"value='{test_payload}",
+                    f'"{test_payload}"',
+                    f"'{test_payload}'",
+                    f"&lt;script",  # HTML encoded
+                    f"%3Cscript"    # URL encoded
+                ]
+                is_encoded = any(enc in resp for enc in encoded_markers)
+
+                # Check for actual script context
+                script_contexts = [
+                    f"<script>{marker}",
+                    f"<script>alert('{marker}')",
+                    f"onerror=alert('{marker}')",
+                    f"onload=alert('{marker}')",
+                    test_payload  # Raw payload in HTML
+                ]
+                in_script_context = any(ctx in resp for ctx in script_contexts)
+
+                if is_reflected and (in_script_context or not is_encoded):
+                    step.success = True
+                    step.note = "Payload reflected in executable context"
+                    timeline.append(step)
+                    if http_capture:
+                        captures.append(http_capture)
+
+                    finding = Finding(
+                        id=self._generate_id(),
+                        vuln_type="Cross-Site Scripting (XSS)",
+                        severity=Severity.HIGH,
+                        url=url,
+                        parameter=param,
+                        payload=test_payload,
+                        evidence="Payload reflected in executable context without encoding",
+                        description="XSS allows attackers to inject malicious scripts",
+                        poc=self._gen_xss_poc(url, param, test_payload),
+                        timeline=timeline,
+                        http_captures=captures
+                    )
+                    await self._add_finding(session, finding, test_url, "xss")
+                    return
 
             timeline.append(step)
             if http_capture:
@@ -710,9 +825,11 @@ class UnifiedScanner:
             step.response_status = status
             step.response_preview = resp[:200] if resp else None
 
-            if resp and any(x in resp.lower() for x in ["localhost", "127.0.0.1", "ami-", "instance"]):
+            # Validate SSRF with strict checks
+            is_ssrf, evidence = self._validate_ssrf(resp, payload)
+            if is_ssrf:
                 step.success = True
-                step.note = "Internal resource accessed"
+                step.note = evidence
                 timeline.append(step)
                 if http_capture:
                     captures.append(http_capture)
@@ -724,7 +841,7 @@ class UnifiedScanner:
                     url=url,
                     parameter=param,
                     payload=payload,
-                    evidence="Internal resource accessed",
+                    evidence=evidence,
                     description="SSRF allows accessing internal resources",
                     poc=self._gen_ssrf_poc(url, param, payload),
                     timeline=timeline,
@@ -872,9 +989,10 @@ class UnifiedScanner:
             step.response_preview = resp[:200] if resp else None
 
             if resp and status == 200:
-                if any(x in resp.lower() for x in ["welcome", "dashboard", "logout", "success"]):
+                # Strict validation: must be authenticated content, not login page
+                if self._is_authenticated_content(resp) and not self._is_login_or_error_page(resp):
                     step.success = True
-                    step.note = "Authentication bypass detected"
+                    step.note = "Authentication bypass - accessed protected content"
                     timeline.append(step)
                     if http_capture:
                         captures.append(http_capture)
@@ -886,7 +1004,7 @@ class UnifiedScanner:
                         url=url,
                         parameter=param,
                         payload=payload,
-                        evidence="Authentication bypass detected",
+                        evidence="Authentication bypass - accessed protected content without credentials",
                         description="NoSQL injection allows bypassing authentication",
                         poc=self._gen_nosql_poc(url, param, payload),
                         timeline=timeline,
