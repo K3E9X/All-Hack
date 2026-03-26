@@ -81,38 +81,55 @@ if [ "$NEED_NODE" = true ]; then
     log "Node.js: $(node -v)"
 fi
 
-# ---- Ollama ----
-header "Ollama (Local LLM)"
-if command -v ollama &> /dev/null; then
-    log "Ollama already installed"
-else
-    log "Installing Ollama..."
-    if [ "$OS" == "macos" ]; then
-        brew install ollama
+# ---- Ollama (Optional) ----
+header "Ollama (Optional - Local LLM)"
+INSTALL_OLLAMA=${INSTALL_OLLAMA:-"ask"}
+
+if [ "$INSTALL_OLLAMA" = "ask" ]; then
+    read -p "Install Ollama for AI analysis? [y/N] " -n 1 -r
+    echo
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        INSTALL_OLLAMA="yes"
     else
-        curl -fsSL https://ollama.com/install.sh | sh
+        INSTALL_OLLAMA="no"
     fi
 fi
 
-# Start Ollama
-if ! pgrep -x "ollama" > /dev/null 2>&1; then
-    log "Starting Ollama..."
-    if [ "$OS" == "macos" ]; then
-        brew services start ollama 2>/dev/null || ollama serve &
+if [ "$INSTALL_OLLAMA" = "yes" ]; then
+    if command -v ollama &> /dev/null; then
+        log "Ollama already installed"
     else
-        if [ "$EUID" -eq 0 ]; then
-            systemctl enable ollama 2>/dev/null || true
-            systemctl start ollama 2>/dev/null || ollama serve &
+        log "Installing Ollama..."
+        if [ "$OS" == "macos" ]; then
+            brew install ollama
         else
-            sudo systemctl enable ollama 2>/dev/null || true
-            sudo systemctl start ollama 2>/dev/null || ollama serve &
+            curl -fsSL https://ollama.com/install.sh | sh
         fi
     fi
-    sleep 2
-fi
 
-log "Pulling llama3.2..."
-ollama pull llama3.2 2>/dev/null || warn "Could not pull model. Run 'ollama pull llama3.2' later."
+    # Start Ollama
+    if ! pgrep -x "ollama" > /dev/null 2>&1; then
+        log "Starting Ollama..."
+        if [ "$OS" == "macos" ]; then
+            brew services start ollama 2>/dev/null || ollama serve &
+        else
+            if [ "$EUID" -eq 0 ]; then
+                systemctl enable ollama 2>/dev/null || true
+                systemctl start ollama 2>/dev/null || ollama serve &
+            else
+                sudo systemctl enable ollama 2>/dev/null || true
+                sudo systemctl start ollama 2>/dev/null || ollama serve &
+            fi
+        fi
+        sleep 2
+    fi
+
+    log "Pulling llama3.2..."
+    ollama pull llama3.2 2>/dev/null || warn "Could not pull model. Run 'ollama pull llama3.2' later."
+else
+    log "Skipping Ollama (optional). Tool works without it."
+    log "You can install later: curl -fsSL https://ollama.com/install.sh | sh"
+fi
 
 # ---- Python venv ----
 header "Python Environment"

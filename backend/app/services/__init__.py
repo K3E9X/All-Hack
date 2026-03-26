@@ -8,8 +8,29 @@ from .screenshot import (
     capture_finding_screenshot
 )
 
+from .external_apis import (
+    ExternalAPIs,
+    get_external_apis,
+    EnrichmentResult
+)
+
+from .llm_service import (
+    LLMService,
+    get_llm_service,
+    analyze_with_llm
+)
+
 __all__ = [
+    # Screenshot
     "ScreenshotService",
     "get_screenshot_service",
-    "capture_finding_screenshot"
+    "capture_finding_screenshot",
+    # External APIs
+    "ExternalAPIs",
+    "get_external_apis",
+    "EnrichmentResult",
+    # LLM
+    "LLMService",
+    "get_llm_service",
+    "analyze_with_llm",
 ]
