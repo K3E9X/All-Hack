@@ -74,6 +74,11 @@ npm run build
 
 ## Usage
 
+cd All-Hack
+chmod +x install.sh
+./install.sh
+./start.sh
+
 ### Start
 
 ```bash
