@@ -80,7 +80,7 @@ function LogsPanel({ results, status }) {
 
   const renderModules = () => {
     const modules = results?.module_results || {}
-    const moduleOrder = ['recon', 'auth', 'api', 'websocket', 'fuzzer']
+    const moduleOrder = ['recon', 'auth', 'api', 'websocket', 'fuzzer', 'post_exploitation']
 
     return (
       <div className="space-y-4">
@@ -179,7 +179,98 @@ function LogsPanel({ results, status }) {
                         </div>
                       </>
                     )}
+                    {moduleName === 'post_exploitation' && (
+                      <>
+                        <div>
+                          <span className="text-gray-500">Chains Attempted:</span>
+                          <span className="text-white ml-2">{data.chains_attempted?.length || 0}</span>
+                        </div>
+                        <div>
+                          <span className="text-gray-500">Chains Successful:</span>
+                          <span className={`ml-2 ${data.chains_successful?.length > 0 ? 'text-red-400 font-bold' : 'text-white'}`}>
+                            {data.chains_successful?.length || 0}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-gray-500">Data Extractions:</span>
+                          <span className={`ml-2 ${data.total_extractions > 0 ? 'text-orange-400' : 'text-white'}`}>
+                            {data.total_extractions || 0}
+                          </span>
+                        </div>
+                      </>
+                    )}
                   </div>
+
+                  {/* Post-exploitation chains */}
+                  {moduleName === 'post_exploitation' && data.chains_successful?.length > 0 && (
+                    <div className="mt-3">
+                      <div className="text-xs text-gray-500 mb-2">Successful Exploitation Chains</div>
+                      <div className="space-y-2">
+                        {data.chains_successful.map((chain, i) => (
+                          <div key={i} className="bg-red-500/10 border border-red-500/30 rounded p-3">
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className="text-red-400 font-medium">{chain.name}</span>
+                              <span className="text-[10px] px-2 py-0.5 bg-red-500/30 text-red-300 rounded">CRITICAL</span>
+                            </div>
+                            <div className="text-sm text-gray-300 mb-2">{chain.impact}</div>
+                            {chain.steps && (
+                              <div className="space-y-1 mb-2">
+                                {chain.steps.map((step, j) => (
+                                  <div key={j} className={`text-xs flex items-center gap-2 ${step.success ? 'text-green-400' : 'text-gray-500'}`}>
+                                    <span>{step.success ? '[+]' : '[-]'}</span>
+                                    <span>{step.name}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                            {chain.poc && (
+                              <details className="mt-2">
+                                <summary className="text-xs text-gray-500 cursor-pointer hover:text-gray-300">View PoC</summary>
+                                <pre className="mt-2 text-xs text-green-400 bg-neutral-950 rounded p-2 overflow-x-auto whitespace-pre-wrap">
+                                  {chain.poc}
+                                </pre>
+                              </details>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Post-exploitation extracted data */}
+                  {moduleName === 'post_exploitation' && data.data_extracted?.length > 0 && (
+                    <div className="mt-3">
+                      <div className="text-xs text-gray-500 mb-2">Extracted Data</div>
+                      <div className="space-y-2">
+                        {data.data_extracted.map((extraction, i) => (
+                          <div key={i} className="bg-orange-500/10 border border-orange-500/30 rounded p-3">
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className="text-orange-400 font-medium">{extraction.vuln_type}</span>
+                            </div>
+                            {extraction.tables && extraction.tables.length > 0 && (
+                              <div className="mb-2">
+                                <span className="text-xs text-gray-500">Tables: </span>
+                                <span className="text-xs text-yellow-400">{extraction.tables.join(', ')}</span>
+                              </div>
+                            )}
+                            {extraction.files && extraction.files.length > 0 && (
+                              <div className="mb-2">
+                                <span className="text-xs text-gray-500">Files: </span>
+                                <span className="text-xs text-yellow-400">{extraction.files.join(', ')}</span>
+                              </div>
+                            )}
+                            {extraction.db_info && Object.keys(extraction.db_info).length > 0 && (
+                              <div className="text-xs text-gray-400">
+                                DB: {extraction.db_info.database || 'N/A'} |
+                                User: {extraction.db_info.user || 'N/A'} |
+                                Version: {extraction.db_info.version || 'N/A'}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Module data */}
                   {data.data && (

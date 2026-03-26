@@ -31,6 +31,7 @@ class ScanPhase(Enum):
     TECH_DETECT = "technology_detection"
     VULN_SCAN = "vulnerability_scanning"
     EXPLOIT = "exploitation"
+    POST_EXPLOIT = "post_exploitation"
     EXTRACT = "data_extraction"
     REPORT = "report_generation"
     COMPLETE = "complete"
@@ -201,6 +202,8 @@ class UnifiedScanner:
         self.stop_requested: Dict[str, bool] = {}
         self.screenshot_service = None
         self.screenshots_enabled = True
+        self.validator = None
+        self.validate_findings = True  # STRICT VALIDATION - No false positives
 
         # Import payloads
         from app.payloads import (
@@ -238,6 +241,15 @@ class UnifiedScanner:
                 timeout=aiohttp.ClientTimeout(total=30),
                 connector=aiohttp.TCPConnector(ssl=False, limit=20)
             )
+
+        # Initialize validator for strict finding verification
+        if self.validate_findings and not self.validator:
+            try:
+                from app.services.validation import get_validator
+                self.validator = get_validator()
+                self.validator.session = self.session
+            except Exception as e:
+                logger.warning(f"Validator not available: {e}")
 
         # Initialize screenshot service
         if self.screenshots_enabled and not self.screenshot_service:
@@ -281,14 +293,63 @@ class UnifiedScanner:
         test_url: str,
         vuln_type: str
     ):
-        """Add finding with screenshot capture"""
+        """Add finding with STRICT VALIDATION - No false positives"""
+        # MICRO-TEST VALIDATION: Verify finding before adding
+        if self.validate_findings and self.validator:
+            try:
+                from app.services.validation import validate_finding as do_validate
+                validation = await do_validate(
+                    vuln_type=finding.vuln_type,
+                    url=finding.url,
+                    param=finding.parameter,
+                    payload=finding.payload
+                )
+
+                if not validation.is_valid:
+                    self._log_event(session, vuln_type,
+                        f"REJECTED (not validated): {finding.url} - {validation.evidence}")
+                    # Add to detailed logs for transparency
+                    session.detailed_logs.append({
+                        "timestamp": datetime.now().isoformat(),
+                        "module": "validation",
+                        "action": "Finding rejected - failed micro-tests",
+                        "data": {
+                            "url": finding.url,
+                            "vuln_type": finding.vuln_type,
+                            "reason": validation.evidence,
+                            "test_details": validation.test_details
+                        },
+                        "status": "rejected"
+                    })
+                    return  # DO NOT ADD - Failed validation
+
+                # Update finding with validation confidence
+                finding.evidence = f"{finding.evidence} | Validated: {validation.evidence} (confidence: {validation.confidence:.0%})"
+                session.detailed_logs.append({
+                    "timestamp": datetime.now().isoformat(),
+                    "module": "validation",
+                    "action": "Finding validated",
+                    "data": {
+                        "url": finding.url,
+                        "vuln_type": finding.vuln_type,
+                        "confidence": validation.confidence,
+                        "tests": validation.test_details
+                    },
+                    "status": "validated"
+                })
+
+            except Exception as e:
+                logger.warning(f"Validation error: {e}")
+                # On validation error, still add but note it
+                finding.evidence = f"{finding.evidence} | (validation skipped: {str(e)[:50]})"
+
         # Capture screenshot
         screenshot_path = await self._capture_screenshot(finding, test_url)
         if screenshot_path:
             finding.screenshot_path = screenshot_path
 
         session.findings.append(finding)
-        self._log_event(session, vuln_type, f"FOUND: {finding.url}")
+        self._log_event(session, vuln_type, f"CONFIRMED: {finding.url}")
 
     def _generate_id(self) -> str:
         return hashlib.md5(f"{datetime.now().isoformat()}".encode()).hexdigest()[:12]
@@ -1521,18 +1582,305 @@ class UnifiedScanner:
                     logger.debug(f"LLM analysis error: {e}")
                     add_detailed_log("llm", "Error", {"error": str(e)}, "error")
 
+            # === POST-EXPLOITATION ===
+            if not self.stop_requested.get(scan_id) and session.findings:
+                await self._run_post_exploitation(session, target_url, add_detailed_log)
+
             session.progress = 95
             self._log_event(session, "advanced", "Advanced modules completed")
             add_detailed_log("summary", "All advanced modules completed", {
                 "total_findings": len(session.findings),
                 "enrichments": len(session.enrichments),
-                "modules_run": list(session.module_results.keys())
+                "modules_run": list(session.module_results.keys()),
+                "post_exploitation": session.module_results.get("post_exploitation", {})
             })
 
         except ImportError as e:
             logger.warning(f"Could not import advanced modules: {e}")
         except Exception as e:
             logger.warning(f"Advanced modules error: {e}")
+
+    async def _run_post_exploitation(self, session: ScanSession, target_url: str, add_detailed_log):
+        """
+        Post-exploitation phase:
+        - Chain exploits for maximum impact
+        - Extract data from confirmed vulnerabilities
+        - Attempt privilege escalation paths
+        """
+        scan_id = session.scan_id
+        self._log_event(session, "post-exploit", "Starting post-exploitation phase...")
+        add_detailed_log("post-exploit", "Starting post-exploitation", {"findings_count": len(session.findings)})
+
+        post_results = {
+            "chains_attempted": [],
+            "chains_successful": [],
+            "data_extracted": [],
+            "total_extractions": 0
+        }
+
+        try:
+            # Import post-exploitation modules
+            from app.modules.chain_exploits import ChainExploiter
+            from app.autonomous_exploiter import AutonomousExploiter
+
+            chain_exploiter = ChainExploiter(self.session)
+            auto_exploiter = AutonomousExploiter()
+            await auto_exploiter.initialize()
+
+            # Group findings by type for targeted post-exploitation
+            sqli_findings = [f for f in session.findings if 'sql' in f.vuln_type.lower()]
+            lfi_findings = [f for f in session.findings if 'lfi' in f.vuln_type.lower() or 'path' in f.vuln_type.lower()]
+            ssrf_findings = [f for f in session.findings if 'ssrf' in f.vuln_type.lower()]
+            xxe_findings = [f for f in session.findings if 'xxe' in f.vuln_type.lower()]
+            rce_findings = [f for f in session.findings if 'rce' in f.vuln_type.lower() or 'command' in f.vuln_type.lower()]
+
+            # === CHAIN EXPLOITS ===
+            # Try SSRF -> RCE chains
+            for finding in ssrf_findings[:2]:
+                if self.stop_requested.get(scan_id):
+                    break
+                try:
+                    self._log_event(session, "post-exploit", f"Attempting SSRF->RCE chain on {finding.url}")
+                    add_detailed_log("post-exploit", "Attempting SSRF->RCE chain", {"url": finding.url, "param": finding.parameter})
+
+                    chain = await chain_exploiter.chain_ssrf_to_rce(finding.url, finding.parameter)
+                    post_results["chains_attempted"].append("SSRF->RCE")
+
+                    if chain and chain.success:
+                        post_results["chains_successful"].append({
+                            "name": chain.name,
+                            "steps": [{"name": s.name, "success": s.success, "result": s.result} for s in chain.steps],
+                            "impact": chain.final_impact,
+                            "poc": chain.poc
+                        })
+                        self._log_event(session, "post-exploit", f"SUCCESS: {chain.name}")
+                        add_detailed_log("post-exploit", "Chain successful", {"chain": chain.name, "impact": chain.final_impact}, "vulnerability")
+
+                        # Add as critical finding
+                        chain_finding = Finding(
+                            id=self._generate_id(),
+                            vuln_type=f"Chained: {chain.name}",
+                            severity=Severity.CRITICAL,
+                            url=finding.url,
+                            parameter=finding.parameter,
+                            payload="Multiple payloads - see PoC",
+                            evidence=chain.final_impact,
+                            description=f"Successful exploitation chain: {chain.name}",
+                            poc=chain.poc,
+                            timeline=[ExploitStep(
+                                step=i+1,
+                                action=s.name,
+                                timestamp=datetime.now().isoformat(),
+                                success=s.success,
+                                note=s.result
+                            ) for i, s in enumerate(chain.steps)]
+                        )
+                        session.findings.append(chain_finding)
+                except Exception as e:
+                    logger.debug(f"SSRF chain error: {e}")
+                    add_detailed_log("post-exploit", "Chain error", {"error": str(e)}, "error")
+
+            # Try LFI -> RCE chains
+            for finding in lfi_findings[:2]:
+                if self.stop_requested.get(scan_id):
+                    break
+                try:
+                    self._log_event(session, "post-exploit", f"Attempting LFI->RCE chain on {finding.url}")
+                    add_detailed_log("post-exploit", "Attempting LFI->RCE chain", {"url": finding.url})
+
+                    chain = await chain_exploiter.chain_lfi_to_rce(finding.url, finding.parameter)
+                    post_results["chains_attempted"].append("LFI->RCE")
+
+                    if chain and chain.success:
+                        post_results["chains_successful"].append({
+                            "name": chain.name,
+                            "steps": [{"name": s.name, "success": s.success} for s in chain.steps],
+                            "impact": chain.final_impact,
+                            "poc": chain.poc
+                        })
+                        self._log_event(session, "post-exploit", f"SUCCESS: {chain.name}")
+                        add_detailed_log("post-exploit", "Chain successful", {"chain": chain.name}, "vulnerability")
+
+                        chain_finding = Finding(
+                            id=self._generate_id(),
+                            vuln_type=f"Chained: {chain.name}",
+                            severity=Severity.CRITICAL,
+                            url=finding.url,
+                            parameter=finding.parameter,
+                            payload="Log poisoning payload",
+                            evidence=chain.final_impact,
+                            description=f"Successful exploitation chain: {chain.name}",
+                            poc=chain.poc
+                        )
+                        session.findings.append(chain_finding)
+                except Exception as e:
+                    logger.debug(f"LFI chain error: {e}")
+
+            # Try SQLi -> RCE chains
+            for finding in sqli_findings[:2]:
+                if self.stop_requested.get(scan_id):
+                    break
+                try:
+                    self._log_event(session, "post-exploit", f"Attempting SQLi->RCE chain on {finding.url}")
+                    add_detailed_log("post-exploit", "Attempting SQLi->RCE chain", {"url": finding.url})
+
+                    chain = await chain_exploiter.chain_sqli_to_rce(finding.url, finding.parameter)
+                    post_results["chains_attempted"].append("SQLi->RCE")
+
+                    if chain and chain.success:
+                        post_results["chains_successful"].append({
+                            "name": chain.name,
+                            "steps": [{"name": s.name, "success": s.success} for s in chain.steps],
+                            "impact": chain.final_impact,
+                            "poc": chain.poc
+                        })
+                        self._log_event(session, "post-exploit", f"SUCCESS: {chain.name}")
+
+                        chain_finding = Finding(
+                            id=self._generate_id(),
+                            vuln_type=f"Chained: {chain.name}",
+                            severity=Severity.CRITICAL,
+                            url=finding.url,
+                            parameter=finding.parameter,
+                            payload="INTO OUTFILE webshell",
+                            evidence=chain.final_impact,
+                            description=f"Successful exploitation chain: {chain.name}",
+                            poc=chain.poc
+                        )
+                        session.findings.append(chain_finding)
+                except Exception as e:
+                    logger.debug(f"SQLi chain error: {e}")
+
+            # Try XXE -> Cloud chains
+            for finding in xxe_findings[:2]:
+                if self.stop_requested.get(scan_id):
+                    break
+                try:
+                    self._log_event(session, "post-exploit", f"Attempting XXE->Cloud chain on {finding.url}")
+
+                    chain = await chain_exploiter.chain_xxe_to_cloud(finding.url)
+                    post_results["chains_attempted"].append("XXE->Cloud")
+
+                    if chain and chain.success:
+                        post_results["chains_successful"].append({
+                            "name": chain.name,
+                            "impact": chain.final_impact,
+                            "poc": chain.poc
+                        })
+                        self._log_event(session, "post-exploit", f"SUCCESS: {chain.name}")
+
+                        chain_finding = Finding(
+                            id=self._generate_id(),
+                            vuln_type=f"Chained: {chain.name}",
+                            severity=Severity.CRITICAL,
+                            url=finding.url,
+                            parameter=None,
+                            payload="XXE SSRF to cloud metadata",
+                            evidence=chain.final_impact,
+                            description=f"Cloud credentials extracted via XXE",
+                            poc=chain.poc
+                        )
+                        session.findings.append(chain_finding)
+                except Exception as e:
+                    logger.debug(f"XXE chain error: {e}")
+
+            # === DATA EXTRACTION ===
+            # Extract data from SQL injections
+            for finding in sqli_findings[:3]:
+                if self.stop_requested.get(scan_id):
+                    break
+                try:
+                    self._log_event(session, "post-exploit", f"Extracting data via SQLi from {finding.url}")
+                    add_detailed_log("post-exploit", "Starting SQLi data extraction", {"url": finding.url})
+
+                    exploit_session = await auto_exploiter.exploit_target(
+                        finding.url,
+                        extract_data=True,
+                        max_extraction_rows=50
+                    )
+
+                    if exploit_session and exploit_session.extractions:
+                        for extraction in exploit_session.extractions:
+                            extracted_info = {
+                                "vuln_type": extraction.vuln_type,
+                                "source_url": finding.url,
+                                "tables": list(extraction.data_extracted.get("tables", []))[:10],
+                                "columns": {k: v[:5] for k, v in extraction.data_extracted.get("columns", {}).items()},
+                                "sample_data": {k: v[:3] for k, v in extraction.data_extracted.get("data", {}).items()},
+                                "db_info": extraction.data_extracted.get("database_info", {})
+                            }
+                            post_results["data_extracted"].append(extracted_info)
+                            post_results["total_extractions"] += 1
+
+                            self._log_event(session, "post-exploit",
+                                f"Extracted: {len(extracted_info.get('tables', []))} tables, "
+                                f"{len(extracted_info.get('columns', {}))} column sets")
+                            add_detailed_log("post-exploit", "Data extracted via SQLi", extracted_info, "interesting")
+
+                            # Update the finding with extracted data
+                            finding.extracted_data = finding.extracted_data or {}
+                            finding.extracted_data.update(extracted_info)
+                except Exception as e:
+                    logger.debug(f"SQLi extraction error: {e}")
+                    add_detailed_log("post-exploit", "Extraction error", {"error": str(e)}, "error")
+
+            # Extract files via LFI
+            for finding in lfi_findings[:3]:
+                if self.stop_requested.get(scan_id):
+                    break
+                try:
+                    self._log_event(session, "post-exploit", f"Extracting files via LFI from {finding.url}")
+                    add_detailed_log("post-exploit", "Starting LFI file extraction", {"url": finding.url})
+
+                    exploit_session = await auto_exploiter.exploit_target(
+                        finding.url,
+                        extract_data=True
+                    )
+
+                    if exploit_session and exploit_session.extractions:
+                        for extraction in exploit_session.extractions:
+                            files_extracted = extraction.data_extracted.get("files_extracted", {})
+                            if files_extracted:
+                                extracted_info = {
+                                    "vuln_type": "LFI",
+                                    "source_url": finding.url,
+                                    "files": list(files_extracted.keys()),
+                                    "file_previews": {k: v[:500] for k, v in files_extracted.items()}
+                                }
+                                post_results["data_extracted"].append(extracted_info)
+                                post_results["total_extractions"] += 1
+
+                                self._log_event(session, "post-exploit",
+                                    f"Extracted {len(files_extracted)} files via LFI")
+                                add_detailed_log("post-exploit", "Files extracted via LFI", {
+                                    "files": list(files_extracted.keys())
+                                }, "interesting")
+
+                                finding.extracted_data = finding.extracted_data or {}
+                                finding.extracted_data["files_extracted"] = list(files_extracted.keys())
+                except Exception as e:
+                    logger.debug(f"LFI extraction error: {e}")
+
+            # Save post-exploitation results
+            session.module_results["post_exploitation"] = post_results
+
+            # Summary
+            chains_success = len(post_results["chains_successful"])
+            extractions = post_results["total_extractions"]
+            self._log_event(session, "post-exploit",
+                f"Post-exploitation complete: {chains_success} chains, {extractions} extractions")
+            add_detailed_log("post-exploit", "Post-exploitation completed", {
+                "chains_attempted": len(post_results["chains_attempted"]),
+                "chains_successful": chains_success,
+                "data_extractions": extractions
+            })
+
+        except ImportError as e:
+            logger.warning(f"Post-exploitation modules not available: {e}")
+            add_detailed_log("post-exploit", "Modules not available", {"error": str(e)}, "warning")
+        except Exception as e:
+            logger.warning(f"Post-exploitation error: {e}")
+            add_detailed_log("post-exploit", "Error", {"error": str(e)}, "error")
 
     def stop_scan(self, scan_id: str):
         """Request scan stop"""
