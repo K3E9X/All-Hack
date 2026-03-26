@@ -202,6 +202,8 @@ class UnifiedScanner:
         self.stop_requested: Dict[str, bool] = {}
         self.screenshot_service = None
         self.screenshots_enabled = True
+        self.validator = None
+        self.validate_findings = True  # STRICT VALIDATION - No false positives
 
         # Import payloads
         from app.payloads import (
@@ -239,6 +241,15 @@ class UnifiedScanner:
                 timeout=aiohttp.ClientTimeout(total=30),
                 connector=aiohttp.TCPConnector(ssl=False, limit=20)
             )
+
+        # Initialize validator for strict finding verification
+        if self.validate_findings and not self.validator:
+            try:
+                from app.services.validation import get_validator
+                self.validator = get_validator()
+                self.validator.session = self.session
+            except Exception as e:
+                logger.warning(f"Validator not available: {e}")
 
         # Initialize screenshot service
         if self.screenshots_enabled and not self.screenshot_service:
@@ -282,14 +293,63 @@ class UnifiedScanner:
         test_url: str,
         vuln_type: str
     ):
-        """Add finding with screenshot capture"""
+        """Add finding with STRICT VALIDATION - No false positives"""
+        # MICRO-TEST VALIDATION: Verify finding before adding
+        if self.validate_findings and self.validator:
+            try:
+                from app.services.validation import validate_finding as do_validate
+                validation = await do_validate(
+                    vuln_type=finding.vuln_type,
+                    url=finding.url,
+                    param=finding.parameter,
+                    payload=finding.payload
+                )
+
+                if not validation.is_valid:
+                    self._log_event(session, vuln_type,
+                        f"REJECTED (not validated): {finding.url} - {validation.evidence}")
+                    # Add to detailed logs for transparency
+                    session.detailed_logs.append({
+                        "timestamp": datetime.now().isoformat(),
+                        "module": "validation",
+                        "action": "Finding rejected - failed micro-tests",
+                        "data": {
+                            "url": finding.url,
+                            "vuln_type": finding.vuln_type,
+                            "reason": validation.evidence,
+                            "test_details": validation.test_details
+                        },
+                        "status": "rejected"
+                    })
+                    return  # DO NOT ADD - Failed validation
+
+                # Update finding with validation confidence
+                finding.evidence = f"{finding.evidence} | Validated: {validation.evidence} (confidence: {validation.confidence:.0%})"
+                session.detailed_logs.append({
+                    "timestamp": datetime.now().isoformat(),
+                    "module": "validation",
+                    "action": "Finding validated",
+                    "data": {
+                        "url": finding.url,
+                        "vuln_type": finding.vuln_type,
+                        "confidence": validation.confidence,
+                        "tests": validation.test_details
+                    },
+                    "status": "validated"
+                })
+
+            except Exception as e:
+                logger.warning(f"Validation error: {e}")
+                # On validation error, still add but note it
+                finding.evidence = f"{finding.evidence} | (validation skipped: {str(e)[:50]})"
+
         # Capture screenshot
         screenshot_path = await self._capture_screenshot(finding, test_url)
         if screenshot_path:
             finding.screenshot_path = screenshot_path
 
         session.findings.append(finding)
-        self._log_event(session, vuln_type, f"FOUND: {finding.url}")
+        self._log_event(session, vuln_type, f"CONFIRMED: {finding.url}")
 
     def _generate_id(self) -> str:
         return hashlib.md5(f"{datetime.now().isoformat()}".encode()).hexdigest()[:12]

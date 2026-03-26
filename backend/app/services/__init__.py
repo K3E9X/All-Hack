@@ -20,6 +20,13 @@ from .llm_service import (
     analyze_with_llm
 )
 
+from .validation import (
+    VulnerabilityValidator,
+    ValidationResult,
+    get_validator,
+    validate_finding
+)
+
 __all__ = [
     # Screenshot
     "ScreenshotService",
@@ -33,4 +40,9 @@ __all__ = [
     "LLMService",
     "get_llm_service",
     "analyze_with_llm",
+    # Validation
+    "VulnerabilityValidator",
+    "ValidationResult",
+    "get_validator",
+    "validate_finding",
 ]
