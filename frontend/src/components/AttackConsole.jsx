@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import axios from 'axios'
+import LogsPanel from './LogsPanel'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001/api/v1'
 
@@ -14,6 +15,7 @@ function AttackConsole() {
   const [error, setError] = useState(null)
   const [selectedFinding, setSelectedFinding] = useState(null)
   const [copiedIndex, setCopiedIndex] = useState(null)
+  const [rightPanelTab, setRightPanelTab] = useState('findings')
   const consoleRef = useRef(null)
   const pollRef = useRef(null)
 
@@ -328,15 +330,50 @@ function AttackConsole() {
           </div>
         </div>
 
-        {/* Right Panel - Findings Detail */}
-        <div className="w-[480px] flex flex-col">
-          <div className="px-4 py-2 border-b border-neutral-800">
-            <span className="text-xs uppercase tracking-wider text-gray-500">
-              Findings {results?.findings?.length ? `(${results.findings.length})` : ''}
-            </span>
+        {/* Right Panel - Findings & Logs */}
+        <div className="w-[520px] flex flex-col">
+          {/* Tab Header */}
+          <div className="px-2 py-1 border-b border-neutral-800 flex items-center gap-1">
+            <button
+              onClick={() => setRightPanelTab('findings')}
+              className={`px-4 py-1.5 text-xs uppercase tracking-wider rounded transition ${
+                rightPanelTab === 'findings'
+                  ? 'bg-neutral-800 text-white'
+                  : 'text-gray-500 hover:text-gray-300'
+              }`}
+            >
+              Findings
+              {results?.findings?.length > 0 && (
+                <span className={`ml-2 px-1.5 py-0.5 rounded text-[10px] ${
+                  rightPanelTab === 'findings' ? 'bg-red-500/30 text-red-400' : 'bg-neutral-700 text-gray-400'
+                }`}>
+                  {results.findings.length}
+                </span>
+              )}
+            </button>
+            <button
+              onClick={() => setRightPanelTab('logs')}
+              className={`px-4 py-1.5 text-xs uppercase tracking-wider rounded transition ${
+                rightPanelTab === 'logs'
+                  ? 'bg-neutral-800 text-white'
+                  : 'text-gray-500 hover:text-gray-300'
+              }`}
+            >
+              Logs
+              {results?.enrichments?.length > 0 && (
+                <span className={`ml-2 px-1.5 py-0.5 rounded text-[10px] ${
+                  rightPanelTab === 'logs' ? 'bg-blue-500/30 text-blue-400' : 'bg-neutral-700 text-gray-400'
+                }`}>
+                  {results.enrichments.length}
+                </span>
+              )}
+            </button>
           </div>
 
-          {results?.findings?.length > 0 ? (
+          {/* Tab Content */}
+          {rightPanelTab === 'logs' ? (
+            <LogsPanel results={results} status={status} />
+          ) : results?.findings?.length > 0 ? (
             <div className="flex-1 overflow-y-auto">
               {results.findings.map((finding, idx) => (
                 <div
@@ -557,11 +594,11 @@ function AttackConsole() {
                 </div>
               ))}
             </div>
-          ) : (
+          ) : rightPanelTab === 'findings' ? (
             <div className="flex-1 flex items-center justify-center text-gray-600 text-sm">
               {running ? 'Scanning...' : 'No findings yet'}
             </div>
-          )}
+          ) : null}
         </div>
       </div>
     </div>

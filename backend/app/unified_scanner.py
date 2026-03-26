@@ -153,6 +153,12 @@ class ScanSession:
     total_requests: int = 0
     errors: List[str] = field(default_factory=list)
     end_time: Optional[str] = None
+    # New fields for detailed logs tab
+    enrichments: List[Dict] = field(default_factory=list)
+    recon_results: Optional[Dict] = None
+    module_results: Dict[str, Any] = field(default_factory=dict)
+    detailed_logs: List[Dict] = field(default_factory=list)
+    llm_analyses: List[Dict] = field(default_factory=list)
 
     def to_dict(self) -> Dict:
         return {
@@ -165,10 +171,17 @@ class ScanSession:
             "findings": [f.to_dict() for f in self.findings],
             "findings_count": len(self.findings),
             "severity_counts": self._count_severities(),
+            "severity_summary": self._count_severities(),
             "endpoints_discovered": len(self.endpoints_discovered),
+            "endpoints_list": self.endpoints_discovered[:100],
             "technologies": self.technologies,
             "total_requests": self.total_requests,
-            "errors": self.errors
+            "errors": self.errors,
+            "enrichments": self.enrichments,
+            "recon_results": self.recon_results,
+            "module_results": self.module_results,
+            "detailed_logs": self.detailed_logs[-500:],
+            "llm_analyses": self.llm_analyses
         }
 
     def _count_severities(self) -> Dict[str, int]:
@@ -1184,6 +1197,16 @@ class UnifiedScanner:
         """Run advanced security testing modules"""
         scan_id = session.scan_id
 
+        def add_detailed_log(module: str, action: str, data: Any = None, status: str = "info"):
+            """Add detailed log entry"""
+            session.detailed_logs.append({
+                "timestamp": datetime.now().isoformat(),
+                "module": module,
+                "action": action,
+                "data": data,
+                "status": status
+            })
+
         try:
             # Import modules
             from app.modules import (
@@ -1198,37 +1221,60 @@ class UnifiedScanner:
             # === RECON MODULE ===
             if not self.stop_requested.get(scan_id):
                 self._log_event(session, "recon", "Running advanced reconnaissance...")
+                add_detailed_log("recon", "Starting reconnaissance", {"target": domain})
                 try:
                     recon = ReconScanner()
+                    recon_data = {"subdomains": [], "ports": [], "technologies": [], "wayback_urls": []}
 
                     # Subdomain enumeration
                     subdomains = await recon.enumerate_subdomains(domain)
                     if subdomains:
                         self._log_event(session, "recon", f"Found {len(subdomains)} subdomains")
+                        recon_data["subdomains"] = subdomains
                         session.endpoints_discovered.extend([f"https://{s}" for s in subdomains[:10]])
+                        add_detailed_log("recon", "Subdomains enumerated", {"count": len(subdomains), "subdomains": subdomains[:20]})
 
                     # Port scanning on main domain
                     ports = await recon.scan_ports(domain)
                     if ports:
                         self._log_event(session, "recon", f"Open ports: {ports}")
+                        recon_data["ports"] = ports
+                        add_detailed_log("recon", "Port scan completed", {"ports": ports})
+
+                    # Save recon results to session
+                    session.recon_results = recon_data
+                    session.module_results["recon"] = {
+                        "status": "completed",
+                        "subdomains_found": len(subdomains) if subdomains else 0,
+                        "ports_found": len(ports) if ports else 0,
+                        "data": recon_data
+                    }
 
                     await recon.close()
                 except Exception as e:
                     logger.warning(f"Recon module error: {e}")
+                    add_detailed_log("recon", "Error", {"error": str(e)}, "error")
 
             # === AUTH TESTING MODULE ===
             if not self.stop_requested.get(scan_id):
                 self._log_event(session, "auth", "Testing authentication security...")
+                add_detailed_log("auth", "Starting authentication tests", {"target": target_url})
                 try:
                     auth_tester = AuthTester(self.session)
+                    auth_tests_run = []
 
                     # Test session fixation
+                    add_detailed_log("auth", "Testing session fixation")
                     await auth_tester.test_session_fixation(target_url)
+                    auth_tests_run.append("session_fixation")
 
                     # Test cookie security
+                    add_detailed_log("auth", "Testing cookie security")
                     await auth_tester.test_cookie_security(target_url)
+                    auth_tests_run.append("cookie_security")
 
                     # Convert findings
+                    auth_findings_count = 0
                     for af in auth_tester.findings:
                         finding = Finding(
                             id=self._generate_id(),
@@ -1243,25 +1289,40 @@ class UnifiedScanner:
                         )
                         session.findings.append(finding)
                         self._log_event(session, "auth", f"FOUND: {af.vuln_type}")
+                        add_detailed_log("auth", "Vulnerability found", {"type": af.vuln_type, "url": af.url}, "vulnerability")
+                        auth_findings_count += 1
+
+                    session.module_results["auth"] = {
+                        "status": "completed",
+                        "tests_run": auth_tests_run,
+                        "findings_count": auth_findings_count
+                    }
                 except Exception as e:
                     logger.warning(f"Auth testing error: {e}")
+                    add_detailed_log("auth", "Error", {"error": str(e)}, "error")
 
             # === API SECURITY MODULE ===
             if not self.stop_requested.get(scan_id):
                 self._log_event(session, "api", "Testing API security...")
+                add_detailed_log("api", "Starting API security tests", {"target": target_url})
                 try:
                     api_tester = APISecurityTester(self.session)
 
                     # Discover API endpoints
                     api_endpoints = await api_tester.discover_api_endpoints(target_url)
+                    discovered_endpoints = []
                     if api_endpoints:
                         self._log_event(session, "api", f"Found {len(api_endpoints)} API endpoints")
+                        discovered_endpoints = [str(ep) for ep in api_endpoints[:20]]
+                        add_detailed_log("api", "API endpoints discovered", {"count": len(api_endpoints), "endpoints": discovered_endpoints})
 
                     # Test for BOLA/IDOR
                     for endpoint in api_endpoints[:5]:  # Limit to first 5
+                        add_detailed_log("api", "Testing BOLA/IDOR", {"endpoint": str(endpoint)})
                         await api_tester.test_bola(endpoint)
 
                     # Convert findings
+                    api_findings_count = 0
                     for af in api_tester.findings:
                         finding = Finding(
                             id=self._generate_id(),
@@ -1276,19 +1337,35 @@ class UnifiedScanner:
                         )
                         session.findings.append(finding)
                         self._log_event(session, "api", f"FOUND: {af.vuln_type}")
+                        add_detailed_log("api", "Vulnerability found", {"type": af.vuln_type, "url": af.url}, "vulnerability")
+                        api_findings_count += 1
+
+                    session.module_results["api"] = {
+                        "status": "completed",
+                        "endpoints_discovered": len(api_endpoints) if api_endpoints else 0,
+                        "endpoints_tested": min(5, len(api_endpoints)) if api_endpoints else 0,
+                        "findings_count": api_findings_count,
+                        "endpoints_list": discovered_endpoints
+                    }
                 except Exception as e:
                     logger.warning(f"API security error: {e}")
+                    add_detailed_log("api", "Error", {"error": str(e)}, "error")
 
             # === WEBSOCKET TESTING ===
             if not self.stop_requested.get(scan_id):
+                add_detailed_log("websocket", "Starting WebSocket testing", {"base_url": base_url})
                 # Check for WebSocket endpoints
                 ws_paths = ["/ws", "/websocket", "/socket.io", "/sockjs"]
+                ws_endpoints_found = []
+                ws_findings_count = 0
                 for ws_path in ws_paths:
                     ws_url = f"{base_url}{ws_path}"
                     try:
                         ws_tester = WebSocketTester()
                         if await ws_tester.check_websocket_exists(ws_url):
+                            ws_endpoints_found.append(ws_url)
                             self._log_event(session, "websocket", f"Testing WebSocket at {ws_url}")
+                            add_detailed_log("websocket", "WebSocket endpoint found", {"url": ws_url})
                             await ws_tester.test_auth_bypass(ws_url)
 
                             for wf in ws_tester.findings:
@@ -1305,32 +1382,65 @@ class UnifiedScanner:
                                 )
                                 session.findings.append(finding)
                                 self._log_event(session, "websocket", f"FOUND: {wf.vuln_type}")
+                                add_detailed_log("websocket", "Vulnerability found", {"type": wf.vuln_type, "url": ws_url}, "vulnerability")
+                                ws_findings_count += 1
                         await ws_tester.close()
                     except Exception as e:
                         logger.debug(f"WebSocket test error for {ws_path}: {e}")
+                        add_detailed_log("websocket", "Test error", {"path": ws_path, "error": str(e)}, "warning")
+
+                session.module_results["websocket"] = {
+                    "status": "completed",
+                    "paths_checked": ws_paths,
+                    "endpoints_found": ws_endpoints_found,
+                    "findings_count": ws_findings_count
+                }
 
             # === FUZZING (light) ===
             if not self.stop_requested.get(scan_id) and session.endpoints_discovered:
                 self._log_event(session, "fuzz", "Running light fuzzing...")
+                add_detailed_log("fuzz", "Starting fuzzing", {"endpoints_to_fuzz": len(session.endpoints_discovered[:3])})
                 try:
                     fuzzer = AdvancedFuzzer(self.session)
+                    fuzz_results = []
+                    interesting_count = 0
 
                     # Fuzz first discovered endpoint with params
                     for endpoint in session.endpoints_discovered[:3]:
                         parsed_ep = urllib.parse.urlparse(endpoint)
                         if parsed_ep.query:
+                            add_detailed_log("fuzz", "Fuzzing endpoint", {"endpoint": endpoint})
                             results = await fuzzer.fuzz_endpoint(endpoint, max_iterations=20)
                             for fr in results:
                                 if fr.is_interesting:
                                     self._log_event(session, "fuzz", f"Interesting response at {endpoint}")
+                                    add_detailed_log("fuzz", "Interesting response", {
+                                        "endpoint": endpoint,
+                                        "status_code": fr.status_code if hasattr(fr, 'status_code') else None
+                                    }, "interesting")
+                                    interesting_count += 1
+                                    fuzz_results.append({
+                                        "endpoint": endpoint,
+                                        "status": "interesting",
+                                        "payload": fr.payload if hasattr(fr, 'payload') else None
+                                    })
+
+                    session.module_results["fuzzer"] = {
+                        "status": "completed",
+                        "endpoints_fuzzed": min(3, len(session.endpoints_discovered)),
+                        "interesting_responses": interesting_count,
+                        "results": fuzz_results[:20]
+                    }
                 except Exception as e:
                     logger.warning(f"Fuzzing error: {e}")
+                    add_detailed_log("fuzz", "Error", {"error": str(e)}, "error")
 
             session.progress = 92
 
             # === EXTERNAL API ENRICHMENT ===
             if not self.stop_requested.get(scan_id):
                 self._log_event(session, "enrich", "Running external API enrichment...")
+                add_detailed_log("enrichment", "Starting external API enrichment", {"target": target_url})
                 try:
                     from app.services.external_apis import get_external_apis
 
@@ -1342,6 +1452,13 @@ class UnifiedScanner:
                             session, "enrich",
                             f"[{enrichment.source}] Retrieved {len(enrichment.data)} data points"
                         )
+                        # Save enrichment to session
+                        session.enrichments.append({
+                            "source": enrichment.source,
+                            "timestamp": enrichment.timestamp,
+                            "data": enrichment.data
+                        })
+                        add_detailed_log("enrichment", f"Data from {enrichment.source}", enrichment.data)
 
                         # Add interesting findings from enrichment
                         if enrichment.source == "shodan" and enrichment.data.get("vulns"):
@@ -1352,18 +1469,65 @@ class UnifiedScanner:
                             malicious = enrichment.data.get("malicious", 0)
                             if malicious > 0:
                                 self._log_event(session, "enrich", f"VirusTotal: {malicious} malicious detections!")
+                                add_detailed_log("enrichment", "VirusTotal alert", {"malicious": malicious}, "warning")
 
                         if enrichment.source == "abuseipdb":
                             score = enrichment.data.get("abuse_score", 0)
                             if score > 50:
                                 self._log_event(session, "enrich", f"AbuseIPDB: High abuse score ({score}%)")
+                                add_detailed_log("enrichment", "AbuseIPDB alert", {"abuse_score": score}, "warning")
 
                     await apis.close()
                 except Exception as e:
                     logger.debug(f"Enrichment error: {e}")
+                    add_detailed_log("enrichment", "Error", {"error": str(e)}, "error")
+
+            # === LLM ANALYSIS ===
+            if not self.stop_requested.get(scan_id) and session.findings:
+                self._log_event(session, "llm", "Running LLM analysis on findings...")
+                add_detailed_log("llm", "Starting LLM analysis", {"findings_count": len(session.findings)})
+                try:
+                    from app.services.llm_service import get_llm_service
+
+                    llm = get_llm_service()
+                    if await llm.is_available():
+                        # Analyze top findings
+                        for finding in session.findings[:5]:  # Limit to first 5
+                            analysis = await llm.analyze_vulnerability(finding.to_dict())
+                            if analysis:
+                                session.llm_analyses.append({
+                                    "finding_id": finding.id,
+                                    "vuln_type": finding.vuln_type,
+                                    "analysis": analysis,
+                                    "timestamp": datetime.now().isoformat()
+                                })
+                                add_detailed_log("llm", f"Analysis for {finding.vuln_type}", {"analysis": analysis[:200]})
+                                self._log_event(session, "llm", f"Analyzed: {finding.vuln_type}")
+
+                        # Generate report summary
+                        summary = await llm.generate_report_summary([f.to_dict() for f in session.findings])
+                        if summary:
+                            session.llm_analyses.append({
+                                "type": "executive_summary",
+                                "summary": summary,
+                                "timestamp": datetime.now().isoformat()
+                            })
+                            add_detailed_log("llm", "Executive summary generated", {"summary": summary})
+
+                        await llm.close()
+                    else:
+                        add_detailed_log("llm", "LLM not available", None, "info")
+                except Exception as e:
+                    logger.debug(f"LLM analysis error: {e}")
+                    add_detailed_log("llm", "Error", {"error": str(e)}, "error")
 
             session.progress = 95
             self._log_event(session, "advanced", "Advanced modules completed")
+            add_detailed_log("summary", "All advanced modules completed", {
+                "total_findings": len(session.findings),
+                "enrichments": len(session.enrichments),
+                "modules_run": list(session.module_results.keys())
+            })
 
         except ImportError as e:
             logger.warning(f"Could not import advanced modules: {e}")
@@ -1387,7 +1551,13 @@ class UnifiedScanner:
             "progress": session.progress,
             "findings_count": len(session.findings),
             "requests": session.total_requests,
-            "events": session.events[-20:]
+            "events": session.events[-50:],
+            "technologies": session.technologies,
+            "endpoints_count": len(session.endpoints_discovered),
+            "enrichments_count": len(session.enrichments),
+            "module_results_count": len(session.module_results),
+            "llm_analyses_count": len(session.llm_analyses),
+            "errors": session.errors[-10:] if session.errors else []
         }
 
     # ==================== HELPERS ====================
