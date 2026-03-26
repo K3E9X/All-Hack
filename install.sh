@@ -131,7 +131,16 @@ pip install -r "$ROOT_DIR/backend/requirements.txt" -q
 
 # Playwright
 log "Installing Playwright chromium..."
-playwright install chromium 2>/dev/null || python3 -m playwright install chromium 2>/dev/null || warn "Playwright install failed. Run 'playwright install chromium' later."
+if [ "$OS" == "ubuntu" ] || [ "$OS" == "debian" ]; then
+    # Install system dependencies for Playwright
+    if [ "$EUID" -eq 0 ]; then
+        apt-get install -y libnss3 libnspr4 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 libxrandr2 libgbm1 libasound2 libpango-1.0-0 libcairo2 2>/dev/null || true
+    else
+        sudo apt-get install -y libnss3 libnspr4 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 libxrandr2 libgbm1 libasound2 libpango-1.0-0 libcairo2 2>/dev/null || true
+    fi
+fi
+python3 -m playwright install chromium 2>/dev/null || warn "Playwright chromium install failed."
+python3 -m playwright install-deps chromium 2>/dev/null || true
 
 # ---- Frontend ----
 header "Frontend"
