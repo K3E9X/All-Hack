@@ -954,7 +954,7 @@ class UnifiedScanner:
         max_pages: int = 50,
         callback: Optional[Callable] = None
     ) -> ScanSession:
-        """Execute complete security scan"""
+        """Execute complete security scan - creates new session"""
         await self.initialize()
 
         scan_id = self._generate_id()
@@ -967,6 +967,18 @@ class UnifiedScanner:
         self.sessions[scan_id] = session
         self.stop_requested[scan_id] = False
         self.event_callback = callback
+
+        await self._run_full_scan(session, max_pages)
+        return session
+
+    async def _run_full_scan(
+        self,
+        session: ScanSession,
+        max_pages: int = 50
+    ):
+        """Execute scan on existing session"""
+        scan_id = session.scan_id
+        target_url = session.target_url
 
         try:
             # Phase 1: Reconnaissance
@@ -1042,8 +1054,6 @@ class UnifiedScanner:
             session.errors.append(str(e))
             self._log_event(session, "error", str(e))
             logger.exception(f"Scan failed: {e}")
-
-        return session
 
     def stop_scan(self, scan_id: str):
         """Request scan stop"""
