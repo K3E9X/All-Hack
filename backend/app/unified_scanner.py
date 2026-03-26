@@ -1161,7 +1161,14 @@ class UnifiedScanner:
                 gql_url = f"{target_url.rstrip('/')}{gql_path}"
                 await self._test_graphql(session, gql_url)
 
-            # Phase 3: Complete
+            if self.stop_requested.get(scan_id):
+                return
+
+            # Phase 3: Advanced Modules
+            session.progress = 85
+            await self._run_advanced_modules(session, target_url)
+
+            # Phase 4: Complete
             session.phase = ScanPhase.COMPLETE
             session.progress = 100
             session.end_time = datetime.now().isoformat()
@@ -1172,6 +1179,196 @@ class UnifiedScanner:
             session.errors.append(str(e))
             self._log_event(session, "error", str(e))
             logger.exception(f"Scan failed: {e}")
+
+    async def _run_advanced_modules(self, session: ScanSession, target_url: str):
+        """Run advanced security testing modules"""
+        scan_id = session.scan_id
+
+        try:
+            # Import modules
+            from app.modules import (
+                AuthTester, APISecurityTester, WebSocketTester,
+                ReconScanner, AdvancedFuzzer
+            )
+
+            parsed = urllib.parse.urlparse(target_url)
+            domain = parsed.netloc
+            base_url = f"{parsed.scheme}://{parsed.netloc}"
+
+            # === RECON MODULE ===
+            if not self.stop_requested.get(scan_id):
+                self._log_event(session, "recon", "Running advanced reconnaissance...")
+                try:
+                    recon = ReconScanner()
+
+                    # Subdomain enumeration
+                    subdomains = await recon.enumerate_subdomains(domain)
+                    if subdomains:
+                        self._log_event(session, "recon", f"Found {len(subdomains)} subdomains")
+                        session.endpoints_discovered.extend([f"https://{s}" for s in subdomains[:10]])
+
+                    # Port scanning on main domain
+                    ports = await recon.scan_ports(domain)
+                    if ports:
+                        self._log_event(session, "recon", f"Open ports: {ports}")
+
+                    await recon.close()
+                except Exception as e:
+                    logger.warning(f"Recon module error: {e}")
+
+            # === AUTH TESTING MODULE ===
+            if not self.stop_requested.get(scan_id):
+                self._log_event(session, "auth", "Testing authentication security...")
+                try:
+                    auth_tester = AuthTester(self.session)
+
+                    # Test session fixation
+                    await auth_tester.test_session_fixation(target_url)
+
+                    # Test cookie security
+                    await auth_tester.test_cookie_security(target_url)
+
+                    # Convert findings
+                    for af in auth_tester.findings:
+                        finding = Finding(
+                            id=self._generate_id(),
+                            vuln_type=af.vuln_type,
+                            severity=Severity[af.severity.upper()] if hasattr(Severity, af.severity.upper()) else Severity.MEDIUM,
+                            url=af.url,
+                            parameter=None,
+                            payload="",
+                            evidence=af.evidence,
+                            description=af.description,
+                            poc=af.poc
+                        )
+                        session.findings.append(finding)
+                        self._log_event(session, "auth", f"FOUND: {af.vuln_type}")
+                except Exception as e:
+                    logger.warning(f"Auth testing error: {e}")
+
+            # === API SECURITY MODULE ===
+            if not self.stop_requested.get(scan_id):
+                self._log_event(session, "api", "Testing API security...")
+                try:
+                    api_tester = APISecurityTester(self.session)
+
+                    # Discover API endpoints
+                    api_endpoints = await api_tester.discover_api_endpoints(target_url)
+                    if api_endpoints:
+                        self._log_event(session, "api", f"Found {len(api_endpoints)} API endpoints")
+
+                    # Test for BOLA/IDOR
+                    for endpoint in api_endpoints[:5]:  # Limit to first 5
+                        await api_tester.test_bola(endpoint)
+
+                    # Convert findings
+                    for af in api_tester.findings:
+                        finding = Finding(
+                            id=self._generate_id(),
+                            vuln_type=af.vuln_type,
+                            severity=Severity[af.severity.upper()] if hasattr(Severity, af.severity.upper()) else Severity.HIGH,
+                            url=af.url,
+                            parameter=af.parameter if hasattr(af, 'parameter') else None,
+                            payload=af.payload if hasattr(af, 'payload') else "",
+                            evidence=af.evidence,
+                            description=af.description,
+                            poc=af.poc
+                        )
+                        session.findings.append(finding)
+                        self._log_event(session, "api", f"FOUND: {af.vuln_type}")
+                except Exception as e:
+                    logger.warning(f"API security error: {e}")
+
+            # === WEBSOCKET TESTING ===
+            if not self.stop_requested.get(scan_id):
+                # Check for WebSocket endpoints
+                ws_paths = ["/ws", "/websocket", "/socket.io", "/sockjs"]
+                for ws_path in ws_paths:
+                    ws_url = f"{base_url}{ws_path}"
+                    try:
+                        ws_tester = WebSocketTester()
+                        if await ws_tester.check_websocket_exists(ws_url):
+                            self._log_event(session, "websocket", f"Testing WebSocket at {ws_url}")
+                            await ws_tester.test_auth_bypass(ws_url)
+
+                            for wf in ws_tester.findings:
+                                finding = Finding(
+                                    id=self._generate_id(),
+                                    vuln_type=wf.vuln_type,
+                                    severity=Severity.HIGH,
+                                    url=ws_url,
+                                    parameter=None,
+                                    payload="",
+                                    evidence=wf.evidence,
+                                    description=wf.description,
+                                    poc=wf.poc
+                                )
+                                session.findings.append(finding)
+                                self._log_event(session, "websocket", f"FOUND: {wf.vuln_type}")
+                        await ws_tester.close()
+                    except Exception as e:
+                        logger.debug(f"WebSocket test error for {ws_path}: {e}")
+
+            # === FUZZING (light) ===
+            if not self.stop_requested.get(scan_id) and session.endpoints_discovered:
+                self._log_event(session, "fuzz", "Running light fuzzing...")
+                try:
+                    fuzzer = AdvancedFuzzer(self.session)
+
+                    # Fuzz first discovered endpoint with params
+                    for endpoint in session.endpoints_discovered[:3]:
+                        parsed_ep = urllib.parse.urlparse(endpoint)
+                        if parsed_ep.query:
+                            results = await fuzzer.fuzz_endpoint(endpoint, max_iterations=20)
+                            for fr in results:
+                                if fr.is_interesting:
+                                    self._log_event(session, "fuzz", f"Interesting response at {endpoint}")
+                except Exception as e:
+                    logger.warning(f"Fuzzing error: {e}")
+
+            session.progress = 92
+
+            # === EXTERNAL API ENRICHMENT ===
+            if not self.stop_requested.get(scan_id):
+                self._log_event(session, "enrich", "Running external API enrichment...")
+                try:
+                    from app.services.external_apis import get_external_apis
+
+                    apis = get_external_apis()
+                    enrichments = await apis.enrich_target(target_url)
+
+                    for enrichment in enrichments:
+                        self._log_event(
+                            session, "enrich",
+                            f"[{enrichment.source}] Retrieved {len(enrichment.data)} data points"
+                        )
+
+                        # Add interesting findings from enrichment
+                        if enrichment.source == "shodan" and enrichment.data.get("vulns"):
+                            for vuln in enrichment.data["vulns"][:3]:
+                                self._log_event(session, "enrich", f"Shodan CVE: {vuln}")
+
+                        if enrichment.source == "virustotal":
+                            malicious = enrichment.data.get("malicious", 0)
+                            if malicious > 0:
+                                self._log_event(session, "enrich", f"VirusTotal: {malicious} malicious detections!")
+
+                        if enrichment.source == "abuseipdb":
+                            score = enrichment.data.get("abuse_score", 0)
+                            if score > 50:
+                                self._log_event(session, "enrich", f"AbuseIPDB: High abuse score ({score}%)")
+
+                    await apis.close()
+                except Exception as e:
+                    logger.debug(f"Enrichment error: {e}")
+
+            session.progress = 95
+            self._log_event(session, "advanced", "Advanced modules completed")
+
+        except ImportError as e:
+            logger.warning(f"Could not import advanced modules: {e}")
+        except Exception as e:
+            logger.warning(f"Advanced modules error: {e}")
 
     def stop_scan(self, scan_id: str):
         """Request scan stop"""
