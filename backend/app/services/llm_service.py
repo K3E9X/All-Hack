@@ -3,11 +3,14 @@ LLM Service - AI Analysis (ENABLED BY DEFAULT)
 
 Multiple free providers with automatic fallback:
 1. Groq (free tier: 30 req/min) - RECOMMENDED
-2. Together.ai (free tier)
-3. HuggingFace Inference API (free)
-4. Ollama (local, unlimited)
+2. Qwen via DashScope (free tier: 1M tokens/month)
+3. Qwen via OpenRouter (free tier available)
+4. Together.ai (free tier)
+5. HuggingFace Inference API (free)
+6. Ollama (local, unlimited) - supports qwen2, llama3
 
 Set GROQ_API_KEY for best results (free at console.groq.com)
+Set DASHSCOPE_API_KEY for Qwen (free at dashscope.aliyun.com)
 """
 
 import aiohttp
@@ -44,24 +47,38 @@ class LLMService:
             "type": "openai"
         },
         {
+            "name": "dashscope",
+            "env_key": "DASHSCOPE_API_KEY",
+            "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+            "model": "qwen-turbo",
+            "type": "openai"
+        },
+        {
+            "name": "openrouter",
+            "env_key": "OPENROUTER_API_KEY",
+            "base_url": "https://openrouter.ai/api/v1",
+            "model": "qwen/qwen-2-7b-instruct:free",
+            "type": "openai"
+        },
+        {
             "name": "together",
             "env_key": "TOGETHER_API_KEY",
             "base_url": "https://api.together.xyz/v1",
-            "model": "meta-llama/Llama-3-8b-chat-hf",
+            "model": "Qwen/Qwen2-7B-Instruct",
             "type": "openai"
         },
         {
             "name": "huggingface",
             "env_key": "HF_API_KEY",
             "base_url": "https://api-inference.huggingface.co/models",
-            "model": "meta-llama/Meta-Llama-3-8B-Instruct",
+            "model": "Qwen/Qwen2-7B-Instruct",
             "type": "huggingface"
         },
         {
             "name": "ollama",
             "env_key": None,
             "base_url": "http://localhost:11434",
-            "model": "llama3.2",
+            "model": "qwen2",
             "type": "ollama"
         }
     ]
@@ -139,11 +156,22 @@ class LLMService:
                 async with self.session.get(url, timeout=aiohttp.ClientTimeout(total=5)) as resp:
                     return resp.status == 200
 
-            elif config.provider in ["groq", "together"]:
+            elif config.provider in ["groq", "together", "openrouter"]:
                 url = f"{config.base_url}/models"
                 headers = {"Authorization": f"Bearer {config.api_key}"}
                 async with self.session.get(url, headers=headers, timeout=aiohttp.ClientTimeout(total=5)) as resp:
                     return resp.status == 200
+
+            elif config.provider == "dashscope":
+                # DashScope uses different auth header
+                url = f"{config.base_url}/models"
+                headers = {"Authorization": f"Bearer {config.api_key}"}
+                async with self.session.get(url, headers=headers, timeout=aiohttp.ClientTimeout(total=5)) as resp:
+                    # DashScope may return 200 or just test with a simple completion
+                    if resp.status == 200:
+                        return True
+                    # Fallback: try a simple completion
+                    return await self._test_completion(config)
 
             elif config.provider == "huggingface":
                 url = f"{config.base_url}/{config.model}"
@@ -159,6 +187,27 @@ class LLMService:
 
         except Exception as e:
             logger.debug(f"Provider check failed: {e}")
+
+    async def _test_completion(self, config: LLMConfig) -> bool:
+        """Test provider with a simple completion request"""
+        try:
+            url = f"{config.base_url}/chat/completions"
+            headers = {
+                "Authorization": f"Bearer {config.api_key}",
+                "Content-Type": "application/json"
+            }
+            payload = {
+                "model": config.model,
+                "messages": [{"role": "user", "content": "test"}],
+                "max_tokens": 5
+            }
+            async with self.session.post(
+                url, headers=headers, json=payload,
+                timeout=aiohttp.ClientTimeout(total=10)
+            ) as resp:
+                return resp.status == 200
+        except:
+            return False
 
         return False
 
