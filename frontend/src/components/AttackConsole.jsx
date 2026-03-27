@@ -188,18 +188,24 @@ function AttackConsole() {
   }
 
   return (
-    <div className="min-h-screen bg-neutral-950 text-gray-100">
+    <div className="flex flex-col h-full">
       {/* Header */}
-      <header className="border-b border-neutral-800 px-6 py-4">
-        <h1 className="text-xl font-light tracking-wide text-white">all-hack</h1>
+      <header className="flex items-center justify-between px-6 h-14 border-b border-border bg-background">
+        <h1 className="text-lg font-semibold">Attack Console</h1>
+        {running && (
+          <span className="flex items-center gap-2 text-sm text-secondary">
+            <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+            Scanning
+          </span>
+        )}
       </header>
 
-      <div className="flex h-[calc(100vh-57px)]">
+      <div className="flex flex-1 overflow-hidden">
         {/* Left Panel - Controls */}
-        <div className="w-80 border-r border-neutral-800 p-4 space-y-4 overflow-y-auto">
+        <div className="w-80 border-r border-border p-4 space-y-4 overflow-y-auto bg-background">
           {/* Target Input */}
           <div>
-            <label className="block text-xs uppercase tracking-wider text-gray-500 mb-2">
+            <label className="block text-xs uppercase tracking-wider text-secondary mb-2">
               Target
             </label>
             <input
@@ -208,12 +214,12 @@ function AttackConsole() {
               onChange={(e) => setTarget(e.target.value)}
               placeholder="https://target.com"
               disabled={running}
-              className="w-full bg-neutral-900 border border-neutral-700 rounded px-3 py-2 text-sm font-mono focus:outline-none focus:border-neutral-500 disabled:opacity-50"
+              className="w-full bg-surface border border-border rounded px-3 py-2 text-sm font-mono focus:outline-none focus:border-neutral-500 disabled:opacity-50"
             />
           </div>
 
           <div>
-            <label className="block text-xs uppercase tracking-wider text-gray-500 mb-2">
+            <label className="block text-xs uppercase tracking-wider text-secondary mb-2">
               Depth
             </label>
             <input
@@ -223,7 +229,7 @@ function AttackConsole() {
               min={10}
               max={200}
               disabled={running}
-              className="w-full bg-neutral-900 border border-neutral-700 rounded px-3 py-2 text-sm font-mono focus:outline-none focus:border-neutral-500 disabled:opacity-50"
+              className="w-full bg-surface border border-border rounded px-3 py-2 text-sm font-mono focus:outline-none focus:border-neutral-500 disabled:opacity-50"
             />
           </div>
 
@@ -251,18 +257,18 @@ function AttackConsole() {
 
           {/* Status */}
           {status && (
-            <div className="pt-4 border-t border-neutral-800">
+            <div className="pt-4 border-t border-border">
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-gray-500">Phase</span>
+                  <span className="text-secondary">Phase</span>
                   <span className="font-mono text-xs">{status.phase}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-500">Progress</span>
+                  <span className="text-secondary">Progress</span>
                   <span className="font-mono">{status.progress}%</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-500">Vulns</span>
+                  <span className="text-secondary">Vulns</span>
                   <span className={`font-mono ${status.findings_count > 0 ? 'text-red-400' : ''}`}>
                     {status.findings_count}
                   </span>
@@ -279,7 +285,7 @@ function AttackConsole() {
 
           {/* Severity Summary */}
           {results?.severity_summary && (
-            <div className="pt-4 border-t border-neutral-800">
+            <div className="pt-4 border-t border-border">
               <div className="grid grid-cols-5 gap-1 text-center text-xs">
                 {['critical', 'high', 'medium', 'low', 'info'].map(sev => (
                   <div key={sev}>
@@ -300,11 +306,11 @@ function AttackConsole() {
         </div>
 
         {/* Center Panel - Console */}
-        <div className="flex-1 flex flex-col border-r border-neutral-800">
-          <div className="px-4 py-2 border-b border-neutral-800 flex items-center justify-between">
-            <span className="text-xs uppercase tracking-wider text-gray-500">Console</span>
+        <div className="flex-1 flex flex-col border-r border-border">
+          <div className="px-4 py-2 border-b border-border flex items-center justify-between">
+            <span className="text-xs uppercase tracking-wider text-secondary">Console</span>
             {running && (
-              <span className="flex items-center gap-2 text-xs text-gray-500">
+              <span className="flex items-center gap-2 text-xs text-secondary">
                 <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span>
                 live
               </span>
@@ -322,7 +328,7 @@ function AttackConsole() {
               events.map(event => (
                 <div key={event.id} className={`flex gap-2 py-0.5 ${event.type === 'vuln' ? 'bg-red-500/5' : ''}`}>
                   <span className="text-gray-600 flex-shrink-0 w-16">{event.time}</span>
-                  <span className="text-gray-500 flex-shrink-0 w-20 truncate">[{event.phase}]</span>
+                  <span className="text-secondary flex-shrink-0 w-20 truncate">[{event.phase}]</span>
                   <span className={getEventColor(event.type)}>{event.message}</span>
                 </div>
               ))
@@ -333,13 +339,13 @@ function AttackConsole() {
         {/* Right Panel - Findings & Logs */}
         <div className="w-[520px] flex flex-col">
           {/* Tab Header */}
-          <div className="px-2 py-1 border-b border-neutral-800 flex items-center gap-1">
+          <div className="px-2 py-1 border-b border-border flex items-center gap-1">
             <button
               onClick={() => setRightPanelTab('findings')}
               className={`px-4 py-1.5 text-xs uppercase tracking-wider rounded transition ${
                 rightPanelTab === 'findings'
                   ? 'bg-neutral-800 text-white'
-                  : 'text-gray-500 hover:text-gray-300'
+                  : 'text-secondary hover:text-gray-300'
               }`}
             >
               Findings
@@ -356,7 +362,7 @@ function AttackConsole() {
               className={`px-4 py-1.5 text-xs uppercase tracking-wider rounded transition ${
                 rightPanelTab === 'logs'
                   ? 'bg-neutral-800 text-white'
-                  : 'text-gray-500 hover:text-gray-300'
+                  : 'text-secondary hover:text-gray-300'
               }`}
             >
               Logs
@@ -378,12 +384,12 @@ function AttackConsole() {
               {results.findings.map((finding, idx) => (
                 <div
                   key={finding.id || idx}
-                  className={`border-b border-neutral-800 ${selectedFinding === idx ? 'bg-neutral-900' : ''}`}
+                  className={`border-b border-border ${selectedFinding === idx ? 'bg-surface' : ''}`}
                 >
                   {/* Finding Header - Clickable */}
                   <div
                     onClick={() => setSelectedFinding(selectedFinding === idx ? null : idx)}
-                    className="p-3 cursor-pointer hover:bg-neutral-900/50 transition"
+                    className="p-3 cursor-pointer hover:bg-surface/50 transition"
                   >
                     <div className="flex items-center gap-2 mb-1">
                       <span className={`w-2 h-2 rounded-full ${getSeverityBadge(finding.severity)}`}></span>
@@ -392,7 +398,7 @@ function AttackConsole() {
                         {finding.severity}
                       </span>
                     </div>
-                    <p className="text-xs text-gray-500 font-mono truncate">{finding.url}</p>
+                    <p className="text-xs text-secondary font-mono truncate">{finding.url}</p>
                     {finding.parameter && (
                       <p className="text-xs text-gray-600 mt-0.5">
                         param: <span className="text-gray-400">{finding.parameter}</span>
@@ -405,7 +411,7 @@ function AttackConsole() {
                     <div className="px-3 pb-3 space-y-3">
                       {/* Evidence */}
                       <div>
-                        <div className="text-[10px] uppercase text-gray-500 mb-1">Evidence</div>
+                        <div className="text-[10px] uppercase text-secondary mb-1">Evidence</div>
                         <div className="text-xs text-gray-300 bg-neutral-950 rounded p-2">
                           {finding.evidence}
                         </div>
@@ -414,7 +420,7 @@ function AttackConsole() {
                       {/* Payload */}
                       {finding.payload && (
                         <div>
-                          <div className="text-[10px] uppercase text-gray-500 mb-1">Payload</div>
+                          <div className="text-[10px] uppercase text-secondary mb-1">Payload</div>
                           <div className="relative">
                             <pre className="text-xs text-red-400 bg-neutral-950 rounded p-2 overflow-x-auto font-mono">
                               {finding.payload}
@@ -431,7 +437,7 @@ function AttackConsole() {
 
                       {/* Curl Command */}
                       <div>
-                        <div className="text-[10px] uppercase text-gray-500 mb-1">Reproduce</div>
+                        <div className="text-[10px] uppercase text-secondary mb-1">Reproduce</div>
                         <div className="relative">
                           <pre className="text-xs text-green-400 bg-neutral-950 rounded p-2 overflow-x-auto font-mono whitespace-pre-wrap break-all">
                             {generateCurlCommand(finding)}
@@ -448,7 +454,7 @@ function AttackConsole() {
                       {/* Full PoC */}
                       {finding.poc && (
                         <div>
-                          <div className="text-[10px] uppercase text-gray-500 mb-1">Full PoC</div>
+                          <div className="text-[10px] uppercase text-secondary mb-1">Full PoC</div>
                           <div className="relative">
                             <pre className="text-xs text-gray-400 bg-neutral-950 rounded p-2 overflow-x-auto font-mono whitespace-pre-wrap max-h-48">
                               {finding.poc}
@@ -466,7 +472,7 @@ function AttackConsole() {
                       {/* Extracted Data */}
                       {finding.extracted_data && Object.keys(finding.extracted_data).length > 0 && (
                         <div>
-                          <div className="text-[10px] uppercase text-gray-500 mb-1">Extracted Data</div>
+                          <div className="text-[10px] uppercase text-secondary mb-1">Extracted Data</div>
                           <pre className="text-xs text-yellow-400 bg-neutral-950 rounded p-2 overflow-x-auto font-mono whitespace-pre-wrap max-h-32">
                             {JSON.stringify(finding.extracted_data, null, 2)}
                           </pre>
@@ -476,17 +482,17 @@ function AttackConsole() {
                       {/* Exploitation Timeline */}
                       {finding.timeline && finding.timeline.length > 0 && (
                         <div>
-                          <div className="text-[10px] uppercase text-gray-500 mb-1">Exploitation Timeline</div>
+                          <div className="text-[10px] uppercase text-secondary mb-1">Exploitation Timeline</div>
                           <div className="bg-neutral-950 rounded p-2 space-y-2 max-h-64 overflow-y-auto">
                             {finding.timeline.map((step, stepIdx) => (
                               <div
                                 key={stepIdx}
                                 className={`text-xs border-l-2 pl-2 ${
-                                  step.success ? 'border-green-500' : 'border-neutral-700'
+                                  step.success ? 'border-green-500' : 'border-border'
                                 }`}
                               >
                                 <div className="flex items-center gap-2">
-                                  <span className="text-gray-500 font-mono">#{step.step}</span>
+                                  <span className="text-secondary font-mono">#{step.step}</span>
                                   <span className={step.success ? 'text-green-400' : 'text-gray-400'}>
                                     {step.action}
                                   </span>
@@ -514,12 +520,12 @@ function AttackConsole() {
                       {/* HTTP Captures */}
                       {finding.http_captures && finding.http_captures.length > 0 && (
                         <div>
-                          <div className="text-[10px] uppercase text-gray-500 mb-1">HTTP Captures</div>
+                          <div className="text-[10px] uppercase text-secondary mb-1">HTTP Captures</div>
                           <div className="space-y-2">
                             {finding.http_captures.slice(-3).map((capture, capIdx) => (
                               <div key={capIdx} className="bg-neutral-950 rounded overflow-hidden">
                                 <div
-                                  className="px-2 py-1 bg-neutral-900 text-[10px] flex justify-between cursor-pointer"
+                                  className="px-2 py-1 bg-surface text-[10px] flex justify-between cursor-pointer"
                                   onClick={() => {
                                     const el = document.getElementById(`capture-${idx}-${capIdx}`)
                                     if (el) el.classList.toggle('hidden')
@@ -540,12 +546,12 @@ function AttackConsole() {
                                 </div>
                                 <div id={`capture-${idx}-${capIdx}`} className="hidden p-2 text-xs font-mono space-y-2">
                                   <div>
-                                    <div className="text-gray-500 text-[10px] mb-1">REQUEST</div>
+                                    <div className="text-secondary text-[10px] mb-1">REQUEST</div>
                                     <div className="text-blue-400">
                                       {capture.request?.method} {capture.request?.url}
                                     </div>
                                     {capture.request?.headers && (
-                                      <div className="text-gray-500 mt-1">
+                                      <div className="text-secondary mt-1">
                                         {Object.entries(capture.request.headers).map(([k, v]) => (
                                           <div key={k}>{k}: {v}</div>
                                         ))}
@@ -558,7 +564,7 @@ function AttackConsole() {
                                     )}
                                   </div>
                                   <div>
-                                    <div className="text-gray-500 text-[10px] mb-1">RESPONSE</div>
+                                    <div className="text-secondary text-[10px] mb-1">RESPONSE</div>
                                     <pre className="text-gray-400 whitespace-pre-wrap max-h-32 overflow-y-auto">
                                       {capture.response?.body?.slice(0, 500)}
                                       {capture.response?.body?.length > 500 && '...'}
@@ -574,18 +580,18 @@ function AttackConsole() {
                       {/* Screenshot */}
                       {finding.screenshot_path && (
                         <div>
-                          <div className="text-[10px] uppercase text-gray-500 mb-1">Screenshot</div>
+                          <div className="text-[10px] uppercase text-secondary mb-1">Screenshot</div>
                           <div className="bg-neutral-950 rounded p-2">
                             <img
                               src={`${API_URL.replace('/api/v1', '')}/screenshots/${finding.screenshot_path.split('/').pop()}`}
                               alt="Vulnerability screenshot"
-                              className="w-full rounded border border-neutral-700"
+                              className="w-full rounded border border-border"
                               onError={(e) => {
                                 e.target.style.display = 'none'
                                 e.target.nextSibling.style.display = 'block'
                               }}
                             />
-                            <p className="text-gray-500 text-xs hidden">Screenshot unavailable</p>
+                            <p className="text-secondary text-xs hidden">Screenshot unavailable</p>
                           </div>
                         </div>
                       )}

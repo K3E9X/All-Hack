@@ -17,6 +17,8 @@ from app.autonomous_exploiter import get_exploiter, AutonomousExploiter
 from app.unified_scanner import get_unified_scanner, UnifiedScanner
 from app.models import ScanRequest, ScanResult, ScanProgress
 from app.ai_enhanced_orchestrator import AIEnhancedScanOrchestrator
+from app.database.connection import init_db
+from app.openclaw.api import router as agent_router
 
 # Configure logging
 logging.basicConfig(
@@ -41,6 +43,12 @@ FRONTEND_DIST = Path(__file__).parent.parent.parent / "frontend" / "dist"
 async def lifespan(app: FastAPI):
     """Lifespan events"""
     logger.info("Starting Advanced Pentest Tool API")
+    # Initialize database
+    try:
+        init_db()
+        logger.info("Database initialized")
+    except Exception as e:
+        logger.warning(f"Database init warning: {e}")
     yield
     logger.info("Shutting down Advanced Pentest Tool API")
 
@@ -60,6 +68,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Include Agent Loop router
+app.include_router(agent_router, prefix=settings.API_PREFIX)
 
 @app.get("/api")
 async def api_info():
