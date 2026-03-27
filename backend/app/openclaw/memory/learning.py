@@ -81,7 +81,7 @@ class MemorySystem:
                     times_used=1,
                     times_succeeded=1,
                     success_rate=1.0,
-                    metadata=metadata or {}
+                    extra_data=metadata or {}
                 )
                 self.db.add(memory)
 
