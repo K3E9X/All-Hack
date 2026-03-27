@@ -86,6 +86,86 @@ async def health():
     """Health check endpoint"""
     return {"status": "healthy"}
 
+# ---- Settings API ----
+from app.database.connection import get_db, SessionLocal
+from app.database.models import UserSettings
+import os
+
+@app.get(f"{settings.API_PREFIX}/settings")
+async def get_settings():
+    """Get user settings"""
+    db = SessionLocal()
+    try:
+        user_settings = db.query(UserSettings).first()
+        if not user_settings:
+            return {
+                "theme": "dark",
+                "groq_api_key": "",
+                "dashscope_api_key": "",
+                "openrouter_api_key": "",
+                "default_depth": "balanced",
+                "auto_exploit": True,
+                "validate_findings": True,
+                "agent_enabled": True
+            }
+        return {
+            "theme": user_settings.theme,
+            "groq_api_key": "***" if user_settings.api_keys.get("groq") else "",
+            "dashscope_api_key": "***" if user_settings.api_keys.get("dashscope") else "",
+            "openrouter_api_key": "***" if user_settings.api_keys.get("openrouter") else "",
+            "default_depth": user_settings.default_depth,
+            "auto_exploit": user_settings.auto_exploit,
+            "validate_findings": user_settings.validate_findings,
+            "agent_enabled": user_settings.agent_enabled
+        }
+    finally:
+        db.close()
+
+@app.post(f"{settings.API_PREFIX}/settings")
+async def save_settings(data: dict):
+    """Save user settings"""
+    db = SessionLocal()
+    try:
+        user_settings = db.query(UserSettings).first()
+        if not user_settings:
+            user_settings = UserSettings()
+            db.add(user_settings)
+
+        # Update theme
+        if "theme" in data:
+            user_settings.theme = data["theme"]
+
+        # Update API keys (only if not masked)
+        api_keys = user_settings.api_keys or {}
+        if data.get("groq_api_key") and data["groq_api_key"] != "***":
+            api_keys["groq"] = data["groq_api_key"]
+            os.environ["GROQ_API_KEY"] = data["groq_api_key"]
+        if data.get("dashscope_api_key") and data["dashscope_api_key"] != "***":
+            api_keys["dashscope"] = data["dashscope_api_key"]
+            os.environ["DASHSCOPE_API_KEY"] = data["dashscope_api_key"]
+        if data.get("openrouter_api_key") and data["openrouter_api_key"] != "***":
+            api_keys["openrouter"] = data["openrouter_api_key"]
+            os.environ["OPENROUTER_API_KEY"] = data["openrouter_api_key"]
+        user_settings.api_keys = api_keys
+
+        # Update preferences
+        if "default_depth" in data:
+            user_settings.default_depth = data["default_depth"]
+        if "auto_exploit" in data:
+            user_settings.auto_exploit = data["auto_exploit"]
+        if "validate_findings" in data:
+            user_settings.validate_findings = data["validate_findings"]
+        if "agent_enabled" in data:
+            user_settings.agent_enabled = data["agent_enabled"]
+
+        db.commit()
+        return {"status": "saved"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
 @app.post(f"{settings.API_PREFIX}/scans", response_model=dict)
 async def create_scan(scan_request: ScanRequest):
     """
