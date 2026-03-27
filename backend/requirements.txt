@@ -33,6 +33,9 @@ publicsuffix2==2.20191221
 # Async support
 aiofiles==23.2.1
 
+# Database
+sqlalchemy==2.0.23
+
 # AI Agent - Autonomous pentesting with Claude
 anthropic==0.39.0
 
