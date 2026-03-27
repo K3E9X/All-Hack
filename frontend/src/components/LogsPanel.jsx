@@ -80,7 +80,7 @@ function LogsPanel({ results, status }) {
 
   const renderModules = () => {
     const modules = results?.module_results || {}
-    const moduleOrder = ['recon', 'auth', 'api', 'websocket', 'fuzzer', 'post_exploitation']
+    const moduleOrder = ['recon', 'auth', 'api', 'websocket', 'fuzzer', 'oauth', 'saml', 'privilege_escalation', 'ai_chains', 'post_exploitation']
 
     return (
       <div className="space-y-4">
@@ -179,6 +179,41 @@ function LogsPanel({ results, status }) {
                         </div>
                       </>
                     )}
+                    {(moduleName === 'oauth' || moduleName === 'saml') && (
+                      <>
+                        <div>
+                          <span className="text-gray-500">Findings:</span>
+                          <span className={`ml-2 ${data.findings_count > 0 ? 'text-red-400' : 'text-white'}`}>
+                            {data.findings_count || 0}
+                          </span>
+                        </div>
+                      </>
+                    )}
+                    {moduleName === 'privilege_escalation' && (
+                      <>
+                        <div>
+                          <span className="text-gray-500">Horizontal PrivEsc:</span>
+                          <span className={`ml-2 ${data.findings_count > 0 ? 'text-red-400' : 'text-white'}`}>
+                            {data.findings_count || 0}
+                          </span>
+                        </div>
+                      </>
+                    )}
+                    {moduleName === 'ai_chains' && (
+                      <>
+                        <div>
+                          <span className="text-gray-500">Chains Found:</span>
+                          <span className={`ml-2 ${data.count > 0 ? 'text-purple-400' : 'text-white'}`}>
+                            {data.count || 0}
+                          </span>
+                        </div>
+                        {data.fallback_used && (
+                          <div>
+                            <span className="text-xs text-gray-500">(rule-based)</span>
+                          </div>
+                        )}
+                      </>
+                    )}
                     {moduleName === 'post_exploitation' && (
                       <>
                         <div>
@@ -200,6 +235,33 @@ function LogsPanel({ results, status }) {
                       </>
                     )}
                   </div>
+
+                  {/* AI Exploitation Chains */}
+                  {moduleName === 'ai_chains' && data.chains?.length > 0 && (
+                    <div className="mt-3">
+                      <div className="text-xs text-gray-500 mb-2">AI-Detected Exploitation Chains</div>
+                      <div className="space-y-2">
+                        {data.chains.map((chain, i) => (
+                          <div key={i} className="bg-purple-500/10 border border-purple-500/30 rounded p-3">
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className="text-purple-400 font-medium">{chain.name}</span>
+                              <span className="text-[10px] px-2 py-0.5 bg-purple-500/30 text-purple-300 rounded">
+                                {chain.complexity || 'medium'}
+                              </span>
+                            </div>
+                            <div className="text-sm text-gray-300">{chain.description}</div>
+                            {chain.vulnerabilities_used && (
+                              <div className="mt-2 flex flex-wrap gap-1">
+                                {chain.vulnerabilities_used.map((v, j) => (
+                                  <span key={j} className="text-xs px-2 py-0.5 bg-neutral-800 rounded text-gray-400">{v}</span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Post-exploitation chains */}
                   {moduleName === 'post_exploitation' && data.chains_successful?.length > 0 && (
