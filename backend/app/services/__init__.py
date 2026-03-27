@@ -27,6 +27,13 @@ from .validation import (
     validate_finding
 )
 
+from .ai_enhancements import (
+    AIEnhancementService,
+    AIEnhancementResult,
+    get_ai_enhancements,
+    init_ai_enhancements
+)
+
 __all__ = [
     # Screenshot
     "ScreenshotService",
@@ -45,4 +52,9 @@ __all__ = [
     "ValidationResult",
     "get_validator",
     "validate_finding",
+    # AI Enhancements
+    "AIEnhancementService",
+    "AIEnhancementResult",
+    "get_ai_enhancements",
+    "init_ai_enhancements",
 ]

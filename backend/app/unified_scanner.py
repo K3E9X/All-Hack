@@ -1496,6 +1496,164 @@ class UnifiedScanner:
                     logger.warning(f"Fuzzing error: {e}")
                     add_detailed_log("fuzz", "Error", {"error": str(e)}, "error")
 
+            # === AI ENHANCEMENTS INITIALIZATION ===
+            ai_service = None
+            if not self.stop_requested.get(scan_id):
+                try:
+                    from app.services.ai_enhancements import init_ai_enhancements
+                    ai_service = await init_ai_enhancements()
+                    ai_service.start_session(scan_id, target_url)
+                    add_detailed_log("ai", "AI enhancements initialized", ai_service.get_status())
+
+                    # Remember findings for learning
+                    for finding in session.findings:
+                        ai_service.remember_finding(finding.to_dict())
+                except Exception as e:
+                    logger.debug(f"AI enhancements not available: {e}")
+
+            # === OAUTH SECURITY SCANNER ===
+            if not self.stop_requested.get(scan_id):
+                self._log_event(session, "oauth", "Testing OAuth security...")
+                add_detailed_log("oauth", "Starting OAuth security tests")
+                try:
+                    from app.scanners.api_security.oauth_scanner import OAuthSecurityScanner
+                    from app.utils.http_client import PentestHTTPClient
+
+                    oauth_client = PentestHTTPClient(base_url=base_url)
+                    oauth_scanner = OAuthSecurityScanner(oauth_client)
+
+                    oauth_vulns = await oauth_scanner.scan(session.endpoints_discovered[:20])
+                    oauth_count = 0
+                    for vuln in oauth_vulns:
+                        finding = Finding(
+                            id=self._generate_id(),
+                            vuln_type=f"OAuth: {vuln.title}",
+                            severity=Severity[vuln.severity.name] if hasattr(vuln.severity, 'name') else Severity.HIGH,
+                            url=vuln.url,
+                            parameter=vuln.parameter,
+                            payload=vuln.evidence[:200] if vuln.evidence else "",
+                            evidence=vuln.evidence or "",
+                            description=vuln.description,
+                            poc=vuln.remediation or ""
+                        )
+                        session.findings.append(finding)
+                        self._log_event(session, "oauth", f"FOUND: {vuln.title}")
+                        oauth_count += 1
+
+                    session.module_results["oauth"] = {
+                        "status": "completed",
+                        "findings_count": oauth_count
+                    }
+                    add_detailed_log("oauth", "OAuth scan completed", {"findings": oauth_count})
+                except ImportError:
+                    add_detailed_log("oauth", "OAuth scanner not available", None, "info")
+                except Exception as e:
+                    logger.debug(f"OAuth scan error: {e}")
+                    add_detailed_log("oauth", "Error", {"error": str(e)}, "error")
+
+            # === SAML SECURITY SCANNER ===
+            if not self.stop_requested.get(scan_id):
+                self._log_event(session, "saml", "Testing SAML security...")
+                add_detailed_log("saml", "Starting SAML security tests")
+                try:
+                    from app.scanners.api_security.saml_scanner import SAMLSecurityScanner
+                    from app.utils.http_client import PentestHTTPClient
+
+                    saml_client = PentestHTTPClient(base_url=base_url)
+                    saml_scanner = SAMLSecurityScanner(saml_client)
+
+                    saml_vulns = await saml_scanner.scan(session.endpoints_discovered[:20])
+                    saml_count = 0
+                    for vuln in saml_vulns:
+                        finding = Finding(
+                            id=self._generate_id(),
+                            vuln_type=f"SAML: {vuln.title}",
+                            severity=Severity[vuln.severity.name] if hasattr(vuln.severity, 'name') else Severity.HIGH,
+                            url=vuln.url,
+                            parameter=vuln.parameter,
+                            payload=vuln.evidence[:200] if vuln.evidence else "",
+                            evidence=vuln.evidence or "",
+                            description=vuln.description,
+                            poc=vuln.remediation or ""
+                        )
+                        session.findings.append(finding)
+                        self._log_event(session, "saml", f"FOUND: {vuln.title}")
+                        saml_count += 1
+
+                    session.module_results["saml"] = {
+                        "status": "completed",
+                        "findings_count": saml_count
+                    }
+                    add_detailed_log("saml", "SAML scan completed", {"findings": saml_count})
+                except ImportError:
+                    add_detailed_log("saml", "SAML scanner not available", None, "info")
+                except Exception as e:
+                    logger.debug(f"SAML scan error: {e}")
+                    add_detailed_log("saml", "Error", {"error": str(e)}, "error")
+
+            # === HORIZONTAL PRIVILEGE ESCALATION ===
+            if not self.stop_requested.get(scan_id):
+                self._log_event(session, "privesc", "Testing horizontal privilege escalation...")
+                add_detailed_log("privesc", "Starting privilege escalation tests")
+                try:
+                    from app.scanners.access_control.privilege_escalation import HorizontalPrivilegeScanner
+                    from app.utils.http_client import PentestHTTPClient
+
+                    # Create two clients to simulate different users
+                    user_a = PentestHTTPClient(base_url=base_url)
+                    user_b = PentestHTTPClient(base_url=base_url)
+                    privesc_scanner = HorizontalPrivilegeScanner(user_a, user_b)
+
+                    privesc_vulns = await privesc_scanner.scan(session.endpoints_discovered[:15])
+                    privesc_count = 0
+                    for vuln in privesc_vulns:
+                        finding = Finding(
+                            id=self._generate_id(),
+                            vuln_type=f"PrivEsc: {vuln.title}",
+                            severity=Severity.HIGH,
+                            url=vuln.url,
+                            parameter=vuln.parameter,
+                            payload="",
+                            evidence=vuln.evidence or "",
+                            description=vuln.description,
+                            poc=vuln.remediation or ""
+                        )
+                        session.findings.append(finding)
+                        self._log_event(session, "privesc", f"FOUND: {vuln.title}")
+                        privesc_count += 1
+
+                    session.module_results["privilege_escalation"] = {
+                        "status": "completed",
+                        "findings_count": privesc_count
+                    }
+                    add_detailed_log("privesc", "Privilege escalation scan completed", {"findings": privesc_count})
+                except ImportError:
+                    add_detailed_log("privesc", "Privilege scanner not available", None, "info")
+                except Exception as e:
+                    logger.debug(f"Privilege scan error: {e}")
+                    add_detailed_log("privesc", "Error", {"error": str(e)}, "error")
+
+            # === AI EXPLOITATION CHAINS ===
+            if not self.stop_requested.get(scan_id) and ai_service and session.findings:
+                self._log_event(session, "ai", "Analyzing exploitation chains with AI...")
+                try:
+                    chain_result = await ai_service.find_exploitation_chains(
+                        [f.to_dict() for f in session.findings]
+                    )
+                    if chain_result.success and chain_result.data:
+                        session.module_results["ai_chains"] = {
+                            "chains": chain_result.data,
+                            "count": len(chain_result.data),
+                            "fallback_used": chain_result.fallback_used
+                        }
+                        add_detailed_log("ai", "Exploitation chains found", {
+                            "count": len(chain_result.data),
+                            "chains": [c.get("name") for c in chain_result.data]
+                        })
+                        self._log_event(session, "ai", f"Found {len(chain_result.data)} exploitation chains")
+                except Exception as e:
+                    logger.debug(f"AI chain analysis error: {e}")
+
             session.progress = 92
 
             # === EXTERNAL API ENRICHMENT ===
