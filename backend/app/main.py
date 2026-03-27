@@ -19,6 +19,7 @@ from app.models import ScanRequest, ScanResult, ScanProgress
 from app.ai_enhanced_orchestrator import AIEnhancedScanOrchestrator
 from app.database.connection import init_db
 from app.openclaw.api import router as agent_router
+from app.api.recon_tools import router as recon_tools_router
 
 # Configure logging
 logging.basicConfig(
@@ -71,6 +72,7 @@ app.add_middleware(
 
 # Include Agent Loop router
 app.include_router(agent_router, prefix=settings.API_PREFIX)
+app.include_router(recon_tools_router, prefix=settings.API_PREFIX)
 
 @app.get("/api")
 async def api_info():
