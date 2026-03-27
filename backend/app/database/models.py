@@ -129,7 +129,7 @@ class AgentMemory(Base):
     last_succeeded = Column(DateTime, nullable=True)
 
     # Additional data
-    metadata = Column(JSON, default=dict)
+    extra_data = Column(JSON, default=dict)
 
     __table_args__ = (
         Index("idx_memory_pattern_category", "pattern_type", "category"),
