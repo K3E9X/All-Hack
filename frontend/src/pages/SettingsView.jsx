@@ -42,7 +42,6 @@ export default function SettingsView() {
   // Multi-agent state
   const [providers, setProviders] = useState([]);
   const [newProvider, setNewProvider] = useState({ name: '', type: 'groq', api_key: '', model: '', role: 'general' });
-  const [multiAgentStatus, setMultiAgentStatus] = useState(null);
   const [consensusMode, setConsensusMode] = useState('fallback');
   const [primaryProvider, setPrimaryProvider] = useState('');
   const [checkingProviders, setCheckingProviders] = useState(false);
@@ -69,7 +68,6 @@ export default function SettingsView() {
       const response = await fetch(`${API_URL}/api/v1/multi-agent/status`);
       if (response.ok) {
         const data = await response.json();
-        setMultiAgentStatus(data);
         setProviders(data.providers || []);
         setConsensusMode(data.consensus_mode || 'fallback');
         setPrimaryProvider(data.primary_provider || '');
