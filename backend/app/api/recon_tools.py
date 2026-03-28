@@ -3,7 +3,7 @@ Recon and Tools API Routes
 Exposes reconnaissance scanners and external tools
 """
 
-from fastapi import APIRouter, HTTPException, BackgroundTasks
+from fastapi import APIRouter, HTTPException, BackgroundTasks, Query
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
 import asyncio
@@ -346,31 +346,76 @@ async def get_static_payloads(vuln_type: str, limit: int = 50):
 # ============ Exploitation Assistant ============
 
 @router.post("/tools/exploit-assist")
-async def exploitation_assistant(vuln_type: str, target: str, findings: List[Dict] = None):
+async def exploitation_assistant(
+    vuln_type: str = Query(..., description="Vulnerability type"),
+    target: str = Query("", description="Target URL"),
+    findings: List[Dict] = None
+):
     """
     Get AI-powered exploitation assistance
     """
     try:
-        from app.intelligence.exploitation_assistant import ExploitationAssistant
-        from app.services.llm_service import LLMService
+        # Try multi-agent first for consensus
+        from app.services.multi_agent import get_orchestrator
+        orchestrator = get_orchestrator()
 
+        status = orchestrator.get_status()
+        if status.get("providers") and len(status["providers"]) > 0:
+            prompt = f"""Generate exploitation guidance for {vuln_type} vulnerability.
+Target: {target}
+
+Provide:
+1. Step-by-step exploitation steps
+2. Recommended tools
+3. Example payloads specific to {vuln_type}
+4. Post-exploitation actions
+
+Format as JSON with keys: steps (array), tools (array), payloads (array), post_exploitation (array)"""
+
+            result = await orchestrator.query_single(
+                prompt=prompt,
+                system_prompt="You are a penetration testing expert. Provide technical, actionable guidance for exploiting vulnerabilities. Return valid JSON only."
+            )
+
+            if result.success:
+                import json
+                try:
+                    guidance = json.loads(result.response)
+                except:
+                    guidance = {
+                        "steps": [result.response],
+                        "tools": [],
+                        "payloads": []
+                    }
+                return {
+                    "vuln_type": vuln_type,
+                    "target": target,
+                    "guidance": guidance,
+                    "provider": result.provider_name
+                }
+
+        # Fallback to single LLM
+        from app.services.llm_service import LLMService
         llm = LLMService()
         await llm.initialize()
 
-        assistant = ExploitationAssistant(llm)
+        if llm.available:
+            from app.intelligence.exploitation_assistant import ExploitationAssistant
+            assistant = ExploitationAssistant(llm)
 
-        guidance = await assistant.get_guidance(
-            vuln_type=vuln_type,
-            target=target,
-            findings=findings or []
-        )
+            guidance = await assistant.get_guidance(
+                vuln_type=vuln_type,
+                target=target,
+                findings=findings or []
+            )
 
-        return {
-            "vuln_type": vuln_type,
-            "target": target,
-            "guidance": guidance
-        }
-    except ImportError:
+            return {
+                "vuln_type": vuln_type,
+                "target": target,
+                "guidance": guidance
+            }
+    except Exception as e:
+        logger.warning(f"AI guidance failed: {e}")
         # Return static guidance
         static_guidance = {
             "sqli": {

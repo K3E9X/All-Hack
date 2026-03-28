@@ -40,6 +40,13 @@ class LLMService:
     # Free API providers (in priority order)
     FREE_PROVIDERS = [
         {
+            "name": "codex_iliad",
+            "env_key": "CODEX_ILIAD_API_KEY",
+            "base_url": "https://codex.datax.iliad.fr/v1",
+            "model": "Qwen/Qwen3.5-397B-A17B",
+            "type": "openai"
+        },
+        {
             "name": "groq",
             "env_key": "GROQ_API_KEY",
             "base_url": "https://api.groq.com/openai/v1",
@@ -156,11 +163,14 @@ class LLMService:
                 async with self.session.get(url, timeout=aiohttp.ClientTimeout(total=5)) as resp:
                     return resp.status == 200
 
-            elif config.provider in ["groq", "together", "openrouter"]:
+            elif config.provider in ["groq", "together", "openrouter", "codex_iliad"]:
                 url = f"{config.base_url}/models"
                 headers = {"Authorization": f"Bearer {config.api_key}"}
                 async with self.session.get(url, headers=headers, timeout=aiohttp.ClientTimeout(total=5)) as resp:
-                    return resp.status == 200
+                    if resp.status == 200:
+                        return True
+                    # Fallback: test completion
+                    return await self._test_completion(config)
 
             elif config.provider == "dashscope":
                 # DashScope uses different auth header
@@ -301,7 +311,19 @@ Focus on business impact."""
         else:
             return f"Assessment complete: {total} vulnerabilities found. Review and prioritize remediation."
 
-    async def _generate(self, prompt: str) -> Optional[str]:
+    async def analyze(self, prompt: str, system_prompt: str = "You are a security expert. Be helpful.") -> Optional[str]:
+        """General analysis method for arbitrary prompts"""
+        if not await self.is_available():
+            return None
+
+        return await self._generate(prompt, system_prompt)
+
+    @property
+    def available(self) -> bool:
+        """Check if LLM is available (sync property)"""
+        return self._available if self._available is not None else bool(self.configs)
+
+    async def _generate(self, prompt: str, system_prompt: str = "Security expert. Be concise.") -> Optional[str]:
         """Generate response from active LLM provider"""
         if not self.active_config:
             return None
@@ -311,8 +333,8 @@ Focus on business impact."""
         try:
             if self.active_config.provider == "ollama":
                 return await self._generate_ollama(prompt)
-            elif self.active_config.provider in ["groq", "together"]:
-                return await self._generate_openai_compatible(prompt)
+            elif self.active_config.provider in ["groq", "together", "openrouter", "dashscope", "codex_iliad"]:
+                return await self._generate_openai_compatible(prompt, system_prompt)
             elif self.active_config.provider == "huggingface":
                 return await self._generate_huggingface(prompt)
         except Exception as e:
@@ -339,8 +361,8 @@ Focus on business impact."""
                 return data.get("response", "").strip()
         return None
 
-    async def _generate_openai_compatible(self, prompt: str) -> Optional[str]:
-        """Generate with OpenAI-compatible API (Groq, Together)"""
+    async def _generate_openai_compatible(self, prompt: str, system_prompt: str = "Security expert. Be concise.") -> Optional[str]:
+        """Generate with OpenAI-compatible API (Groq, Together, OpenRouter, DashScope, Codex Iliad)"""
         url = f"{self.active_config.base_url}/chat/completions"
         headers = {
             "Authorization": f"Bearer {self.active_config.api_key}",
@@ -349,17 +371,20 @@ Focus on business impact."""
         payload = {
             "model": self.active_config.model,
             "messages": [
-                {"role": "system", "content": "Security expert. Be concise."},
+                {"role": "system", "content": system_prompt},
                 {"role": "user", "content": prompt}
             ],
             "temperature": 0.3,
-            "max_tokens": 300
+            "max_tokens": 500
         }
 
         async with self.session.post(url, headers=headers, json=payload) as resp:
             if resp.status == 200:
                 data = await resp.json()
                 return data.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
+            else:
+                error_text = await resp.text()
+                logger.warning(f"Provider {self.active_config.provider} returned {resp.status}: {error_text[:200]}")
         return None
 
     async def _generate_huggingface(self, prompt: str) -> Optional[str]:

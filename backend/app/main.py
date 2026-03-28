@@ -603,6 +603,51 @@ async def send_chat_message(scan_id: str, message: str = Query(...)):
         "assistant_response": response
     }
 
+
+@app.post(f"{settings.API_PREFIX}/chat/message")
+async def simple_chat_message(request: dict):
+    """
+    💬 Simple chat without scan context - uses multi-agent if configured
+    """
+    message = request.get("message", "")
+    context = request.get("context")
+
+    if not message:
+        raise HTTPException(status_code=400, detail="Message is required")
+
+    try:
+        # Try multi-agent orchestrator first (uses all configured providers)
+        from app.services.multi_agent import get_orchestrator as get_multi_agent
+        multi_agent = get_multi_agent()
+
+        status = multi_agent.get_status()
+        if status.get("providers") and len(status["providers"]) > 0:
+            result = await multi_agent.query_single(
+                prompt=message,
+                system_prompt="You are a security expert assistant for penetration testing. Help with vulnerability analysis, exploitation strategies, and security questions. Be technical and helpful."
+            )
+            if result.success:
+                return {"response": result.response, "provider": result.provider_name}
+
+        # Fallback to single LLM service
+        from app.services.llm_service import LLMService
+        llm = LLMService()
+        await llm.initialize()
+
+        if not llm.available:
+            return {"response": "No LLM provider configured. Please add an API key in Settings.", "provider": None}
+
+        response = await llm.analyze(
+            f"User question: {message}",
+            system_prompt="You are a security expert assistant for penetration testing."
+        )
+
+        return {"response": response, "provider": "default"}
+    except Exception as e:
+        logger.error(f"Chat error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get(f"{settings.API_PREFIX}/chat/{{scan_id}}/history")
 async def get_chat_history(scan_id: str, limit: int = Query(20, ge=1, le=100)):
     """Get chat history for a session"""

@@ -3,27 +3,49 @@ import axios from 'axios'
 import LogsPanel from './LogsPanel'
 import ResizablePanels from './ResizablePanels'
 import { useScan } from '../contexts/ScanContext'
+import { useActiveScans } from '../contexts/ActiveScansContext'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001/api/v1'
 
 function AttackConsole() {
   const { globalTarget, setGlobalTarget, updateResults, updateStatus, events, addEvent, clearEvents } = useScan()
+  const { moduleStates, updateModuleState, addEvent: addGlobalEvent } = useActiveScans()
 
-  const [target, setTarget] = useState(globalTarget || '')
-  const [maxPages, setMaxPages] = useState(50)
-  const [running, setRunning] = useState(false)
-  const [scanId, setScanId] = useState(null)
-  const [status, setStatus] = useState(null)
-  const [results, setResults] = useState(null)
-  const [localEvents, setLocalEvents] = useState([])
+  // Restore state from ActiveScansContext
+  const savedState = moduleStates.scan || {}
+
+  const [target, setTarget] = useState(savedState.target || globalTarget || '')
+  const [maxPages, setMaxPages] = useState(savedState.maxPages || 50)
+  const [running, setRunning] = useState(savedState.running || false)
+  const [scanId, setScanId] = useState(savedState.scanId || null)
+  const [status, setStatus] = useState(savedState.status || null)
+  const [results, setResults] = useState(savedState.results || null)
+  const [localEvents, setLocalEvents] = useState(savedState.localEvents || [])
   const [error, setError] = useState(null)
-  const [selectedFinding, setSelectedFinding] = useState(null)
+  const [selectedFinding, setSelectedFinding] = useState(savedState.selectedFinding || null)
   const [copiedIndex, setCopiedIndex] = useState(null)
-  const [rightPanelTab, setRightPanelTab] = useState('findings')
+  const [rightPanelTab, setRightPanelTab] = useState(savedState.rightPanelTab || 'findings')
 
   // Panel widths
-  const [leftWidth, setLeftWidth] = useState(280)
-  const [rightWidth, setRightWidth] = useState(480)
+  const [leftWidth, setLeftWidth] = useState(savedState.leftWidth || 280)
+  const [rightWidth, setRightWidth] = useState(savedState.rightWidth || 480)
+
+  // Persist state to ActiveScansContext
+  useEffect(() => {
+    updateModuleState('scan', {
+      target,
+      maxPages,
+      running,
+      scanId,
+      status,
+      results,
+      localEvents,
+      selectedFinding,
+      rightPanelTab,
+      leftWidth,
+      rightWidth
+    })
+  }, [target, maxPages, running, scanId, status, results, localEvents, selectedFinding, rightPanelTab, leftWidth, rightWidth])
 
   const consoleRef = useRef(null)
   const pollRef = useRef(null)
@@ -62,6 +84,7 @@ function AttackConsole() {
     }
     setLocalEvents(prev => [...prev.slice(-200), event])
     addEvent(phase, message, type)
+    addGlobalEvent('scan', phase, message, type)
   }
 
   const copyToClipboard = async (text, index) => {
