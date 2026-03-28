@@ -68,18 +68,39 @@ async def scan_ports(request: PortScanRequest):
     try:
         from app.scanners.advanced.port_scanner import PortScanner
 
-        scanner = PortScanner(request.target)
+        # Handle URL or hostname
+        target = request.target
+        if target.startswith("http"):
+            from urllib.parse import urlparse
+            parsed = urlparse(target)
+            target = parsed.hostname
+
+        scanner = PortScanner(f"http://{target}" if not request.target.startswith("http") else request.target)
 
         if request.ports:
             scanner.COMMON_PORTS = request.ports
 
-        results = await scanner.scan()
+        # scan() returns tuple: (open_ports, vulnerabilities, misconfigurations)
+        open_ports, vulnerabilities, misconfigurations = await scanner.scan()
+
+        # Build services dict from open ports
+        services = {}
+        for port_info in open_ports:
+            if isinstance(port_info, dict) and port_info.get('open'):
+                services[port_info['port']] = {
+                    'service': port_info.get('service', 'unknown'),
+                    'version': port_info.get('version', ''),
+                    'banner': port_info.get('banner', '')
+                }
 
         return {
-            "target": request.target,
-            "open_ports": results.get("open_ports", []),
-            "services": results.get("services", {}),
-            "vulnerabilities": results.get("vulnerabilities", [])
+            "target": target,
+            "open_ports": [p['port'] for p in open_ports if isinstance(p, dict) and p.get('open')],
+            "services": services,
+            "vulnerabilities": [v.dict() if hasattr(v, 'dict') else str(v) for v in vulnerabilities],
+            "misconfigurations": [m.dict() if hasattr(m, 'dict') else str(m) for m in misconfigurations],
+            "total_scanned": len(scanner.COMMON_PORTS),
+            "note": "PaaS-hosted targets (Heroku, AWS ELB, etc.) may only expose ports 80/443"
         }
     except ImportError as e:
         raise HTTPException(status_code=500, detail=f"Scanner not available: {e}")

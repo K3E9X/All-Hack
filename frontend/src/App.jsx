@@ -1,5 +1,6 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { ThemeProvider } from './contexts/ThemeContext';
+import { ScanProvider } from './contexts/ScanContext';
 import Layout from './components/Layout';
 import AttackConsole from './components/AttackConsole';
 import AgentView from './pages/AgentView';
@@ -14,20 +15,22 @@ import './index.css';
 function App() {
   return (
     <ThemeProvider>
-      <Router>
-        <Routes>
-          <Route element={<Layout />}>
-            <Route path="/" element={<AttackConsole />} />
-            <Route path="/agent" element={<AgentView />} />
-            <Route path="/history" element={<HistoryView />} />
-            <Route path="/chat" element={<ChatView />} />
-            <Route path="/settings" element={<SettingsView />} />
-            <Route path="/scan/:scanId" element={<ScanDetails />} />
-            <Route path="/recon" element={<ReconView />} />
-            <Route path="/tools" element={<ToolsView />} />
-          </Route>
-        </Routes>
-      </Router>
+      <ScanProvider>
+        <Router>
+          <Routes>
+            <Route element={<Layout />}>
+              <Route path="/" element={<AttackConsole />} />
+              <Route path="/agent" element={<AgentView />} />
+              <Route path="/history" element={<HistoryView />} />
+              <Route path="/chat" element={<ChatView />} />
+              <Route path="/settings" element={<SettingsView />} />
+              <Route path="/scan/:scanId" element={<ScanDetails />} />
+              <Route path="/recon" element={<ReconView />} />
+              <Route path="/tools" element={<ToolsView />} />
+            </Route>
+          </Routes>
+        </Router>
+      </ScanProvider>
     </ThemeProvider>
   );
 }
