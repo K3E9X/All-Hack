@@ -13,12 +13,14 @@ from ..tools.registry import create_default_registry
 from ..memory.learning import MemorySystem
 from app.database.connection import get_db
 from app.services.llm_service import LLMService
+from app.services.multi_agent import get_orchestrator
 
 router = APIRouter(prefix="/agent", tags=["agent"])
 
 # Singleton instances
 _agent_loop: Optional[AgentLoop] = None
 _llm_service: Optional[LLMService] = None
+_orchestrator = None
 
 
 async def get_llm_service() -> LLMService:
@@ -30,13 +32,22 @@ async def get_llm_service() -> LLMService:
     return _llm_service
 
 
+async def get_multi_agent_orchestrator():
+    """Get multi-agent orchestrator with all configured providers"""
+    global _orchestrator
+    if _orchestrator is None:
+        _orchestrator = get_orchestrator()
+    return _orchestrator
+
+
 async def get_agent_loop(db: Session = Depends(get_db)) -> AgentLoop:
-    """Get or create agent loop"""
+    """Get or create agent loop with multi-agent support"""
     global _agent_loop
     if _agent_loop is None:
         llm = await get_llm_service()
         tools = create_default_registry()
         memory = MemorySystem(db)
+        orchestrator = await get_multi_agent_orchestrator()
 
         _agent_loop = (
             AgentLoopBuilder()
@@ -44,6 +55,7 @@ async def get_agent_loop(db: Session = Depends(get_db)) -> AgentLoop:
             .with_tools(tools)
             .with_memory(memory)
             .with_database(db)
+            .with_orchestrator(orchestrator)
             .build()
         )
     return _agent_loop
@@ -135,16 +147,18 @@ async def agent_websocket(
     await websocket.accept()
 
     try:
-        # Get dependencies
+        # Get dependencies with multi-agent support
         llm = await get_llm_service()
         tools = create_default_registry()
         memory = MemorySystem()
+        orchestrator = await get_multi_agent_orchestrator()
 
         agent = (
             AgentLoopBuilder()
             .with_llm(llm)
             .with_tools(tools)
             .with_memory(memory)
+            .with_orchestrator(orchestrator)
             .build()
         )
 

@@ -1,11 +1,17 @@
 """
 Agent Loop - Main orchestrator for offensive AI agent
+
+Enhanced with:
+- Multi-LLM consensus
+- Web research for POCs
+- Automatic payload generation
+- Exploit script creation
 """
 
 import asyncio
 import uuid
 from datetime import datetime
-from typing import Dict, Any, Optional, Callable, AsyncGenerator
+from typing import Dict, Any, Optional, Callable, AsyncGenerator, List
 from dataclasses import dataclass
 
 from .session import AgentSession, SessionStatus, TaskStatus
@@ -46,13 +52,18 @@ class AgentLoop:
         llm_service,
         tool_registry,
         memory_system=None,
-        db_session=None
+        db_session=None,
+        multi_agent_orchestrator=None
     ):
         self.llm = llm_service
         self.tools = tool_registry
         self.memory = memory_system
         self.db = db_session
+        self.orchestrator = multi_agent_orchestrator
         self.planner = TaskPlanner(llm_service, tool_registry)
+
+        # Exploit researcher for POC lookups
+        self.researcher = None
 
         # Active sessions
         self.sessions: Dict[str, AgentSession] = {}
@@ -180,11 +191,31 @@ class AgentLoop:
 
                     # Adaptive replanning if significant findings
                     if len(findings) > 0 and any(f.get("severity") in ["critical", "high"] for f in findings):
-                        session.add_reasoning("observation", f"Found {len(findings)} vulnerabilities, considering exploitation chains")
+                        session.add_reasoning("observation", f"Found {len(findings)} vulnerabilities, researching exploits...")
                         yield AgentEvent("reasoning", {
                             "step": "observation",
-                            "content": f"Found {len(findings)} vulnerabilities, analyzing exploitation paths"
+                            "content": f"Found {len(findings)} vulnerabilities - researching public POCs and generating payloads"
                         })
+
+                        # Research exploits for each finding
+                        for finding in findings:
+                            if finding.get("severity") in ["critical", "high"]:
+                                research = await self._research_exploit(
+                                    finding.get("type", "unknown"),
+                                    target,
+                                    finding,
+                                    session.context.get("technologies", [])
+                                )
+                                if research:
+                                    yield AgentEvent("research", {
+                                        "vuln_type": finding.get("type"),
+                                        "public_pocs": research.get("public_pocs", [])[:3],
+                                        "payloads": research.get("payloads", [])[:5],
+                                        "exploit_script": research.get("exploit_script") is not None,
+                                        "success_probability": research.get("success_probability", 0)
+                                    })
+                                    # Store research in session
+                                    session.context.setdefault("exploit_research", []).append(research)
 
                         # Check for chain opportunities
                         replan_result = await self.planner.replan(session, findings, session.context)
@@ -192,7 +223,7 @@ class AgentLoop:
                             session.tasks.extend(replan_result.tasks)
                             yield AgentEvent("reasoning", {
                                 "step": "decision",
-                                "content": f"Adding {len(replan_result.tasks)} follow-up tasks for exploitation"
+                                "content": f"Adding {len(replan_result.tasks)} exploitation tasks based on research"
                             })
 
                 except Exception as e:
@@ -301,6 +332,48 @@ class AgentLoop:
 
         return findings
 
+    async def _research_exploit(
+        self,
+        vuln_type: str,
+        target: str,
+        finding: Dict[str, Any],
+        tech_stack: List[str]
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Research exploits for a vulnerability using:
+        1. Web search for public POCs
+        2. LLM-generated payloads
+        3. Exploit script generation
+        """
+        try:
+            # Lazy load researcher with orchestrator
+            if self.researcher is None:
+                from app.services.exploit_researcher import get_exploit_researcher
+                from app.services.multi_agent import get_orchestrator
+                orchestrator = self.orchestrator or get_orchestrator()
+                self.researcher = get_exploit_researcher(orchestrator)
+
+            research = await self.researcher.research_vulnerability(
+                vuln_type=vuln_type,
+                target=target,
+                vuln_details=finding,
+                tech_stack=tech_stack
+            )
+
+            return {
+                "vuln_type": research.vuln_type,
+                "public_pocs": research.public_pocs,
+                "payloads": research.generated_payloads,
+                "exploit_script": research.exploit_script,
+                "references": research.references,
+                "success_probability": research.success_probability,
+                "notes": research.notes
+            }
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(f"Exploit research failed: {e}")
+            return None
+
     async def _persist_session(self, session: AgentSession):
         """Persist session to database"""
         # This would save to AgentTask table
@@ -315,6 +388,7 @@ class AgentLoopBuilder:
         self._tools = None
         self._memory = None
         self._db = None
+        self._orchestrator = None
 
     def with_llm(self, llm_service):
         self._llm = llm_service
@@ -332,6 +406,11 @@ class AgentLoopBuilder:
         self._db = db_session
         return self
 
+    def with_orchestrator(self, orchestrator):
+        """Add multi-agent orchestrator for consensus and research"""
+        self._orchestrator = orchestrator
+        return self
+
     def build(self) -> AgentLoop:
         if not self._llm:
             raise ValueError("LLM service is required")
@@ -342,5 +421,6 @@ class AgentLoopBuilder:
             llm_service=self._llm,
             tool_registry=self._tools,
             memory_system=self._memory,
-            db_session=self._db
+            db_session=self._db,
+            multi_agent_orchestrator=self._orchestrator
         )
