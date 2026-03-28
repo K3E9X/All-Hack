@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import {
   Play,
   Square,
@@ -15,17 +15,22 @@ import {
   RefreshCw
 } from 'lucide-react';
 import clsx from 'clsx';
+import { useActiveScans } from '../contexts/ActiveScansContext';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001';
 
 export default function AgentView() {
-  const [target, setTarget] = useState('');
-  const [request, setRequest] = useState('');
-  const [isRunning, setIsRunning] = useState(false);
-  const [events, setEvents] = useState([]);
-  const [decisionEngine, setDecisionEngine] = useState(null);
+  const { moduleStates, updateModuleState, addEvent: addGlobalEvent } = useActiveScans();
+  const savedState = moduleStates.agent || {};
+
+  // Restore state from context
+  const [target, setTarget] = useState(savedState.target || '');
+  const [request, setRequest] = useState(savedState.request || '');
+  const [isRunning, setIsRunning] = useState(savedState.running || false);
+  const [events, setEvents] = useState(savedState.events || []);
+  const [decisionEngine, setDecisionEngine] = useState(savedState.decisionEngine || null);
   const [loadingEngine, setLoadingEngine] = useState(false);
-  const [expandedSections, setExpandedSections] = useState({
+  const [expandedSections, setExpandedSections] = useState(savedState.expandedSections || {
     decisionEngine: false,
     reasoning: true,
     tools: true,
@@ -35,11 +40,23 @@ export default function AgentView() {
   const wsRef = useRef(null);
   const eventsEndRef = useRef(null);
 
+  // Persist state changes to context
+  useEffect(() => {
+    updateModuleState('agent', {
+      target,
+      request,
+      running: isRunning,
+      events,
+      decisionEngine,
+      expandedSections
+    });
+  }, [target, request, isRunning, events, decisionEngine, expandedSections]);
+
   useEffect(() => {
     eventsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [events]);
 
-  const loadDecisionEngine = async () => {
+  const loadDecisionEngine = useCallback(async () => {
     setLoadingEngine(true);
     try {
       const res = await fetch(`${API_URL}/api/v1/agent/decision-engine`);
@@ -52,17 +69,20 @@ export default function AgentView() {
     } finally {
       setLoadingEngine(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    loadDecisionEngine();
-  }, []);
+    if (!decisionEngine) {
+      loadDecisionEngine();
+    }
+  }, [loadDecisionEngine, decisionEngine]);
 
   const startAgent = () => {
     if (!target || !request) return;
 
     setIsRunning(true);
     setEvents([]);
+    addGlobalEvent('agent', 'start', `Starting OpenClaw agent on ${target}`, 'info');
 
     // Connect via WebSocket
     const wsUrl = `${API_URL.replace('http', 'ws')}/api/v1/agent/ws/${encodeURIComponent(target)}`;
@@ -71,14 +91,21 @@ export default function AgentView() {
 
     ws.onopen = () => {
       ws.send(JSON.stringify({ request, context: {} }));
+      addGlobalEvent('agent', 'connected', 'WebSocket connected', 'info');
     };
 
     ws.onmessage = (event) => {
       const data = JSON.parse(event.data);
       setEvents(prev => [...prev, data]);
 
+      // Log findings to global events
+      if (data.type === 'finding') {
+        addGlobalEvent('agent', 'finding', `Found: ${data.data?.title || data.data?.type}`, 'warning', data.data);
+      }
+
       if (data.type === 'status' && data.data?.phase === 'completed') {
         setIsRunning(false);
+        addGlobalEvent('agent', 'complete', 'Agent scan completed', 'success');
       }
     };
 
@@ -89,6 +116,7 @@ export default function AgentView() {
         data: { message: 'Connection failed' },
         timestamp: new Date().toISOString()
       }]);
+      addGlobalEvent('agent', 'error', 'WebSocket connection failed', 'error');
     };
 
     ws.onclose = () => {
@@ -101,6 +129,7 @@ export default function AgentView() {
       wsRef.current.close();
     }
     setIsRunning(false);
+    addGlobalEvent('agent', 'stop', 'Agent stopped by user', 'warning');
   };
 
   const toggleSection = (section) => {
@@ -118,12 +147,19 @@ export default function AgentView() {
     <div className="flex flex-col h-full">
       {/* Header */}
       <header className="flex items-center justify-between px-6 h-14 border-b border-border bg-background">
-        <h1 className="text-lg font-semibold">Agent Loop</h1>
+        <div className="flex items-center gap-3">
+          <h1 className="text-lg font-semibold">OpenClaw AI</h1>
+          {events.length > 0 && !isRunning && (
+            <span className="text-xs px-2 py-0.5 rounded-full bg-green-500/10 text-green-400">
+              {findings.length} findings
+            </span>
+          )}
+        </div>
         <div className="flex items-center gap-2">
           {isRunning && (
-            <span className="flex items-center gap-2 text-sm text-secondary">
+            <span className="flex items-center gap-2 text-sm text-accent">
               <Loader className="w-4 h-4 animate-spin" />
-              Running
+              Agent Running...
             </span>
           )}
         </div>
