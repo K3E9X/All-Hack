@@ -238,24 +238,51 @@ async def run_nuclei(request: NucleiRequest):
 
         nuclei = NucleiIntegration()
 
-        result = await nuclei.scan(
-            url=request.target,
-            templates=request.templates,
-            severity=request.severity
+        if not nuclei.is_available():
+            return {
+                "target": request.target,
+                "error": "Nuclei not installed",
+                "install_hint": "go install -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest && nuclei -update-templates",
+                "templates_run": 0,
+                "vulnerabilities_found": 0
+            }
+
+        # Call the correct method
+        vulns, misconfigs = await nuclei.scan_target(
+            target=request.target,
+            severity_filter=request.severity
         )
+
+        findings = []
+        for v in vulns:
+            findings.append({
+                "title": v.title,
+                "severity": v.severity.value if hasattr(v.severity, 'value') else str(v.severity),
+                "url": v.affected_url,
+                "description": v.description
+            })
+        for m in misconfigs:
+            findings.append({
+                "title": m.title,
+                "severity": m.severity.value if hasattr(m.severity, 'value') else str(m.severity),
+                "url": m.affected_url,
+                "description": m.description
+            })
 
         return {
             "target": request.target,
-            "findings": result.get("findings", []),
-            "templates_run": result.get("templates_run", 0),
-            "vulnerabilities_found": result.get("vulnerabilities_found", 0)
+            "findings": findings,
+            "templates_run": len(findings),
+            "vulnerabilities_found": len(vulns),
+            "misconfigurations_found": len(misconfigs)
         }
     except ImportError:
         return {
             "target": request.target,
-            "error": "Nuclei not installed",
+            "error": "Nuclei integration not available",
             "install_hint": "go install -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest",
-            "fallback": "Using built-in scanners instead"
+            "templates_run": 0,
+            "vulnerabilities_found": 0
         }
     except Exception as e:
         logger.error(f"Nuclei error: {e}")
@@ -309,30 +336,40 @@ async def get_static_payloads(vuln_type: str, limit: int = 50):
     Get static payloads for vulnerability type
     """
     try:
-        # Map vuln types to payload modules
+        from app.payloads import (
+            SQLI_PAYLOADS, XSS_PAYLOADS, LFI_PAYLOADS,
+            RCE_PAYLOADS, SSTI_PAYLOADS, XXE_PAYLOADS,
+            NOSQL_PAYLOADS, SSRF_PAYLOADS
+        )
+
+        # Map vuln types to payload constants
         payload_map = {
-            "sqli": "app.payloads.sqli",
-            "xss": "app.payloads.xss",
-            "lfi": "app.payloads.lfi",
-            "rce": "app.payloads.rce",
-            "ssti": "app.payloads.ssti",
-            "xxe": "app.payloads.xxe",
-            "nosql": "app.payloads.nosql",
-            "ssrf": "app.payloads.ssrf",
+            "sqli": SQLI_PAYLOADS,
+            "xss": XSS_PAYLOADS,
+            "lfi": LFI_PAYLOADS,
+            "rce": RCE_PAYLOADS,
+            "ssti": SSTI_PAYLOADS,
+            "xxe": XXE_PAYLOADS,
+            "nosql": NOSQL_PAYLOADS,
+            "ssrf": SSRF_PAYLOADS,
         }
 
         if vuln_type not in payload_map:
             return {"error": f"Unknown vuln type: {vuln_type}", "available": list(payload_map.keys())}
 
-        import importlib
-        module = importlib.import_module(payload_map[vuln_type])
+        payloads_data = payload_map[vuln_type]
 
-        # Get payloads from module
-        payloads = []
-        if hasattr(module, 'PAYLOADS'):
-            payloads = module.PAYLOADS[:limit]
-        elif hasattr(module, 'get_payloads'):
-            payloads = module.get_payloads()[:limit]
+        # Flatten if dict (payloads organized by category)
+        if isinstance(payloads_data, dict):
+            payloads = []
+            for category, items in payloads_data.items():
+                if isinstance(items, list):
+                    payloads.extend(items[:limit // max(len(payloads_data), 1)])
+            payloads = payloads[:limit]
+        elif isinstance(payloads_data, list):
+            payloads = payloads_data[:limit]
+        else:
+            payloads = []
 
         return {
             "vuln_type": vuln_type,
@@ -340,6 +377,7 @@ async def get_static_payloads(vuln_type: str, limit: int = 50):
             "count": len(payloads)
         }
     except Exception as e:
+        logger.error(f"Payload error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -348,8 +386,7 @@ async def get_static_payloads(vuln_type: str, limit: int = 50):
 @router.post("/tools/exploit-assist")
 async def exploitation_assistant(
     vuln_type: str = Query(..., description="Vulnerability type"),
-    target: str = Query("", description="Target URL"),
-    findings: List[Dict] = None
+    target: str = Query("", description="Target URL")
 ):
     """
     Get AI-powered exploitation assistance
@@ -406,7 +443,7 @@ Format as JSON with keys: steps (array), tools (array), payloads (array), post_e
             guidance = await assistant.get_guidance(
                 vuln_type=vuln_type,
                 target=target,
-                findings=findings or []
+                findings=[]
             )
 
             return {

