@@ -14,6 +14,7 @@ const PROVIDER_TYPES = [
   { value: 'anthropic', label: 'Anthropic', hint: 'Claude' },
   { value: 'together', label: 'Together.ai', hint: 'Open models' },
   { value: 'openrouter', label: 'OpenRouter', hint: 'Multi-provider' },
+  { value: 'codex_iliad', label: 'Codex Iliad', hint: 'Devstral, Qwen 397B' },
 ];
 
 const CONSENSUS_MODES = [
@@ -30,6 +31,7 @@ export default function SettingsView() {
     groq_api_key: '',
     dashscope_api_key: '',
     openrouter_api_key: '',
+    codex_iliad_api_key: '',
     default_depth: 'balanced',
     auto_exploit: true,
     validate_findings: true,
@@ -40,7 +42,7 @@ export default function SettingsView() {
   const [error, setError] = useState(null);
 
   // Track originally configured keys (to know whether to preserve them)
-  const [originalKeys, setOriginalKeys] = useState({ groq: false, dashscope: false, openrouter: false });
+  const [originalKeys, setOriginalKeys] = useState({ groq: false, dashscope: false, openrouter: false, codex_iliad: false });
 
   // Multi-agent state
   const [providers, setProviders] = useState([]);
@@ -64,7 +66,8 @@ export default function SettingsView() {
         setOriginalKeys({
           groq: data.groq_api_key === '***',
           dashscope: data.dashscope_api_key === '***',
-          openrouter: data.openrouter_api_key === '***'
+          openrouter: data.openrouter_api_key === '***',
+          codex_iliad: data.codex_iliad_api_key === '***'
         });
       }
     } catch (err) {
@@ -164,6 +167,9 @@ export default function SettingsView() {
       }
       if (!settingsToSave.openrouter_api_key && originalKeys.openrouter) {
         settingsToSave.openrouter_api_key = '***';
+      }
+      if (!settingsToSave.codex_iliad_api_key && originalKeys.codex_iliad) {
+        settingsToSave.codex_iliad_api_key = '***';
       }
 
       const response = await fetch(`${API_URL}/api/v1/settings`, {
@@ -333,6 +339,31 @@ export default function SettingsView() {
                     settings.openrouter_api_key === '***' ? 'border-green-500/30' : 'border-border'
                   )}
                 />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1.5 flex items-center gap-2">
+                  Codex Iliad API Key
+                  <span className="text-secondary font-normal">(Devstral, Qwen 397B)</span>
+                  {settings.codex_iliad_api_key === '***' && (
+                    <span className="text-green-400 text-xs flex items-center gap-1">
+                      <CheckCircle className="w-3 h-3" /> Configured
+                    </span>
+                  )}
+                </label>
+                <input
+                  type="password"
+                  value={settings.codex_iliad_api_key === '***' ? '' : settings.codex_iliad_api_key}
+                  onChange={(e) => updateSetting('codex_iliad_api_key', e.target.value)}
+                  placeholder={settings.codex_iliad_api_key === '***' ? '••••••• (keep current key)' : 'sk-...'}
+                  className={clsx(
+                    'w-full px-3 py-2 rounded-lg border bg-surface font-mono text-sm',
+                    settings.codex_iliad_api_key === '***' ? 'border-green-500/30' : 'border-border'
+                  )}
+                />
+                <p className="text-xs text-secondary mt-1">
+                  codex.datax.iliad.fr - Devstral 2 123B, Qwen 3.5 397B
+                </p>
               </div>
             </div>
           </section>

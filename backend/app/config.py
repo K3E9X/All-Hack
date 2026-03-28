@@ -35,6 +35,7 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: Optional[str] = None
     TOGETHER_API_KEY: Optional[str] = None
     HF_API_KEY: Optional[str] = None
+    CODEX_ILIAD_API_KEY: Optional[str] = None
 
     # Scanning Configuration
     MAX_CONCURRENT_SCANS: int = 5

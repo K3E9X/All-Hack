@@ -107,6 +107,7 @@ async def get_settings():
                 "groq_api_key": "",
                 "dashscope_api_key": "",
                 "openrouter_api_key": "",
+                "codex_iliad_api_key": "",
                 "default_depth": "balanced",
                 "auto_exploit": True,
                 "validate_findings": True,
@@ -117,6 +118,7 @@ async def get_settings():
             "groq_api_key": "***" if user_settings.api_keys.get("groq") else "",
             "dashscope_api_key": "***" if user_settings.api_keys.get("dashscope") else "",
             "openrouter_api_key": "***" if user_settings.api_keys.get("openrouter") else "",
+            "codex_iliad_api_key": "***" if user_settings.api_keys.get("codex_iliad") else "",
             "default_depth": user_settings.default_depth,
             "auto_exploit": user_settings.auto_exploit,
             "validate_findings": user_settings.validate_findings,
@@ -150,6 +152,9 @@ async def save_settings(data: dict):
         if data.get("openrouter_api_key") and data["openrouter_api_key"] != "***":
             api_keys["openrouter"] = data["openrouter_api_key"]
             os.environ["OPENROUTER_API_KEY"] = data["openrouter_api_key"]
+        if data.get("codex_iliad_api_key") and data["codex_iliad_api_key"] != "***":
+            api_keys["codex_iliad"] = data["codex_iliad_api_key"]
+            os.environ["CODEX_ILIAD_API_KEY"] = data["codex_iliad_api_key"]
         user_settings.api_keys = api_keys
 
         # Update preferences
