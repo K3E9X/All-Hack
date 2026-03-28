@@ -1,9 +1,28 @@
 import { useState, useEffect } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
-import { Save, Key, Palette, Sliders, CheckCircle, AlertCircle } from 'lucide-react';
+import { Save, Key, Palette, Sliders, CheckCircle, AlertCircle, Bot, Plus, Trash2, RefreshCw } from 'lucide-react';
 import clsx from 'clsx';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001';
+
+const PROVIDER_TYPES = [
+  { value: 'openai', label: 'OpenAI', hint: 'GPT-4o, GPT-4' },
+  { value: 'groq', label: 'Groq', hint: 'Llama 3.1 (Fast)' },
+  { value: 'grok', label: 'Grok (xAI)', hint: 'Grok Beta' },
+  { value: 'ollama', label: 'Ollama', hint: 'Local LLM' },
+  { value: 'qwen', label: 'Qwen (DashScope)', hint: 'Qwen Plus' },
+  { value: 'anthropic', label: 'Anthropic', hint: 'Claude' },
+  { value: 'together', label: 'Together.ai', hint: 'Open models' },
+  { value: 'openrouter', label: 'OpenRouter', hint: 'Multi-provider' },
+];
+
+const CONSENSUS_MODES = [
+  { value: 'single', label: 'Single', desc: 'Use primary only' },
+  { value: 'fallback', label: 'Fallback', desc: 'Try next on failure' },
+  { value: 'voting', label: 'Voting', desc: 'Majority decision' },
+  { value: 'weighted', label: 'Weighted', desc: 'By confidence/speed' },
+  { value: 'all', label: 'All', desc: 'Combine all responses' },
+];
 
 export default function SettingsView() {
   const { theme, setTheme } = useTheme();
@@ -20,8 +39,17 @@ export default function SettingsView() {
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState(null);
 
+  // Multi-agent state
+  const [providers, setProviders] = useState([]);
+  const [newProvider, setNewProvider] = useState({ name: '', type: 'groq', api_key: '', model: '', role: 'general' });
+  const [multiAgentStatus, setMultiAgentStatus] = useState(null);
+  const [consensusMode, setConsensusMode] = useState('fallback');
+  const [primaryProvider, setPrimaryProvider] = useState('');
+  const [checkingProviders, setCheckingProviders] = useState(false);
+
   useEffect(() => {
     fetchSettings();
+    fetchMultiAgentStatus();
   }, []);
 
   const fetchSettings = async () => {
@@ -33,6 +61,81 @@ export default function SettingsView() {
       }
     } catch (err) {
       // Settings endpoint might not exist yet
+    }
+  };
+
+  const fetchMultiAgentStatus = async () => {
+    try {
+      const response = await fetch(`${API_URL}/api/v1/multi-agent/status`);
+      if (response.ok) {
+        const data = await response.json();
+        setMultiAgentStatus(data);
+        setProviders(data.providers || []);
+        setConsensusMode(data.consensus_mode || 'fallback');
+        setPrimaryProvider(data.primary_provider || '');
+      }
+    } catch (err) {
+      // Multi-agent endpoint might not exist yet
+    }
+  };
+
+  const addProvider = async () => {
+    if (!newProvider.name || !newProvider.type) return;
+
+    try {
+      const response = await fetch(`${API_URL}/api/v1/multi-agent/providers`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newProvider)
+      });
+
+      if (response.ok) {
+        setNewProvider({ name: '', type: 'groq', api_key: '', model: '', role: 'general' });
+        fetchMultiAgentStatus();
+      }
+    } catch (err) {
+      setError('Failed to add provider');
+    }
+  };
+
+  const removeProvider = async (name) => {
+    try {
+      await fetch(`${API_URL}/api/v1/multi-agent/providers/${name}`, { method: 'DELETE' });
+      fetchMultiAgentStatus();
+    } catch (err) {
+      setError('Failed to remove provider');
+    }
+  };
+
+  const checkProviders = async () => {
+    setCheckingProviders(true);
+    try {
+      const response = await fetch(`${API_URL}/api/v1/multi-agent/providers/check`, { method: 'POST' });
+      if (response.ok) {
+        fetchMultiAgentStatus();
+      }
+    } catch (err) {
+      // ignore
+    } finally {
+      setCheckingProviders(false);
+    }
+  };
+
+  const updateConsensusMode = async (mode) => {
+    try {
+      await fetch(`${API_URL}/api/v1/multi-agent/set-consensus-mode/${mode}`, { method: 'POST' });
+      setConsensusMode(mode);
+    } catch (err) {
+      setError('Failed to update consensus mode');
+    }
+  };
+
+  const updatePrimaryProvider = async (name) => {
+    try {
+      await fetch(`${API_URL}/api/v1/multi-agent/set-primary/${name}`, { method: 'POST' });
+      setPrimaryProvider(name);
+    } catch (err) {
+      setError('Failed to set primary provider');
     }
   };
 
@@ -179,6 +282,170 @@ export default function SettingsView() {
                   placeholder="sk-or-..."
                   className="w-full px-3 py-2 rounded-lg border border-border bg-surface font-mono text-sm"
                 />
+              </div>
+            </div>
+          </section>
+
+          {/* Multi-Agent Configuration */}
+          <section className="card p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <Bot className="w-5 h-5 text-accent" />
+                <h2 className="font-semibold">Multi-Agent LLM</h2>
+              </div>
+              <button
+                onClick={checkProviders}
+                disabled={checkingProviders}
+                className="flex items-center gap-1 text-sm text-secondary hover:text-primary"
+              >
+                <RefreshCw className={clsx('w-4 h-4', checkingProviders && 'animate-spin')} />
+                Check All
+              </button>
+            </div>
+
+            <p className="text-sm text-secondary mb-4">
+              Configure multiple LLM providers for consensus-based security decisions.
+            </p>
+
+            {/* Consensus Mode */}
+            <div className="mb-6">
+              <label className="block text-sm font-medium mb-2">Consensus Mode</label>
+              <div className="grid grid-cols-5 gap-2">
+                {CONSENSUS_MODES.map((mode) => (
+                  <button
+                    key={mode.value}
+                    onClick={() => updateConsensusMode(mode.value)}
+                    className={clsx(
+                      'p-2 rounded-lg border text-center transition-colors',
+                      consensusMode === mode.value
+                        ? 'border-accent bg-accent/10 text-accent'
+                        : 'border-border hover:border-accent/50'
+                    )}
+                  >
+                    <div className="text-sm font-medium">{mode.label}</div>
+                    <div className="text-xs text-secondary">{mode.desc}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Active Providers */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium mb-2">
+                Active Providers ({providers.length})
+              </label>
+              {providers.length === 0 ? (
+                <p className="text-sm text-secondary p-4 rounded-lg bg-background border border-border">
+                  No providers configured. Add one below.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {providers.map((provider) => (
+                    <div
+                      key={provider.name}
+                      className="flex items-center justify-between p-3 rounded-lg bg-background border border-border"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={clsx(
+                          'w-2 h-2 rounded-full',
+                          provider.available ? 'bg-green-400' : 'bg-red-400'
+                        )} />
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">{provider.name}</span>
+                            {primaryProvider === provider.name && (
+                              <span className="text-xs px-1.5 py-0.5 rounded bg-accent/20 text-accent">Primary</span>
+                            )}
+                          </div>
+                          <div className="text-xs text-secondary">
+                            {provider.type} / {provider.model} / {provider.role}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {primaryProvider !== provider.name && (
+                          <button
+                            onClick={() => updatePrimaryProvider(provider.name)}
+                            className="text-xs text-secondary hover:text-accent"
+                          >
+                            Set Primary
+                          </button>
+                        )}
+                        <button
+                          onClick={() => removeProvider(provider.name)}
+                          className="p-1 text-secondary hover:text-red-400"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Add New Provider */}
+            <div className="p-4 rounded-lg bg-background border border-border">
+              <div className="flex items-center gap-2 mb-3">
+                <Plus className="w-4 h-4 text-secondary" />
+                <span className="text-sm font-medium">Add Provider</span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 mb-3">
+                <input
+                  type="text"
+                  placeholder="Name (e.g., primary-gpt)"
+                  value={newProvider.name}
+                  onChange={(e) => setNewProvider(prev => ({ ...prev, name: e.target.value }))}
+                  className="px-3 py-2 rounded-lg border border-border bg-surface text-sm"
+                />
+                <select
+                  value={newProvider.type}
+                  onChange={(e) => setNewProvider(prev => ({ ...prev, type: e.target.value }))}
+                  className="px-3 py-2 rounded-lg border border-border bg-surface text-sm"
+                >
+                  {PROVIDER_TYPES.map((pt) => (
+                    <option key={pt.value} value={pt.value}>{pt.label} - {pt.hint}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 mb-3">
+                <input
+                  type="password"
+                  placeholder="API Key"
+                  value={newProvider.api_key}
+                  onChange={(e) => setNewProvider(prev => ({ ...prev, api_key: e.target.value }))}
+                  className="px-3 py-2 rounded-lg border border-border bg-surface text-sm font-mono"
+                />
+                <input
+                  type="text"
+                  placeholder="Model (optional, uses default)"
+                  value={newProvider.model}
+                  onChange={(e) => setNewProvider(prev => ({ ...prev, model: e.target.value }))}
+                  className="px-3 py-2 rounded-lg border border-border bg-surface text-sm"
+                />
+              </div>
+
+              <div className="flex items-center gap-3">
+                <select
+                  value={newProvider.role}
+                  onChange={(e) => setNewProvider(prev => ({ ...prev, role: e.target.value }))}
+                  className="px-3 py-2 rounded-lg border border-border bg-surface text-sm"
+                >
+                  <option value="general">General</option>
+                  <option value="analyst">Analyst</option>
+                  <option value="payload_gen">Payload Generator</option>
+                  <option value="validator">Validator</option>
+                </select>
+                <button
+                  onClick={addProvider}
+                  disabled={!newProvider.name}
+                  className="btn btn-primary text-sm disabled:opacity-50"
+                >
+                  <Plus className="w-4 h-4 mr-1" />
+                  Add
+                </button>
               </div>
             </div>
           </section>
