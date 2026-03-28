@@ -7,9 +7,17 @@ import uuid
 from datetime import datetime
 from typing import Dict, Any, Optional, Callable, AsyncGenerator
 from dataclasses import dataclass
+import aiohttp
 
 from .session import AgentSession, SessionStatus, TaskStatus
 from .task_planner import TaskPlanner
+
+# Import Juice Shop detection
+try:
+    from app.knowledge.juice_shop import is_juice_shop, get_attack_plan
+    JUICE_SHOP_AVAILABLE = True
+except ImportError:
+    JUICE_SHOP_AVAILABLE = False
 
 
 @dataclass
@@ -103,6 +111,9 @@ class AgentLoop:
             if self.memory:
                 memory_context = await self.memory.get_relevant_context(target, request)
                 session.context.update(memory_context)
+
+            # Detect known targets (like OWASP Juice Shop)
+            await self._detect_known_targets(target, session)
 
             # Plan tasks
             plan_result = await self.planner.plan(target, request, session.context)
@@ -305,6 +316,27 @@ class AgentLoop:
         """Persist session to database"""
         # This would save to AgentTask table
         pass
+
+    async def _detect_known_targets(self, target: str, session: AgentSession):
+        """Detect known vulnerable targets and update context"""
+        if not JUICE_SHOP_AVAILABLE:
+            return
+
+        try:
+            async with aiohttp.ClientSession() as http:
+                async with http.get(target, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+                    body = await resp.text()
+                    headers = dict(resp.headers)
+
+                    if is_juice_shop(headers, body):
+                        session.context["is_juice_shop"] = True
+                        session.context["attack_plan"] = get_attack_plan(target)
+                        session.add_reasoning(
+                            "observation",
+                            "🍊 OWASP Juice Shop detected! Loaded specialized attack knowledge with 111 known challenges."
+                        )
+        except Exception:
+            pass  # Continue without detection if request fails
 
 
 class AgentLoopBuilder:

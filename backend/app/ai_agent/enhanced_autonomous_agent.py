@@ -28,6 +28,16 @@ from app.config import settings
 
 # Import our new AI modules
 from app.ai_agent.memory_system import AgentMemory
+
+# Import Juice Shop knowledge base
+try:
+    from app.knowledge.juice_shop import (
+        is_juice_shop, get_attack_plan, get_payloads_for_endpoint,
+        JUICE_SHOP_VULNS, JUICE_SHOP_ENDPOINTS, ATTACK_STRATEGIES
+    )
+    JUICE_SHOP_KNOWLEDGE_AVAILABLE = True
+except ImportError:
+    JUICE_SHOP_KNOWLEDGE_AVAILABLE = False
 from app.ai_agent.payload_generator import AIPayloadGenerator
 from app.ai_agent.exploitation_chains import ExploitationChainBuilder, ExploitationGoal
 from app.ai_agent.report_generator import AIPoweredReportGenerator
@@ -79,6 +89,10 @@ class EnhancedAutonomousPentestAgent:
         self.chain_builder = ExploitationChainBuilder(ai_client=self.client)
         self.report_generator = AIPoweredReportGenerator(api_key=self.api_key)
 
+        # Target-specific knowledge
+        self.juice_shop_detected = False
+        self.target_attack_plan = None
+
         logger.info("🤖 Enhanced Autonomous AI Agent initialized!")
         logger.info("   ├─ 🧠 Memory System: ACTIVE")
         logger.info("   ├─ 🎯 Payload Generator: ACTIVE")
@@ -120,6 +134,9 @@ class EnhancedAutonomousPentestAgent:
         logger.info(f"🔄 Max iterations: {self.max_iterations}")
         logger.info("💤 You can go to sleep - AI agent will work autonomously!")
         logger.info("="*80 + "\n")
+
+        # Detect known targets (like OWASP Juice Shop)
+        await self._detect_known_targets(scan_result.target_url)
 
         # Phase 1: Check for similar targets in memory
         similar_insights = self.memory.get_similar_target_insights(scan_result.target_url)
@@ -401,13 +418,19 @@ class EnhancedAutonomousPentestAgent:
 
     def _create_decision_prompt(self, context: Dict[str, Any]) -> str:
         """Create prompt for Claude to make decisions"""
+
+        # Build Juice Shop specific knowledge section if detected
+        juice_shop_section = ""
+        if self.juice_shop_detected and JUICE_SHOP_KNOWLEDGE_AVAILABLE:
+            juice_shop_section = self._get_juice_shop_prompt_section()
+
         prompt = f"""You are an expert autonomous penetration testing AI agent. Analyze scan results and decide which tests to perform next.
 
 # Current Scan Context
 **Target:** {context['target_url']}
 **Scan Mode:** {context['mode']}
 **Status:** {context['status']}
-
+{juice_shop_section}
 ## Statistics
 - Total Vulnerabilities: {context['statistics']['total_vulnerabilities']}
   - Critical: {context['statistics']['critical']}
@@ -442,7 +465,8 @@ Respond with JSON:
             "test": "test_name",
             "target": "specific_endpoint_or_all",
             "priority": "critical|high|medium|low",
-            "reason": "Why this test"
+            "reason": "Why this test",
+            "payload": "optional specific payload to use"
         }}
     ],
     "reasoning": "Strategic thinking",
@@ -459,6 +483,49 @@ Respond with JSON:
 
         return prompt
 
+    def _get_juice_shop_prompt_section(self) -> str:
+        """Generate Juice Shop specific knowledge section for AI prompt"""
+        section = """
+## 🍊 OWASP JUICE SHOP DETECTED - SPECIALIZED KNOWLEDGE LOADED
+
+This is a known vulnerable application with 111 challenges. Use these known attack vectors:
+
+### High-Priority SQL Injection Points:
+- `/rest/products/search?q=')) OR 1=1--` - Search SQLi
+- `/rest/user/login` with email: `admin'--` - Auth bypass
+- `/rest/user/login` with email: `' OR 1=1--` - Generic bypass
+
+### Known XSS Points:
+- `/#/search?q=<iframe src="javascript:alert('xss')">` - DOM XSS
+- `/api/Feedbacks` comment field - Stored XSS
+- `/rest/products/{id}/reviews` - Stored XSS in reviews
+
+### Broken Access Control:
+- `/rest/basket/{id}` - IDOR (try IDs 1-10)
+- `/api/Users/{id}` - User data exposure
+- `/administration` - Admin panel without auth
+
+### Sensitive Data Exposure:
+- `/ftp` - Directory listing with backups
+- `/ftp/package.json.bak` - Credentials backup
+- `/metrics` - Prometheus metrics exposed
+- `/main.js` - Hardcoded secrets
+
+### Known Users:
+- admin@juice-sh.op (SQLi bypass)
+- jim@juice-sh.op (security Q: "Samuel")
+- bender@juice-sh.op (security Q: "Stop'n'Drop")
+
+### Attack Strategy:
+1. Start with SQLi on login for admin access
+2. Use IDOR on baskets to access other users
+3. Try XSS on search for DOM-based attack
+4. Check /ftp for sensitive file leakage
+5. Exploit JWT for token manipulation
+
+"""
+        return section
+
     def _parse_decision(self, decision_text: str) -> Dict[str, Any]:
         """Parse Claude's decision"""
         try:
@@ -470,6 +537,31 @@ Respond with JSON:
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse AI decision: {e}")
             return {"next_actions": [], "reasoning": "Parse failed", "confidence": 0.0}
+
+    async def _detect_known_targets(self, target_url: str):
+        """Detect known targets like OWASP Juice Shop and load specialized knowledge"""
+        if not JUICE_SHOP_KNOWLEDGE_AVAILABLE:
+            return
+
+        import aiohttp
+        try:
+            async with aiohttp.ClientSession() as session:
+                # Check main page
+                async with session.get(target_url, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+                    body = await resp.text()
+                    headers = dict(resp.headers)
+
+                    if is_juice_shop(headers, body):
+                        self.juice_shop_detected = True
+                        self.target_attack_plan = get_attack_plan(target_url)
+
+                        logger.info("🍊 OWASP Juice Shop detected!")
+                        logger.info("   └─ Loaded specialized attack knowledge")
+                        logger.info(f"   └─ {self.target_attack_plan['known_vulns']} known vulnerability types")
+                        logger.info(f"   └─ {self.target_attack_plan['challenges_count']} challenges available")
+
+        except Exception as e:
+            logger.debug(f"Target detection failed: {e}")
 
     def _vuln_to_dict(self, vuln: Vulnerability) -> Dict[str, Any]:
         """Convert Vulnerability to dict"""

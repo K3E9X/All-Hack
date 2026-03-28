@@ -36,7 +36,7 @@ export default function Layout() {
   const hasRunningScans = Object.values(moduleStates).some(s => s.running) || activeScans.length > 0;
 
   return (
-    <div className={clsx('flex h-screen bg-surface text-primary', hasRunningScans && 'pb-12')}
+    <div className={clsx('flex h-screen bg-surface text-primary', hasRunningScans && 'pb-12')}>
       {/* Sidebar */}
       <aside
         className={clsx(
