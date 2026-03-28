@@ -392,3 +392,58 @@ async def exploitation_assistant(vuln_type: str, target: str, findings: List[Dic
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============ Decision Engine Endpoints ============
+
+@router.get("/agent/decision-engine")
+async def get_decision_engine_info():
+    """
+    Get DecisionEngine available tests and capabilities
+    """
+    try:
+        from app.ai_agent.decision_engine import DecisionEngine
+
+        engine = DecisionEngine()
+        available_tests = engine.get_available_tests()
+
+        return {
+            "available_tests": available_tests,
+            "total_tests": len(available_tests),
+            "categories": {
+                "authentication": [t for t in available_tests if "auth" in t["name"].lower()],
+                "injection": [t for t in available_tests if any(x in t["name"].lower() for x in ["sql", "nosql", "graphql"])],
+                "api_security": [t for t in available_tests if any(x in t["name"].lower() for x in ["jwt", "api", "rate"])],
+                "logic_flaws": [t for t in available_tests if any(x in t["name"].lower() for x in ["business", "session", "file"])]
+            }
+        }
+    except ImportError as e:
+        raise HTTPException(status_code=500, detail=f"DecisionEngine not available: {e}")
+    except Exception as e:
+        logger.error(f"DecisionEngine error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/agent/decision-engine/parse")
+async def parse_ai_action(action: Dict[str, Any], endpoints: List[str] = None):
+    """
+    Parse an AI-recommended action into executable test
+    """
+    try:
+        from app.ai_agent.decision_engine import DecisionEngine
+
+        engine = DecisionEngine()
+        test_action = engine.parse_action(action, endpoints or [])
+
+        return {
+            "test_name": test_action.test_name,
+            "scanner": test_action.scanner_class,
+            "target_endpoints": test_action.target_endpoints,
+            "priority": test_action.priority,
+            "reason": test_action.reason,
+            "params": test_action.custom_params,
+            "available": engine.is_test_available(test_action.test_name)
+        }
+    except Exception as e:
+        logger.error(f"Action parse error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
