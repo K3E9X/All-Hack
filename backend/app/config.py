@@ -17,13 +17,24 @@ class Settings(BaseSettings):
     API_HOST: str = "0.0.0.0"
     API_PORT: int = 8001  # Changed from 8000 to avoid conflicts
 
-    # CORS - can be set via ALLOWED_ORIGINS env var (comma-separated)
-    ALLOWED_ORIGINS: str = "http://localhost:3000,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:5173"
+    # CORS - can be set via CORS_ORIGINS or ALLOWED_ORIGINS env var (comma-separated)
+    CORS_ORIGINS: str = "http://localhost:3000,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:5173,http://localhost:8001"
+    ALLOWED_ORIGINS: Optional[str] = None  # Deprecated, use CORS_ORIGINS
 
     @property
     def cors_origins(self) -> List[str]:
-        """Parse ALLOWED_ORIGINS string into list"""
-        return [origin.strip() for origin in self.ALLOWED_ORIGINS.split(',')]
+        """Parse CORS_ORIGINS string into list"""
+        origins = self.ALLOWED_ORIGINS or self.CORS_ORIGINS
+        return [origin.strip() for origin in origins.split(',')]
+
+    # LLM API Keys (all optional)
+    GROQ_API_KEY: Optional[str] = None
+    DASHSCOPE_API_KEY: Optional[str] = None
+    GROK_API_KEY: Optional[str] = None
+    OPENROUTER_API_KEY: Optional[str] = None
+    OPENAI_API_KEY: Optional[str] = None
+    TOGETHER_API_KEY: Optional[str] = None
+    HF_API_KEY: Optional[str] = None
 
     # Scanning Configuration
     MAX_CONCURRENT_SCANS: int = 5
@@ -98,5 +109,6 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         case_sensitive = True
+        extra = "ignore"  # Ignore unknown env vars
 
 settings = Settings()
