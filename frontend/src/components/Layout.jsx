@@ -21,7 +21,7 @@ const navItems = [
   { path: '/', icon: Crosshair, label: 'Scan', exact: true },
   { path: '/recon', icon: Radar, label: 'Recon' },
   { path: '/tools', icon: Wrench, label: 'Tools' },
-  { path: '/agent', icon: Bot, label: 'Agent' },
+  { path: '/agent', icon: Bot, label: 'OpenClaw AI' },
   { path: '/history', icon: History, label: 'History' },
   { path: '/chat', icon: MessageSquare, label: 'Chat' },
 ];
