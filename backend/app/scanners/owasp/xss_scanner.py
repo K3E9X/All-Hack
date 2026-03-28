@@ -75,18 +75,18 @@ class XSSScanner:
 
         for idx, endpoint in enumerate(endpoints, 1):
             if self.progress_callback:
-                await self.progress_callback(f"🎨 Testing XSS on endpoint {idx}/{total_endpoints}: {endpoint[:60]}...")
+                await self.progress_callback(f"[XSS] Testing endpoint {idx}/{total_endpoints}: {endpoint[:60]}...")
 
             try:
                 vulns = await self._test_endpoint(endpoint)
                 vulnerabilities.extend(vulns)
 
                 if vulns and self.progress_callback:
-                    await self.progress_callback(f"✅ Found {len(vulns)} XSS vulnerability(ies) on {endpoint[:60]}")
+                    await self.progress_callback(f"[+] Found {len(vulns)} XSS on {endpoint[:60]}")
             except Exception as e:
                 logger.error(f"Error testing endpoint {endpoint}: {e}")
                 if self.progress_callback:
-                    await self.progress_callback(f"⚠️  Error testing {endpoint[:60]}: {str(e)[:50]}")
+                    await self.progress_callback(f"[!] Error: {endpoint[:60]}: {str(e)[:50]}")
 
         return vulnerabilities
 

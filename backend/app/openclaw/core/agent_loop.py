@@ -65,6 +65,9 @@ class AgentLoop:
         # Exploit researcher for POC lookups
         self.researcher = None
 
+        # Exploit executor for automatic exploitation
+        self.executor = None
+
         # Active sessions
         self.sessions: Dict[str, AgentSession] = {}
 
@@ -216,6 +219,40 @@ class AgentLoop:
                                     })
                                     # Store research in session
                                     session.context.setdefault("exploit_research", []).append(research)
+
+                                    # Automatically execute exploitation
+                                    if research.get("payloads"):
+                                        exploit_results = await self._execute_exploit(
+                                            finding.get("type", "unknown"),
+                                            target,
+                                            research.get("payloads", []),
+                                            finding.get("affected_parameter")
+                                        )
+                                        if exploit_results:
+                                            for result in exploit_results:
+                                                yield AgentEvent("exploit_result", {
+                                                    "success": result.success,
+                                                    "vuln_type": result.vuln_type,
+                                                    "payload": result.payload[:50] + "..." if len(result.payload) > 50 else result.payload,
+                                                    "evidence": result.evidence,
+                                                    "target": result.target
+                                                })
+                                                # Add exploit result as finding
+                                                if result.success:
+                                                    session.add_finding({
+                                                        "type": f"{result.vuln_type}_exploited",
+                                                        "severity": "critical",
+                                                        "title": f"Exploit Successful: {result.vuln_type.upper()}",
+                                                        "evidence": result.evidence,
+                                                        "payload": result.payload,
+                                                        "url": result.target
+                                                    })
+                                                    yield AgentEvent("finding", {
+                                                        "type": f"{result.vuln_type}_exploited",
+                                                        "severity": "critical",
+                                                        "title": f"[PWNED] {result.vuln_type.upper()} exploitation confirmed",
+                                                        "evidence": result.evidence
+                                                    })
 
                         # Check for chain opportunities
                         replan_result = await self.planner.replan(session, findings, session.context)
@@ -373,6 +410,36 @@ class AgentLoop:
             import logging
             logging.getLogger(__name__).warning(f"Exploit research failed: {e}")
             return None
+
+    async def _execute_exploit(
+        self,
+        vuln_type: str,
+        target: str,
+        payloads: List[str],
+        param_name: str = None
+    ) -> List:
+        """
+        Execute exploitation attempts with generated payloads
+        """
+        try:
+            # Lazy load executor
+            if self.executor is None:
+                from app.services.exploit_executor import get_exploit_executor
+                self.executor = get_exploit_executor()
+
+            results = await self.executor.execute_exploit(
+                vuln_type=vuln_type,
+                target=target,
+                payloads=payloads[:10],  # Limit payloads
+                param_name=param_name,
+                verify_only=False  # Full exploitation
+            )
+
+            return results
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(f"Exploit execution failed: {e}")
+            return []
 
     async def _persist_session(self, session: AgentSession):
         """Persist session to database"""
