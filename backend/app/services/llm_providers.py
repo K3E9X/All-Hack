@@ -24,6 +24,7 @@ class ProviderType(str, Enum):
     ANTHROPIC = "anthropic"
     TOGETHER = "together"
     OPENROUTER = "openrouter"
+    CODEX_ILIAD = "codex_iliad"
 
 
 @dataclass
@@ -71,6 +72,10 @@ class ProviderConfig:
             ProviderType.OPENROUTER: {
                 "base_url": "https://openrouter.ai/api/v1",
                 "model": "meta-llama/llama-3.1-8b-instruct:free"
+            },
+            ProviderType.CODEX_ILIAD: {
+                "base_url": "https://codex.datax.iliad.fr/v1",
+                "model": "Qwen/Qwen3.5-397B-A17B"
             },
         }
 
