@@ -9,23 +9,13 @@ from dataclasses import dataclass
 
 from .session import Task, TaskStatus
 
-# Import Juice Shop knowledge
-try:
-    from app.knowledge.juice_shop import (
-        JUICE_SHOP_VULNS, JUICE_SHOP_ENDPOINTS, ATTACK_STRATEGIES,
-        get_attack_plan, is_juice_shop
-    )
-    JUICE_SHOP_AVAILABLE = True
-except ImportError:
-    JUICE_SHOP_AVAILABLE = False
-
 
 # Planning prompt template
 PLANNING_PROMPT = """You are an expert penetration tester AI assistant. Your job is to break down user requests into specific, executable tasks.
 
 TARGET: {target}
 USER REQUEST: {request}
-{target_knowledge}
+
 AVAILABLE TOOLS:
 {tools}
 
@@ -103,14 +93,10 @@ class TaskPlanner:
         # Build context string
         context_str = self._format_context(context)
 
-        # Build target-specific knowledge
-        target_knowledge = self._get_target_knowledge(context)
-
         # Create planning prompt
         prompt = PLANNING_PROMPT.format(
             target=target,
             request=request,
-            target_knowledge=target_knowledge,
             tools=tool_descriptions,
             context=context_str
         )
@@ -167,29 +153,6 @@ class TaskPlanner:
 
         return "\n".join(lines) if lines else "No additional context available."
 
-    def _get_target_knowledge(self, context: Dict[str, Any]) -> str:
-        """Get target-specific knowledge for the prompt"""
-        if not JUICE_SHOP_AVAILABLE or not context.get("is_juice_shop"):
-            return ""
-
-        return """
-🍊 TARGET IDENTIFIED: OWASP Juice Shop (Known Vulnerable Application)
-
-KNOWN ATTACK VECTORS:
-- SQL Injection: /rest/user/login (email: admin'--), /rest/products/search (q: ')) OR 1=1--)
-- XSS: /#/search?q=<iframe src="javascript:alert('xss')"> (DOM XSS)
-- IDOR: /rest/basket/{id} (try IDs 1-10), /api/Users/{id}
-- Sensitive Files: /ftp (directory listing), /ftp/package.json.bak, /metrics
-- Admin Panel: /administration (no auth required)
-
-KNOWN USERS:
-- admin@juice-sh.op (SQL injection bypass)
-- jim@juice-sh.op (security answer: Samuel)
-- bender@juice-sh.op (security answer: Stop'n'Drop)
-
-PRIORITY: Use these known working attack vectors first for quick wins!
-"""
-
     def _parse_plan_response(self, response: str) -> List[Task]:
         """Parse LLM response into Task objects"""
         tasks = []
@@ -238,10 +201,6 @@ PRIORITY: Use these known working attack vectors first for quick wins!
         """
         Rule-based fallback planning when LLM unavailable
         """
-        # Check if this is OWASP Juice Shop
-        if JUICE_SHOP_AVAILABLE and context.get("is_juice_shop"):
-            return self._juice_shop_plan(target, request, context)
-
         tasks = []
         request_lower = request.lower()
 
@@ -339,121 +298,6 @@ PRIORITY: Use these known working attack vectors first for quick wins!
             success=True,
             tasks=tasks,
             reasoning=f"Fallback plan: {len(tasks)} tasks created based on request keywords"
-        )
-
-    def _juice_shop_plan(
-        self,
-        target: str,
-        request: str,
-        context: Dict[str, Any]
-    ) -> PlanResult:
-        """
-        Generate optimized attack plan for OWASP Juice Shop
-        Uses only available tools from the registry.
-        """
-        tasks = []
-
-        # Clean target URL (remove hash fragments)
-        clean_target = target.split('#')[0].rstrip('/')
-
-        # Phase 1: Reconnaissance
-        tasks.append(Task(
-            id=str(uuid.uuid4()),
-            description="Crawl Juice Shop to discover all endpoints",
-            tool_name="crawl",
-            parameters={"url": clean_target, "depth": 3, "max_pages": 50},
-            priority=1
-        ))
-        tasks.append(Task(
-            id=str(uuid.uuid4()),
-            description="Detect technologies used by Juice Shop",
-            tool_name="tech_detect",
-            parameters={"url": clean_target},
-            priority=2
-        ))
-
-        # Phase 2: SQL Injection attacks (known working on Juice Shop)
-        tasks.append(Task(
-            id=str(uuid.uuid4()),
-            description="SQL injection on login endpoint - admin bypass",
-            tool_name="test_sqli",
-            parameters={
-                "url": f"{clean_target}/rest/user/login",
-                "parameter": "email"
-            },
-            priority=10
-        ))
-        tasks.append(Task(
-            id=str(uuid.uuid4()),
-            description="SQL injection on product search",
-            tool_name="test_sqli",
-            parameters={
-                "url": f"{clean_target}/rest/products/search?q=test",
-                "parameter": "q"
-            },
-            priority=11
-        ))
-
-        # Phase 3: XSS attacks
-        tasks.append(Task(
-            id=str(uuid.uuid4()),
-            description="XSS on search functionality",
-            tool_name="test_xss",
-            parameters={
-                "url": f"{clean_target}/rest/products/search?q=test",
-                "parameter": "q"
-            },
-            priority=20
-        ))
-
-        # Phase 4: LFI / Path Traversal (for /ftp access)
-        tasks.append(Task(
-            id=str(uuid.uuid4()),
-            description="Path traversal on file endpoints",
-            tool_name="test_lfi",
-            parameters={
-                "url": f"{clean_target}/ftp",
-                "parameter": "file"
-            },
-            priority=30
-        ))
-
-        # Phase 5: SSRF testing
-        tasks.append(Task(
-            id=str(uuid.uuid4()),
-            description="SSRF testing on URL parameters",
-            tool_name="test_ssrf",
-            parameters={
-                "url": f"{clean_target}/profile/image/url",
-                "parameter": "url"
-            },
-            priority=40
-        ))
-
-        # Phase 6: Auth testing
-        tasks.append(Task(
-            id=str(uuid.uuid4()),
-            description="Authentication bypass testing",
-            tool_name="test_auth",
-            parameters={
-                "url": f"{clean_target}/rest/user/login"
-            },
-            priority=50
-        ))
-
-        # Phase 7: Chain analysis
-        tasks.append(Task(
-            id=str(uuid.uuid4()),
-            description="Analyze vulnerabilities for exploitation chains",
-            tool_name="chain_analysis",
-            parameters={},
-            priority=100
-        ))
-
-        return PlanResult(
-            success=True,
-            tasks=tasks,
-            reasoning=f"Juice Shop detected! Using {len(tasks)} optimized tasks targeting known vulnerabilities (SQLi on login/search, XSS, LFI, SSRF)."
         )
 
     async def replan(
