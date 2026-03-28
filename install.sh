@@ -250,7 +250,19 @@ PLAYWRIGHT_DEPS=""
 
 case $OS_FAMILY in
     debian)
-        PLAYWRIGHT_DEPS="libnss3 libnspr4 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 libxrandr2 libgbm1 libasound2 libpango-1.0-0 libcairo2"
+        # Check Ubuntu version for libasound package name (24.04+ uses libasound2t64)
+        LIBASOUND_PKG="libasound2"
+        if [ -f /etc/os-release ]; then
+            . /etc/os-release
+            if [ "$ID" == "ubuntu" ]; then
+                VERSION_MAJOR=$(echo "$VERSION_ID" | cut -d. -f1)
+                if [ "$VERSION_MAJOR" -ge 24 ] 2>/dev/null; then
+                    LIBASOUND_PKG="libasound2t64"
+                fi
+            fi
+        fi
+
+        PLAYWRIGHT_DEPS="libnss3 libnspr4 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 libxrandr2 libgbm1 $LIBASOUND_PKG libpango-1.0-0 libcairo2"
         if [ "$EUID" -eq 0 ]; then
             apt-get install -y $PLAYWRIGHT_DEPS 2>/dev/null || true
         else
