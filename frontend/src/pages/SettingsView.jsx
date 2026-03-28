@@ -200,51 +200,51 @@ export default function SettingsView() {
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <header className="flex items-center justify-between px-6 h-14 border-b border-border bg-background">
-        <h1 className="text-lg font-semibold">Settings</h1>
+      <header className="flex items-center justify-between px-4 h-10 border-b border-border bg-surface">
+        <h1 className="text-xs font-medium tracking-wider uppercase">SETTINGS</h1>
         <button
           onClick={saveSettings}
           disabled={saving}
-          className="btn btn-primary"
+          className="btn btn-primary text-xs py-1 px-2"
         >
           {saving ? (
-            <span className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full mr-2" />
+            <span className="animate-spin w-3 h-3 border border-background border-t-transparent mr-1" />
           ) : saved ? (
-            <CheckCircle className="w-4 h-4 mr-2" />
+            <CheckCircle className="w-3 h-3 mr-1" />
           ) : (
-            <Save className="w-4 h-4 mr-2" />
+            <Save className="w-3 h-3 mr-1" />
           )}
-          {saved ? 'Saved' : 'Save'}
+          {saved ? 'SAVED' : 'SAVE'}
         </button>
       </header>
 
       {/* Settings Content */}
-      <div className="flex-1 overflow-y-auto p-6 bg-surface">
-        <div className="max-w-2xl mx-auto space-y-8">
+      <div className="flex-1 overflow-y-auto p-4 bg-background">
+        <div className="max-w-2xl mx-auto space-y-6">
           {error && (
-            <div className="flex items-center gap-2 p-4 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400">
-              <AlertCircle className="w-5 h-5" />
+            <div className="flex items-center gap-2 p-2 bg-red-500/10 border border-red-500/30 text-red-400 text-xs">
+              <AlertCircle className="w-3 h-3" />
               {error}
             </div>
           )}
 
           {/* Appearance */}
-          <section className="card p-6">
-            <div className="flex items-center gap-3 mb-4">
-              <Palette className="w-5 h-5 text-accent" />
-              <h2 className="font-semibold">Appearance</h2>
+          <section className="p-4 border border-border bg-surface">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-xs text-accent font-mono">[THM]</span>
+              <h2 className="text-sm font-medium uppercase">Appearance</h2>
             </div>
 
-            <div className="space-y-4">
+            <div className="space-y-3">
               <div>
-                <label className="block text-sm font-medium mb-2">Theme</label>
-                <div className="flex gap-3">
+                <label className="block text-xs font-medium mb-2 uppercase">Theme</label>
+                <div className="flex gap-2">
                   {['light', 'dark', 'system'].map((t) => (
                     <button
                       key={t}
                       onClick={() => setTheme(t)}
                       className={clsx(
-                        'px-4 py-2 rounded-lg border capitalize transition-colors',
+                        'px-3 py-1.5 border text-xs uppercase transition-colors',
                         theme === t
                           ? 'border-accent bg-accent/10 text-accent'
                           : 'border-border hover:border-accent/50'
@@ -259,24 +259,23 @@ export default function SettingsView() {
           </section>
 
           {/* API Keys */}
-          <section className="card p-6">
-            <div className="flex items-center gap-3 mb-4">
-              <Key className="w-5 h-5 text-accent" />
-              <h2 className="font-semibold">API Keys</h2>
+          <section className="p-4 border border-border bg-surface">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-xs text-accent font-mono">[KEY]</span>
+              <h2 className="text-sm font-medium uppercase">API Keys</h2>
             </div>
 
-            <p className="text-xs text-secondary mb-4">
-              Keys are saved securely in the database. Configured keys show a green indicator.
+            <p className="text-xs text-secondary mb-3">
+              Keys saved securely. Green = configured.
             </p>
 
-            <div className="space-y-4">
+            <div className="space-y-3">
               <div>
-                <label className="block text-sm font-medium mb-1.5 flex items-center gap-2">
-                  Groq API Key
-                  <span className="text-secondary font-normal">(Recommended)</span>
+                <label className="block text-xs font-medium mb-1 flex items-center gap-2 uppercase">
+                  Groq
                   {settings.groq_api_key === '***' && (
-                    <span className="text-green-400 text-xs flex items-center gap-1">
-                      <CheckCircle className="w-3 h-3" /> Configured
+                    <span className="text-green-400 flex items-center gap-0.5">
+                      <CheckCircle className="w-2.5 h-2.5" />
                     </span>
                   )}
                 </label>
@@ -284,24 +283,20 @@ export default function SettingsView() {
                   type="password"
                   value={settings.groq_api_key === '***' ? '' : settings.groq_api_key}
                   onChange={(e) => updateSetting('groq_api_key', e.target.value)}
-                  placeholder={settings.groq_api_key === '***' ? '••••••• (keep current key)' : 'gsk_...'}
+                  placeholder={settings.groq_api_key === '***' ? '(configured)' : 'gsk_...'}
                   className={clsx(
-                    'w-full px-3 py-2 rounded-lg border bg-surface font-mono text-sm',
+                    'w-full px-2 py-1.5 border bg-background font-mono text-xs',
                     settings.groq_api_key === '***' ? 'border-green-500/30' : 'border-border'
                   )}
                 />
-                <p className="text-xs text-secondary mt-1">
-                  Free at console.groq.com - 30 requests/minute
-                </p>
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-1.5 flex items-center gap-2">
-                  DashScope API Key
-                  <span className="text-secondary font-normal">(Qwen)</span>
+                <label className="block text-xs font-medium mb-1 flex items-center gap-2 uppercase">
+                  DashScope (Qwen)
                   {settings.dashscope_api_key === '***' && (
-                    <span className="text-green-400 text-xs flex items-center gap-1">
-                      <CheckCircle className="w-3 h-3" /> Configured
+                    <span className="text-green-400 flex items-center gap-0.5">
+                      <CheckCircle className="w-2.5 h-2.5" />
                     </span>
                   )}
                 </label>
@@ -309,23 +304,20 @@ export default function SettingsView() {
                   type="password"
                   value={settings.dashscope_api_key === '***' ? '' : settings.dashscope_api_key}
                   onChange={(e) => updateSetting('dashscope_api_key', e.target.value)}
-                  placeholder={settings.dashscope_api_key === '***' ? '••••••• (keep current key)' : 'sk-...'}
+                  placeholder={settings.dashscope_api_key === '***' ? '(configured)' : 'sk-...'}
                   className={clsx(
-                    'w-full px-3 py-2 rounded-lg border bg-surface font-mono text-sm',
+                    'w-full px-2 py-1.5 border bg-background font-mono text-xs',
                     settings.dashscope_api_key === '***' ? 'border-green-500/30' : 'border-border'
                   )}
                 />
-                <p className="text-xs text-secondary mt-1">
-                  Free at dashscope.aliyun.com - 1M tokens/month
-                </p>
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-1.5 flex items-center gap-2">
-                  OpenRouter API Key
+                <label className="block text-xs font-medium mb-1 flex items-center gap-2 uppercase">
+                  OpenRouter
                   {settings.openrouter_api_key === '***' && (
-                    <span className="text-green-400 text-xs flex items-center gap-1">
-                      <CheckCircle className="w-3 h-3" /> Configured
+                    <span className="text-green-400 flex items-center gap-0.5">
+                      <CheckCircle className="w-2.5 h-2.5" />
                     </span>
                   )}
                 </label>
@@ -333,21 +325,20 @@ export default function SettingsView() {
                   type="password"
                   value={settings.openrouter_api_key === '***' ? '' : settings.openrouter_api_key}
                   onChange={(e) => updateSetting('openrouter_api_key', e.target.value)}
-                  placeholder={settings.openrouter_api_key === '***' ? '••••••• (keep current key)' : 'sk-or-...'}
+                  placeholder={settings.openrouter_api_key === '***' ? '(configured)' : 'sk-or-...'}
                   className={clsx(
-                    'w-full px-3 py-2 rounded-lg border bg-surface font-mono text-sm',
+                    'w-full px-2 py-1.5 border bg-background font-mono text-xs',
                     settings.openrouter_api_key === '***' ? 'border-green-500/30' : 'border-border'
                   )}
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-1.5 flex items-center gap-2">
-                  Codex Iliad API Key
-                  <span className="text-secondary font-normal">(Devstral, Qwen 397B)</span>
+                <label className="block text-xs font-medium mb-1 flex items-center gap-2 uppercase">
+                  Codex Iliad
                   {settings.codex_iliad_api_key === '***' && (
-                    <span className="text-green-400 text-xs flex items-center gap-1">
-                      <CheckCircle className="w-3 h-3" /> Configured
+                    <span className="text-green-400 flex items-center gap-0.5">
+                      <CheckCircle className="w-2.5 h-2.5" />
                     </span>
                   )}
                 </label>
@@ -355,110 +346,104 @@ export default function SettingsView() {
                   type="password"
                   value={settings.codex_iliad_api_key === '***' ? '' : settings.codex_iliad_api_key}
                   onChange={(e) => updateSetting('codex_iliad_api_key', e.target.value)}
-                  placeholder={settings.codex_iliad_api_key === '***' ? '••••••• (keep current key)' : 'sk-...'}
+                  placeholder={settings.codex_iliad_api_key === '***' ? '(configured)' : 'sk-...'}
                   className={clsx(
-                    'w-full px-3 py-2 rounded-lg border bg-surface font-mono text-sm',
+                    'w-full px-2 py-1.5 border bg-background font-mono text-xs',
                     settings.codex_iliad_api_key === '***' ? 'border-green-500/30' : 'border-border'
                   )}
                 />
-                <p className="text-xs text-secondary mt-1">
-                  codex.datax.iliad.fr - Devstral 2 123B, Qwen 3.5 397B
-                </p>
               </div>
             </div>
           </section>
 
           {/* Multi-Agent Configuration */}
-          <section className="card p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <Bot className="w-5 h-5 text-accent" />
-                <h2 className="font-semibold">Multi-Agent LLM (OpenClaw)</h2>
+          <section className="p-4 border border-border bg-surface">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-accent font-mono">[AGT]</span>
+                <h2 className="text-sm font-medium uppercase">Multi-Agent LLM</h2>
               </div>
               <button
                 onClick={checkProviders}
                 disabled={checkingProviders}
-                className="flex items-center gap-1 text-sm text-secondary hover:text-primary"
+                className="flex items-center gap-1 text-xs text-secondary hover:text-primary"
               >
-                <RefreshCw className={clsx('w-4 h-4', checkingProviders && 'animate-spin')} />
-                Check All
+                <RefreshCw className={clsx('w-3 h-3', checkingProviders && 'animate-spin')} />
               </button>
             </div>
 
-            <p className="text-sm text-secondary mb-4">
-              Configure multiple LLM providers for consensus-based security decisions.
-              These providers power the <strong className="text-primary">Agent tab</strong> for autonomous scanning.
+            <p className="text-xs text-secondary mb-3">
+              Configure LLM providers for consensus-based decisions.
             </p>
 
             {/* Consensus Mode */}
-            <div className="mb-6">
-              <label className="block text-sm font-medium mb-2">Consensus Mode</label>
-              <div className="grid grid-cols-5 gap-2">
+            <div className="mb-4">
+              <label className="block text-xs font-medium mb-2 uppercase">Consensus Mode</label>
+              <div className="grid grid-cols-5 gap-1">
                 {CONSENSUS_MODES.map((mode) => (
                   <button
                     key={mode.value}
                     onClick={() => updateConsensusMode(mode.value)}
                     className={clsx(
-                      'p-2 rounded-lg border text-center transition-colors',
+                      'p-1.5 border text-center transition-colors',
                       consensusMode === mode.value
                         ? 'border-accent bg-accent/10 text-accent'
                         : 'border-border hover:border-accent/50'
                     )}
                   >
-                    <div className="text-sm font-medium">{mode.label}</div>
-                    <div className="text-xs text-secondary">{mode.desc}</div>
+                    <div className="text-xs font-medium uppercase">{mode.label}</div>
                   </button>
                 ))}
               </div>
             </div>
 
             {/* Active Providers */}
-            <div className="mb-4">
-              <label className="block text-sm font-medium mb-2">
-                Active Providers ({providers.length})
+            <div className="mb-3">
+              <label className="block text-xs font-medium mb-2 uppercase">
+                Providers ({providers.length})
               </label>
               {providers.length === 0 ? (
-                <p className="text-sm text-secondary p-4 rounded-lg bg-background border border-border">
-                  No providers configured. Add one below.
+                <p className="text-xs text-secondary p-2 bg-background border border-border">
+                  No providers. Add below.
                 </p>
               ) : (
-                <div className="space-y-2">
+                <div className="space-y-1">
                   {providers.map((provider) => (
                     <div
                       key={provider.name}
-                      className="flex items-center justify-between p-3 rounded-lg bg-background border border-border"
+                      className="flex items-center justify-between p-2 bg-background border border-border"
                     >
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2">
                         <div className={clsx(
-                          'w-2 h-2 rounded-full',
+                          'w-1.5 h-1.5',
                           provider.available ? 'bg-green-400' : 'bg-red-400'
                         )} />
                         <div>
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium">{provider.name}</span>
+                          <div className="flex items-center gap-1">
+                            <span className="text-xs font-medium">{provider.name}</span>
                             {primaryProvider === provider.name && (
-                              <span className="text-xs px-1.5 py-0.5 rounded bg-accent/20 text-accent">Primary</span>
+                              <span className="text-xs px-1 border border-accent text-accent">1</span>
                             )}
                           </div>
-                          <div className="text-xs text-secondary">
-                            {provider.type} / {provider.model} / {provider.role}
+                          <div className="text-xs text-secondary font-mono">
+                            {provider.type}/{provider.model}
                           </div>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1">
                         {primaryProvider !== provider.name && (
                           <button
                             onClick={() => updatePrimaryProvider(provider.name)}
-                            className="text-xs text-secondary hover:text-accent"
+                            className="text-xs text-secondary hover:text-accent px-1"
                           >
-                            Set Primary
+                            [1]
                           </button>
                         )}
                         <button
                           onClick={() => removeProvider(provider.name)}
-                          className="p-1 text-secondary hover:text-red-400"
+                          className="p-0.5 text-secondary hover:text-red-400"
                         >
-                          <Trash2 className="w-4 h-4" />
+                          <Trash2 className="w-3 h-3" />
                         </button>
                       </div>
                     </div>
@@ -468,145 +453,145 @@ export default function SettingsView() {
             </div>
 
             {/* Add New Provider */}
-            <div className="p-4 rounded-lg bg-background border border-border">
-              <div className="flex items-center gap-2 mb-3">
-                <Plus className="w-4 h-4 text-secondary" />
-                <span className="text-sm font-medium">Add Provider</span>
+            <div className="p-2 bg-background border border-border">
+              <div className="flex items-center gap-1 mb-2">
+                <Plus className="w-3 h-3 text-secondary" />
+                <span className="text-xs font-medium uppercase">Add Provider</span>
               </div>
 
-              <div className="grid grid-cols-2 gap-3 mb-3">
+              <div className="grid grid-cols-2 gap-2 mb-2">
                 <input
                   type="text"
-                  placeholder="Name (e.g., primary-gpt)"
+                  placeholder="Name"
                   value={newProvider.name}
                   onChange={(e) => setNewProvider(prev => ({ ...prev, name: e.target.value }))}
-                  className="px-3 py-2 rounded-lg border border-border bg-surface text-sm"
+                  className="px-2 py-1.5 border border-border bg-surface text-xs"
                 />
                 <select
                   value={newProvider.type}
                   onChange={(e) => setNewProvider(prev => ({ ...prev, type: e.target.value }))}
-                  className="px-3 py-2 rounded-lg border border-border bg-surface text-sm"
+                  className="px-2 py-1.5 border border-border bg-surface text-xs"
                 >
                   {PROVIDER_TYPES.map((pt) => (
-                    <option key={pt.value} value={pt.value}>{pt.label} - {pt.hint}</option>
+                    <option key={pt.value} value={pt.value}>{pt.label}</option>
                   ))}
                 </select>
               </div>
 
-              <div className="grid grid-cols-2 gap-3 mb-3">
+              <div className="grid grid-cols-2 gap-2 mb-2">
                 <input
                   type="password"
                   placeholder="API Key"
                   value={newProvider.api_key}
                   onChange={(e) => setNewProvider(prev => ({ ...prev, api_key: e.target.value }))}
-                  className="px-3 py-2 rounded-lg border border-border bg-surface text-sm font-mono"
+                  className="px-2 py-1.5 border border-border bg-surface text-xs font-mono"
                 />
                 <input
                   type="text"
-                  placeholder="Model (optional, uses default)"
+                  placeholder="Model (optional)"
                   value={newProvider.model}
                   onChange={(e) => setNewProvider(prev => ({ ...prev, model: e.target.value }))}
-                  className="px-3 py-2 rounded-lg border border-border bg-surface text-sm"
+                  className="px-2 py-1.5 border border-border bg-surface text-xs"
                 />
               </div>
 
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
                 <select
                   value={newProvider.role}
                   onChange={(e) => setNewProvider(prev => ({ ...prev, role: e.target.value }))}
-                  className="px-3 py-2 rounded-lg border border-border bg-surface text-sm"
+                  className="px-2 py-1.5 border border-border bg-surface text-xs"
                 >
                   <option value="general">General</option>
                   <option value="analyst">Analyst</option>
-                  <option value="payload_gen">Payload Generator</option>
+                  <option value="payload_gen">Payload Gen</option>
                   <option value="validator">Validator</option>
                 </select>
                 <button
                   onClick={addProvider}
                   disabled={!newProvider.name}
-                  className="btn btn-primary text-sm disabled:opacity-50"
+                  className="btn btn-primary text-xs py-1 px-2 disabled:opacity-50"
                 >
-                  <Plus className="w-4 h-4 mr-1" />
-                  Add
+                  <Plus className="w-3 h-3 mr-0.5" />
+                  ADD
                 </button>
               </div>
             </div>
           </section>
 
           {/* Scan Preferences */}
-          <section className="card p-6">
-            <div className="flex items-center gap-3 mb-4">
-              <Sliders className="w-5 h-5 text-accent" />
-              <h2 className="font-semibold">Scan Preferences</h2>
+          <section className="p-4 border border-border bg-surface">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-xs text-accent font-mono">[SCN]</span>
+              <h2 className="text-sm font-medium uppercase">Scan Preferences</h2>
             </div>
 
-            <div className="space-y-4">
+            <div className="space-y-3">
               <div>
-                <label className="block text-sm font-medium mb-2">Default Scan Depth</label>
+                <label className="block text-xs font-medium mb-1 uppercase">Default Depth</label>
                 <select
                   value={settings.default_depth}
                   onChange={(e) => updateSetting('default_depth', e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border border-border bg-surface"
+                  className="w-full px-2 py-1.5 border border-border bg-background text-xs uppercase"
                 >
-                  <option value="quick">Quick - Fast surface scan</option>
-                  <option value="balanced">Balanced - Recommended</option>
-                  <option value="deep">Deep - Thorough analysis</option>
+                  <option value="quick">Quick</option>
+                  <option value="balanced">Balanced</option>
+                  <option value="deep">Deep</option>
                 </select>
               </div>
 
-              <div className="flex items-center justify-between py-2">
+              <div className="flex items-center justify-between py-1">
                 <div>
-                  <p className="font-medium">Auto Exploit</p>
-                  <p className="text-sm text-secondary">Automatically attempt exploitation</p>
+                  <p className="text-xs font-medium uppercase">Auto Exploit</p>
+                  <p className="text-xs text-secondary">Auto attempt exploitation</p>
                 </div>
                 <button
                   onClick={() => updateSetting('auto_exploit', !settings.auto_exploit)}
                   className={clsx(
-                    'w-12 h-6 rounded-full transition-colors',
-                    settings.auto_exploit ? 'bg-accent' : 'bg-border'
+                    'w-8 h-4 transition-colors border',
+                    settings.auto_exploit ? 'bg-accent border-accent' : 'bg-background border-border'
                   )}
                 >
                   <span className={clsx(
-                    'block w-5 h-5 rounded-full bg-white shadow transition-transform',
-                    settings.auto_exploit ? 'translate-x-6' : 'translate-x-0.5'
+                    'block w-3 h-3 bg-primary transition-transform',
+                    settings.auto_exploit ? 'translate-x-4' : 'translate-x-0.5'
                   )} />
                 </button>
               </div>
 
-              <div className="flex items-center justify-between py-2">
+              <div className="flex items-center justify-between py-1">
                 <div>
-                  <p className="font-medium">Validate Findings</p>
-                  <p className="text-sm text-secondary">Reduce false positives with strict validation</p>
+                  <p className="text-xs font-medium uppercase">Validate Findings</p>
+                  <p className="text-xs text-secondary">Strict validation</p>
                 </div>
                 <button
                   onClick={() => updateSetting('validate_findings', !settings.validate_findings)}
                   className={clsx(
-                    'w-12 h-6 rounded-full transition-colors',
-                    settings.validate_findings ? 'bg-accent' : 'bg-border'
+                    'w-8 h-4 transition-colors border',
+                    settings.validate_findings ? 'bg-accent border-accent' : 'bg-background border-border'
                   )}
                 >
                   <span className={clsx(
-                    'block w-5 h-5 rounded-full bg-white shadow transition-transform',
-                    settings.validate_findings ? 'translate-x-6' : 'translate-x-0.5'
+                    'block w-3 h-3 bg-primary transition-transform',
+                    settings.validate_findings ? 'translate-x-4' : 'translate-x-0.5'
                   )} />
                 </button>
               </div>
 
-              <div className="flex items-center justify-between py-2">
+              <div className="flex items-center justify-between py-1">
                 <div>
-                  <p className="font-medium">Agent Enabled</p>
-                  <p className="text-sm text-secondary">Enable AI agent for intelligent scanning</p>
+                  <p className="text-xs font-medium uppercase">Agent Enabled</p>
+                  <p className="text-xs text-secondary">AI-powered scanning</p>
                 </div>
                 <button
                   onClick={() => updateSetting('agent_enabled', !settings.agent_enabled)}
                   className={clsx(
-                    'w-12 h-6 rounded-full transition-colors',
-                    settings.agent_enabled ? 'bg-accent' : 'bg-border'
+                    'w-8 h-4 transition-colors border',
+                    settings.agent_enabled ? 'bg-accent border-accent' : 'bg-background border-border'
                   )}
                 >
                   <span className={clsx(
-                    'block w-5 h-5 rounded-full bg-white shadow transition-transform',
-                    settings.agent_enabled ? 'translate-x-6' : 'translate-x-0.5'
+                    'block w-3 h-3 bg-primary transition-transform',
+                    settings.agent_enabled ? 'translate-x-4' : 'translate-x-0.5'
                   )} />
                 </button>
               </div>

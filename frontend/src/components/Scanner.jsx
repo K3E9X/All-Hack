@@ -32,12 +32,12 @@ function Scanner({ onScanStart, onScanComplete }) {
 
   const stopScan = async () => {
     if (!currentScanId) {
-      alert('⚠️ No active scan to stop')
+      alert('No active scan to stop')
       return
     }
 
     try {
-      console.log('🛑 Stopping scan:', currentScanId)
+      console.log('Stopping scan:', currentScanId)
       await axios.post(`${API_URL}/scans/${currentScanId}/stop`)
 
       if (pollIntervalRef.current) {
@@ -45,7 +45,7 @@ function Scanner({ onScanStart, onScanComplete }) {
         pollIntervalRef.current = null
       }
 
-      setStatus('⏹️  Scan stopped by user. Fetching partial results...')
+      setStatus('Scan stopped by user. Fetching partial results...')
 
       // Wait a bit then fetch partial results
       setTimeout(async () => {
@@ -53,31 +53,31 @@ function Scanner({ onScanStart, onScanComplete }) {
           const resultsResponse = await axios.get(`${API_URL}/scans/${currentScanId}`)
           onScanComplete(resultsResponse.data)
           setLoading(false)
-          setStatus('✅ Scan stopped. Partial results available.')
+          setStatus('Scan stopped. Partial results available.')
         } catch (error) {
           console.error('Error fetching partial results:', error)
           setLoading(false)
-          setStatus('⚠️  Scan stopped but could not fetch results')
+          setStatus(' Scan stopped but could not fetch results')
         }
       }, 2000)
     } catch (error) {
-      console.error('❌ Error stopping scan:', error)
+      console.error('Error stopping scan:', error)
       alert('Failed to stop scan: ' + (error.response?.data?.detail || error.message))
     }
   }
 
   const startScan = async () => {
-    console.log('🚀 Start Scan button clicked!')
+    console.log('Start Scan button clicked!')
     console.log('URL:', url)
     console.log('Mode:', mode)
     console.log('Scan Depth:', scanDepth)
 
     if (!url) {
-      alert('⚠️ Please enter a target URL before starting the scan')
+      alert('Please enter a target URL before starting the scan')
       return
     }
 
-    console.log('✅ URL validation passed, starting scan...')
+    console.log('URL validation passed, starting scan...')
     setLoading(true)
     setStatus('Starting scan...')
     setProgress(0)
@@ -89,15 +89,15 @@ function Scanner({ onScanStart, onScanComplete }) {
         try {
           parsedSequence = JSON.parse(authSequenceText)
         } catch (error) {
-          console.error('❌ Invalid auth sequence JSON:', error)
+          console.error('Invalid auth sequence JSON:', error)
           setLoading(false)
           setStatus('Error: Invalid authentication sequence JSON')
-          alert('❌ Authentication sequence must be valid JSON')
+          alert('Authentication sequence must be valid JSON')
           return
         }
       }
 
-      console.log('📡 Sending POST request to:', `${API_URL}/scans`)
+      console.log('Sending POST request to:', `${API_URL}/scans`)
       console.log('Request payload preview:', {
         target_url: url,
         mode: mode,
@@ -123,7 +123,7 @@ function Scanner({ onScanStart, onScanComplete }) {
         track_stability: stabilityTracking
       })
 
-      console.log('✅ Scan started successfully! Response:', response.data)
+      console.log('Scan started successfully! Response:', response.data)
       const scanId = response.data.scan_id
       console.log('📋 Scan ID:', scanId)
 
@@ -176,7 +176,7 @@ function Scanner({ onScanStart, onScanComplete }) {
       }, 2000) // Poll every 2 seconds
 
     } catch (error) {
-      console.error('❌ Scan error:', error)
+      console.error('Scan error:', error)
       console.error('Error details:', {
         message: error.message,
         response: error.response?.data,
@@ -190,258 +190,244 @@ function Scanner({ onScanStart, onScanComplete }) {
 
       // Show user-friendly error
       if (error.code === 'ERR_NETWORK' || error.message.includes('Network Error')) {
-        alert('❌ Cannot connect to backend server. Please ensure:\n\n1. Backend is running (uvicorn app.main:app --reload)\n2. Backend is accessible at ' + API_URL)
+        alert('Cannot connect to backend server. Please ensure:\n\n1. Backend is running (uvicorn app.main:app --reload)\n2. Backend is accessible at ' + API_URL)
       } else {
-        alert('❌ Scan failed: ' + errorMessage)
+        alert('Scan failed: ' + errorMessage)
       }
     }
   }
 
   return (
-    <div className="card mb-8">
-      <h2 className="text-2xl font-bold mb-6 text-gray-100">Start Security Scan</h2>
+    <div className="border border-border bg-surface p-4 mb-6">
+      <h2 className="text-sm font-medium uppercase tracking-wider mb-4">[SCN] Security Scan</h2>
 
       {/* Target URL */}
-      <div className="mb-6">
-        <label className="block text-sm font-medium text-gray-300 mb-2">Target URL</label>
+      <div className="mb-4">
+        <label className="block text-xs font-medium uppercase tracking-wider mb-1">TARGET URL</label>
         <input
           type="text"
           value={url}
           onChange={(e) => setUrl(e.target.value)}
           placeholder="https://example.com"
-          className="input-field"
+          className="w-full px-3 py-2 border border-border bg-background text-sm font-mono"
           disabled={loading}
         />
-        <p className="text-xs text-gray-500 mt-2">Enter the full URL of the target application</p>
       </div>
 
       {/* Scan Mode */}
-      <div className="mb-6">
-        <label className="block text-sm font-medium text-gray-300 mb-2">Scan Mode</label>
+      <div className="mb-4">
+        <label className="block text-xs font-medium uppercase tracking-wider mb-1">MODE</label>
         <div className="flex gap-4">
-          <label className="flex items-center gap-2 cursor-pointer">
+          <label className="flex items-center gap-2 cursor-pointer text-xs">
             <input
               type="radio"
               value="black_box"
               checked={mode === 'black_box'}
               onChange={(e) => setMode(e.target.value)}
               disabled={loading}
-              className="w-4 h-4"
+              className="w-3 h-3"
             />
-            <span className="text-gray-300">Black Box (No Authentication)</span>
+            <span>BLACK BOX</span>
           </label>
-          <label className="flex items-center gap-2 cursor-pointer">
+          <label className="flex items-center gap-2 cursor-pointer text-xs">
             <input
               type="radio"
               value="grey_box"
               checked={mode === 'grey_box'}
               onChange={(e) => setMode(e.target.value)}
               disabled={loading}
-              className="w-4 h-4"
+              className="w-3 h-3"
             />
-            <span className="text-gray-300">Grey Box (With Authentication)</span>
+            <span>GREY BOX</span>
           </label>
         </div>
       </div>
 
       {/* Scan Depth */}
-      <div className="mb-6">
-        <label className="block text-sm font-medium text-gray-300 mb-2">Scan Depth / Speed</label>
+      <div className="mb-4">
+        <label className="block text-xs font-medium uppercase tracking-wider mb-1">DEPTH</label>
         <div className="flex gap-4">
-          <label className="flex items-center gap-2 cursor-pointer">
+          <label className="flex items-center gap-2 cursor-pointer text-xs">
             <input
               type="radio"
               value="quick"
               checked={scanDepth === 'quick'}
               onChange={(e) => setScanDepth(e.target.value)}
               disabled={loading}
-              className="w-4 h-4"
+              className="w-3 h-3"
             />
-            <span className="text-gray-300">Quick (10 endpoints, ~5-15 min) ⚡</span>
+            <span>QUICK</span>
           </label>
-          <label className="flex items-center gap-2 cursor-pointer">
+          <label className="flex items-center gap-2 cursor-pointer text-xs">
             <input
               type="radio"
               value="balanced"
               checked={scanDepth === 'balanced'}
               onChange={(e) => setScanDepth(e.target.value)}
               disabled={loading}
-              className="w-4 h-4"
+              className="w-3 h-3"
             />
-            <span className="text-gray-300">Balanced (50 endpoints, ~30-60 min) ⚖️</span>
+            <span>BALANCED</span>
           </label>
-          <label className="flex items-center gap-2 cursor-pointer">
+          <label className="flex items-center gap-2 cursor-pointer text-xs">
             <input
               type="radio"
               value="deep"
               checked={scanDepth === 'deep'}
               onChange={(e) => setScanDepth(e.target.value)}
               disabled={loading}
-              className="w-4 h-4"
+              className="w-3 h-3"
             />
-            <span className="text-gray-300">Deep (All endpoints, 2-10 hours) 🔥</span>
+            <span>DEEP</span>
           </label>
         </div>
-        <p className="text-xs text-gray-500 mt-2">Balanced is recommended for most scans. Quick for testing, Deep for comprehensive pentests.</p>
       </div>
 
       {/* Advanced Options */}
-      <div className="mb-6">
+      <div className="mb-4">
         <button
           onClick={() => setShowAdvanced(!showAdvanced)}
-          className="text-accent-primary text-sm hover:underline"
+          className="text-accent text-xs uppercase tracking-wider hover:underline"
         >
-          {showAdvanced ? '▼' : '▶'} Advanced Options
+          [{showAdvanced ? '-' : '+'}] Advanced
         </button>
       </div>
 
       {showAdvanced && (
-        <div className="mb-6 p-4 bg-dark-hover rounded-lg border border-dark-border">
+        <div className="mb-4 p-3 bg-background border border-border">
           {mode === 'grey_box' && (
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Authentication Token (Bearer)
-              </label>
+            <div className="mb-3">
+              <label className="block text-xs font-medium uppercase mb-1">AUTH TOKEN</label>
               <input
                 type="text"
                 value={authToken}
                 onChange={(e) => setAuthToken(e.target.value)}
-                placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-                className="input-field"
+                placeholder="Bearer token..."
+                className="w-full px-2 py-1.5 border border-border bg-surface text-xs font-mono"
                 disabled={loading}
               />
-              <p className="text-xs text-gray-500 mt-2">Optional: JWT token or API key for authenticated scans</p>
             </div>
           )}
 
           {mode === 'grey_box' && (
-            <div className="grid md:grid-cols-2 gap-4 mb-4">
+            <div className="grid md:grid-cols-2 gap-2 mb-3">
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">Authentication Sequence (JSON)</label>
+                <label className="block text-xs font-medium uppercase mb-1">AUTH SEQUENCE (JSON)</label>
                 <textarea
                   value={authSequenceText}
                   onChange={(e) => setAuthSequenceText(e.target.value)}
-                  placeholder='[{"method":"POST","path":"/login","json":{"username":"admin","password":"pass"},"store_tokens":true}]'
-                  className="input-field h-32"
+                  placeholder='[{"method":"POST","path":"/login"...}]'
+                  className="w-full px-2 py-1.5 border border-border bg-surface text-xs font-mono h-24"
                   disabled={loading}
                 />
-                <p className="text-xs text-gray-500 mt-2">Define multi-step login flows with optional TOTP injection.</p>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">MFA TOTP Secret</label>
+                <label className="block text-xs font-medium uppercase mb-1">MFA TOTP SECRET</label>
                 <input
                   type="text"
                   value={mfaSecret}
                   onChange={(e) => setMfaSecret(e.target.value)}
                   placeholder="JBSWY3DPEHPK3PXP"
-                  className="input-field"
+                  className="w-full px-2 py-1.5 border border-border bg-surface text-xs font-mono"
                   disabled={loading}
                 />
-                <p className="text-xs text-gray-500 mt-2">Used when steps require an OTP code.</p>
               </div>
             </div>
           )}
 
-          <div className="grid md:grid-cols-2 gap-4 mb-4">
-            <label className="flex items-center gap-3 text-sm text-gray-300">
+          <div className="grid md:grid-cols-2 gap-2 mb-3">
+            <label className="flex items-center gap-2 text-xs">
               <input
                 type="checkbox"
                 checked={browserCrawling}
                 onChange={(e) => setBrowserCrawling(e.target.checked)}
                 disabled={loading}
+                className="w-3 h-3"
               />
-              Enable browser-based crawling for SPA routes
+              Browser crawling
             </label>
-            <label className="flex items-center gap-3 text-sm text-gray-300">
+            <label className="flex items-center gap-2 text-xs">
               <input
                 type="checkbox"
                 checked={apiSchemaHarvesting}
                 onChange={(e) => setApiSchemaHarvesting(e.target.checked)}
                 disabled={loading}
+                className="w-3 h-3"
               />
-              Harvest OpenAPI / GraphQL schemas
+              API schema harvest
             </label>
-            <label className="flex items-center gap-3 text-sm text-gray-300">
+            <label className="flex items-center gap-2 text-xs">
               <input
                 type="checkbox"
                 checked={osintEnrichment}
                 onChange={(e) => setOsintEnrichment(e.target.checked)}
                 disabled={loading}
+                className="w-3 h-3"
               />
-              Collect local OSINT insights (DNS, certificates, secrets)
+              OSINT enrichment
             </label>
-            <label className="flex items-center gap-3 text-sm text-gray-300">
+            <label className="flex items-center gap-2 text-xs">
               <input
                 type="checkbox"
                 checked={stabilityTracking}
                 onChange={(e) => setStabilityTracking(e.target.checked)}
                 disabled={loading}
+                className="w-3 h-3"
               />
-              Capture host stability metrics during scan
+              Stability metrics
             </label>
           </div>
 
-          <div className="text-sm text-gray-400">
-            <p className="font-medium text-gray-300 mb-2">Enabled Tests:</p>
-            <ul className="list-disc list-inside space-y-1">
-              <li>SQL Injection Detection</li>
-              <li>Cross-Site Scripting (XSS)</li>
-              <li>Command Injection</li>
-              <li>SSRF (Server-Side Request Forgery)</li>
-              <li>IDOR (Insecure Direct Object Reference)</li>
-              <li>Privilege Escalation</li>
-              <li>Security Misconfigurations</li>
-              <li>CORS Misconfiguration</li>
-              <li>Endpoint Discovery & Fuzzing</li>
-            </ul>
+          <div className="text-xs text-secondary">
+            <p className="font-medium uppercase mb-1">Tests: SQLi, XSS, RCE, SSRF, IDOR, PrivEsc, CORS</p>
           </div>
         </div>
       )}
 
       {/* Progress Bar and Live Test Output */}
       {loading && (
-        <div className="mb-6">
-          <div className="flex justify-between text-sm text-gray-400 mb-2">
-            <span className="font-semibold text-accent-primary">{status}</span>
-            <span className="font-bold">{Math.round(progress)}%</span>
+        <div className="mb-4">
+          <div className="flex justify-between text-xs mb-1">
+            <span className="text-accent uppercase">{status}</span>
+            <span className="font-mono">{Math.round(progress)}%</span>
           </div>
-          <div className="w-full bg-dark-hover rounded-full h-3 overflow-hidden border border-dark-border">
+          <div className="w-full bg-background h-1.5 border border-border">
             <div
-              className="bg-gradient-to-r from-accent-primary to-accent-secondary h-full transition-all duration-500"
+              className="bg-accent h-full transition-all duration-500"
               style={{ width: `${progress}%` }}
             ></div>
           </div>
 
           {/* Live Test Output */}
-          <div className="mt-4">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-2 h-2 bg-accent-primary rounded-full animate-pulse"></div>
-              <h3 className="text-sm font-semibold text-gray-300">Live Test Output</h3>
+          <div className="mt-3">
+            <div className="flex items-center gap-2 mb-1">
+              <div className="w-1.5 h-1.5 bg-accent animate-pulse"></div>
+              <h3 className="text-xs font-medium uppercase">Live Output</h3>
             </div>
-            <div ref={eventLogRef} className="max-h-96 overflow-y-auto text-sm bg-dark-card border border-dark-border rounded-lg p-4 space-y-1 font-mono">
+            <div ref={eventLogRef} className="max-h-64 overflow-y-auto text-xs bg-background border border-border p-2 font-mono">
               {eventLog.length === 0 ? (
-                <div className="text-gray-500 italic text-center py-4">
-                  Waiting for scan to start...
+                <div className="text-secondary text-center py-2">
+                  Waiting...
                 </div>
               ) : (
                 eventLog.map((event, index) => (
                   <div
                     key={event.id}
-                    className="flex items-start gap-2 py-1 border-l-2 border-dark-border pl-3 hover:border-accent-primary transition-colors"
+                    className="flex items-start gap-2 py-0.5 border-l border-border pl-2 hover:border-accent transition-colors"
                   >
-                    <span className="text-xs text-gray-600 flex-shrink-0 w-20">
+                    <span className="text-secondary flex-shrink-0 w-16">
                       {new Date(event.timestamp).toLocaleTimeString()}
                     </span>
-                    <span className="text-xs font-semibold text-accent-secondary flex-shrink-0 w-32 truncate" title={event.phase}>
+                    <span className="text-accent flex-shrink-0 w-24 truncate" title={event.phase}>
                       [{event.phase}]
                     </span>
-                    <span className="text-gray-100 flex-1">{event.message}</span>
+                    <span className="flex-1">{event.message}</span>
                   </div>
                 ))
               )}
               {eventLog.length > 0 && (
-                <div className="text-xs text-gray-600 text-center pt-2 border-t border-dark-border mt-2">
-                  {eventLog.length} events logged
+                <div className="text-secondary text-center pt-1 border-t border-border mt-1">
+                  {eventLog.length} events
                 </div>
               )}
             </div>
@@ -451,39 +437,36 @@ function Scanner({ onScanStart, onScanComplete }) {
 
       {/* Start Button */}
       <div>
-        <div className="flex gap-3">
+        <div className="flex gap-2">
           <button
             onClick={startScan}
             disabled={loading || !url}
-            className="btn-primary flex-1 disabled:opacity-50 disabled:cursor-not-allowed"
-            title={!url ? 'Please enter a target URL first' : 'Start security scan'}
+            className="btn btn-primary flex-1 disabled:opacity-50 disabled:cursor-not-allowed text-xs uppercase"
+            title={!url ? 'Enter target URL first' : 'Start scan'}
           >
             {loading ? (
-              <span className="flex items-center justify-center gap-2">
-                <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                </svg>
-                Scanning...
+              <span className="flex items-center justify-center gap-1">
+                <span className="w-3 h-3 border border-background border-t-transparent animate-spin"></span>
+                SCANNING...
               </span>
             ) : (
-              'Start Scan'
+              'START SCAN'
             )}
           </button>
 
           {loading && (
             <button
               onClick={stopScan}
-              className="bg-red-600 hover:bg-red-700 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-200"
-              title="Stop the current scan and get partial results"
+              className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-xs uppercase transition-colors border border-red-500"
+              title="Stop scan"
             >
-              🛑 Stop Scan
+              STOP
             </button>
           )}
         </div>
         {!url && !loading && (
-          <p className="text-sm text-yellow-500 mt-2">
-            ⚠️ Please enter a target URL above to enable the scan button
+          <p className="text-xs text-yellow-500 mt-1 uppercase">
+            Enter target URL to enable scan
           </p>
         )}
       </div>

@@ -64,11 +64,11 @@ export default function AgentStatus({ scanId }) {
   };
 
   const phases = [
-    { id: 'recon', name: 'Reconnaissance', emoji: '🔍' },
-    { id: 'exploitation', name: 'Exploitation', emoji: '💥' },
-    { id: 'validation', name: 'Validation', emoji: '✅' },
-    { id: 'analysis', name: 'Analysis', emoji: '🧠' },
-    { id: 'reporting', name: 'Reporting', emoji: '📄' },
+    { id: 'recon', name: 'Reconnaissance', code: 'RCN' },
+    { id: 'exploitation', name: 'Exploitation', code: 'EXP' },
+    { id: 'validation', name: 'Validation', code: 'VAL' },
+    { id: 'analysis', name: 'Analysis', code: 'ANL' },
+    { id: 'reporting', name: 'Reporting', code: 'RPT' },
   ];
 
   return (
@@ -82,7 +82,7 @@ export default function AgentStatus({ scanId }) {
       <div className="mb-6 p-4 bg-gray-700 rounded-lg">
         <p className="text-sm text-gray-400 mb-1">Current Phase</p>
         <p className="text-xl font-semibold">
-          {phases.find((p) => p.id === workflow.current_phase)?.emoji}{' '}
+          [{phases.find((p) => p.id === workflow.current_phase)?.code}]{' '}
           {workflow.current_phase.charAt(0).toUpperCase() + workflow.current_phase.slice(1)}
         </p>
       </div>
@@ -101,7 +101,7 @@ export default function AgentStatus({ scanId }) {
               }`}
             >
               <div className="flex items-center flex-1">
-                <span className="text-2xl mr-3">{phase.emoji}</span>
+                <span className="text-xs font-mono mr-3 px-2 py-1 border border-current">[{phase.code}]</span>
                 <div className="flex-1">
                   <p className="font-semibold">{phase.name}</p>
                   <p className="text-sm text-gray-400">Agent: {phaseData.agent}</p>

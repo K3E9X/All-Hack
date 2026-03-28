@@ -24,7 +24,7 @@ export default function ChatInterface({ scanId }) {
     const websocket = new WebSocket(`${WS_BASE}/ws/chat/${scanId}`);
 
     websocket.onopen = () => {
-      console.log('✅ WebSocket connected');
+      console.log('WebSocket connected');
       setConnected(true);
       setMessages((prev) => [
         ...prev,
@@ -77,7 +77,7 @@ export default function ChatInterface({ scanId }) {
           ...prev,
           {
             type: 'error',
-            content: `❌ Error: ${data.content}`,
+            content: `Error: ${data.content}`,
             timestamp: new Date(),
           },
         ]);
@@ -86,7 +86,7 @@ export default function ChatInterface({ scanId }) {
     };
 
     websocket.onerror = (error) => {
-      console.error('❌ WebSocket error:', error);
+      console.error('WebSocket error:', error);
       setConnected(false);
     };
 

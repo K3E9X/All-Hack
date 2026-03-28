@@ -41,108 +41,108 @@ export default function Dashboard() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white p-8">
-      <header className="mb-12">
-        <h1 className="text-5xl font-bold mb-2">🎯 All-Hack</h1>
-        <p className="text-gray-400 text-lg">AI-Powered Penetration Testing Tool</p>
+    <div className="min-h-screen bg-background text-primary p-4">
+      <header className="mb-6">
+        <h1 className="text-xl font-medium tracking-wider uppercase">ALL-HACK</h1>
+        <p className="text-secondary text-xs uppercase">AI-Powered Penetration Testing</p>
       </header>
 
       {/* New Scan Form */}
-      <div className="bg-gray-800 rounded-lg p-6 mb-8 border border-gray-700">
-        <h2 className="text-2xl font-semibold mb-4">🚀 Start New Scan</h2>
+      <div className="border border-border bg-surface p-4 mb-4">
+        <h2 className="text-sm font-medium uppercase mb-3">[NEW] Start Scan</h2>
 
-        <div className="space-y-4">
+        <div className="space-y-3">
           <input
             type="text"
             placeholder="Target URL (e.g., http://testphp.vulnweb.com)"
             value={newScan.target_url}
             onChange={(e) => setNewScan({ ...newScan, target_url: e.target.value })}
-            className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:border-blue-500"
+            className="w-full px-3 py-2 border border-border bg-background text-sm font-mono"
           />
 
           <select
             value={newScan.mode}
             onChange={(e) => setNewScan({ ...newScan, mode: e.target.value })}
-            className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:border-blue-500"
+            className="w-full px-3 py-2 border border-border bg-background text-sm uppercase"
           >
-            <option value="black_box">Black Box (No credentials)</option>
-            <option value="grey_box">Grey Box (With credentials)</option>
+            <option value="black_box">BLACK BOX</option>
+            <option value="grey_box">GREY BOX</option>
           </select>
 
-          <div className="flex gap-4">
+          <div className="flex gap-2">
             <button
               onClick={() => startScan(false)}
               disabled={loading || !newScan.target_url}
-              className="flex-1 bg-blue-600 hover:bg-blue-700 px-6 py-3 rounded-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="flex-1 btn btn-secondary text-xs uppercase disabled:opacity-50"
             >
-              <ShieldCheckIcon className="inline w-5 h-5 mr-2" />
-              {loading ? 'Starting...' : 'Standard Scan'}
+              <ShieldCheckIcon className="inline w-4 h-4 mr-1" />
+              {loading ? 'STARTING...' : 'STANDARD'}
             </button>
 
             <button
               onClick={() => startScan(true)}
               disabled={loading || !newScan.target_url}
-              className="flex-1 bg-purple-600 hover:bg-purple-700 px-6 py-3 rounded-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="flex-1 btn btn-primary text-xs uppercase disabled:opacity-50"
             >
-              <BeakerIcon className="inline w-5 h-5 mr-2" />
-              {loading ? 'Starting...' : '🤖 AI Agent Scan (Phase 2)'}
+              <BeakerIcon className="inline w-4 h-4 mr-1" />
+              {loading ? 'STARTING...' : 'AI AGENT'}
             </button>
           </div>
         </div>
       </div>
 
       {/* Recent Scans */}
-      <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
-        <h2 className="text-2xl font-semibold mb-4 flex items-center">
-          <ChartBarIcon className="w-6 h-6 mr-2" />
+      <div className="border border-border bg-surface p-4">
+        <h2 className="text-sm font-medium uppercase mb-3 flex items-center">
+          <ChartBarIcon className="w-4 h-4 mr-1" />
           Recent Scans
         </h2>
 
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="w-full text-xs">
             <thead>
-              <tr className="border-b border-gray-700">
-                <th className="text-left py-3 px-4">Scan ID</th>
-                <th className="text-left py-3 px-4">Target</th>
-                <th className="text-left py-3 px-4">Status</th>
-                <th className="text-left py-3 px-4">Vulnerabilities</th>
-                <th className="text-left py-3 px-4">Actions</th>
+              <tr className="border-b border-border">
+                <th className="text-left py-2 px-2 uppercase">ID</th>
+                <th className="text-left py-2 px-2 uppercase">Target</th>
+                <th className="text-left py-2 px-2 uppercase">Status</th>
+                <th className="text-left py-2 px-2 uppercase">Vulns</th>
+                <th className="text-left py-2 px-2 uppercase">Actions</th>
               </tr>
             </thead>
             <tbody>
               {scans.length === 0 ? (
                 <tr>
-                  <td colSpan="5" className="text-center py-8 text-gray-400">
-                    No scans yet. Start your first scan above!
+                  <td colSpan="5" className="text-center py-4 text-secondary uppercase">
+                    No scans. Start above.
                   </td>
                 </tr>
               ) : (
                 scans.map((scan) => (
-                  <tr key={scan.scan_id} className="border-b border-gray-700 hover:bg-gray-750">
-                    <td className="py-3 px-4 font-mono text-sm">{scan.scan_id.slice(0, 8)}...</td>
-                    <td className="py-3 px-4">{scan.target_url}</td>
-                    <td className="py-3 px-4">
+                  <tr key={scan.scan_id} className="border-b border-border hover:bg-hover">
+                    <td className="py-2 px-2 font-mono">{scan.scan_id.slice(0, 8)}</td>
+                    <td className="py-2 px-2 font-mono truncate max-w-32">{scan.target_url}</td>
+                    <td className="py-2 px-2">
                       <span
-                        className={`px-2 py-1 rounded text-xs font-semibold ${
+                        className={`px-1.5 py-0.5 border text-xs font-mono uppercase ${
                           scan.status === 'completed'
-                            ? 'bg-green-600'
+                            ? 'border-green-500 text-green-400'
                             : scan.status === 'running'
-                            ? 'bg-yellow-600'
+                            ? 'border-yellow-500 text-yellow-400'
                             : scan.status === 'failed'
-                            ? 'bg-red-600'
-                            : 'bg-gray-600'
+                            ? 'border-red-500 text-red-400'
+                            : 'border-border text-secondary'
                         }`}
                       >
                         {scan.status}
                       </span>
                     </td>
-                    <td className="py-3 px-4">{scan.vulnerabilities_count || 0}</td>
-                    <td className="py-3 px-4">
+                    <td className="py-2 px-2 font-mono">{scan.vulnerabilities_count || 0}</td>
+                    <td className="py-2 px-2">
                       <a
                         href={`/scan/${scan.scan_id}`}
-                        className="text-blue-400 hover:text-blue-300 text-sm"
+                        className="text-accent hover:underline"
                       >
-                        View Details →
+                        VIEW
                       </a>
                     </td>
                   </tr>

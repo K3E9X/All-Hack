@@ -71,12 +71,12 @@ export default function HistoryView() {
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <header className="flex items-center justify-between px-6 h-14 border-b border-border bg-background">
+      <header className="flex items-center justify-between px-4 h-10 border-b border-border bg-surface">
         <div className="flex items-center gap-3">
-          <h1 className="text-lg font-semibold">Scan History</h1>
+          <h1 className="text-xs font-medium tracking-wider uppercase">HISTORY</h1>
           {activeScans.length > 0 && (
-            <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-accent/10 text-accent text-xs">
-              <Activity className="w-3 h-3 animate-pulse" />
+            <span className="flex items-center gap-1 px-1.5 py-0.5 border border-accent text-accent text-xs">
+              <span className="w-1.5 h-1.5 bg-accent animate-pulse" />
               {activeScans.length} running
             </span>
           )}
@@ -84,32 +84,30 @@ export default function HistoryView() {
         <button
           onClick={refresh}
           disabled={loading}
-          className="btn btn-secondary"
+          className="btn btn-secondary text-xs p-1.5"
         >
-          <RefreshCw className={clsx('w-4 h-4 mr-2', loading && 'animate-spin')} />
-          Refresh
+          <RefreshCw className={clsx('w-3 h-3', loading && 'animate-spin')} />
         </button>
       </header>
 
       {/* Filters */}
-      <div className="flex items-center gap-4 px-6 py-4 border-b border-border bg-background">
+      <div className="flex items-center gap-3 px-4 py-2 border-b border-border bg-surface">
         <div className="flex-1 relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-secondary" />
+          <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-secondary" />
           <input
             type="text"
-            placeholder="Search by target..."
+            placeholder="Search..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 rounded-lg border border-border bg-surface"
+            className="w-full pl-7 pr-3 py-1.5 border border-border bg-background text-sm font-mono"
           />
         </div>
 
         <div className="flex items-center gap-2">
-          <Filter className="w-4 h-4 text-secondary" />
           <select
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
-            className="px-3 py-2 rounded-lg border border-border bg-surface"
+            className="px-2 py-1.5 border border-border bg-background text-xs uppercase"
           >
             <option value="all">All</option>
             <option value="completed">Completed</option>
@@ -120,75 +118,75 @@ export default function HistoryView() {
       </div>
 
       {/* Scans List */}
-      <div className="flex-1 overflow-y-auto p-6 bg-surface">
+      <div className="flex-1 overflow-y-auto p-4 bg-background">
         {loading ? (
           <div className="flex items-center justify-center h-full">
-            <div className="animate-spin w-8 h-8 border-2 border-accent border-t-transparent rounded-full" />
+            <div className="animate-spin w-6 h-6 border-2 border-accent border-t-transparent" />
           </div>
         ) : filteredScans.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-secondary">
-            <Clock className="w-12 h-12 mb-4 opacity-50" />
-            <p>No scans found</p>
+            <Clock className="w-8 h-8 mb-3 opacity-50" />
+            <p className="text-xs uppercase tracking-wider">No scans found</p>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-2">
             {filteredScans.map((scan) => {
               const counts = getSeverityCounts(scan);
 
               return (
                 <div
                   key={scan.id}
-                  className="card p-4 hover:border-accent/50 transition-colors cursor-pointer"
+                  className="p-3 border border-border bg-surface hover:border-accent/50 transition-colors cursor-pointer"
                   onClick={() => navigate(`/scan/${scan.id}`)}
                 >
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
                       <span className={clsx(
-                        'w-2 h-2 rounded-full',
+                        'w-1.5 h-1.5',
                         scan.status === 'completed' && 'bg-green-400',
                         scan.status === 'running' && 'bg-yellow-400 animate-pulse',
                         scan.status === 'failed' && 'bg-red-400'
                       )} />
-                      <span className="font-mono text-sm truncate max-w-md">
+                      <span className="font-mono text-xs truncate max-w-md">
                         {scan.target}
                       </span>
                     </div>
 
-                    <div className="flex items-center gap-3 text-sm text-secondary">
+                    <div className="flex items-center gap-2 text-xs text-secondary">
                       <span>{formatDate(scan.started_at)}</span>
-                      <ExternalLink className="w-4 h-4" />
+                      <ExternalLink className="w-3 h-3" />
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-1">
                       {counts.critical > 0 && (
-                        <span className="severity-critical px-2 py-0.5 rounded text-xs font-medium border">
-                          {counts.critical} Critical
+                        <span className="severity-critical px-1.5 py-0.5 text-xs font-mono border">
+                          {counts.critical}C
                         </span>
                       )}
                       {counts.high > 0 && (
-                        <span className="severity-high px-2 py-0.5 rounded text-xs font-medium border">
-                          {counts.high} High
+                        <span className="severity-high px-1.5 py-0.5 text-xs font-mono border">
+                          {counts.high}H
                         </span>
                       )}
                       {counts.medium > 0 && (
-                        <span className="severity-medium px-2 py-0.5 rounded text-xs font-medium border">
-                          {counts.medium} Medium
+                        <span className="severity-medium px-1.5 py-0.5 text-xs font-mono border">
+                          {counts.medium}M
                         </span>
                       )}
                       {counts.low > 0 && (
-                        <span className="severity-low px-2 py-0.5 rounded text-xs font-medium border">
-                          {counts.low} Low
+                        <span className="severity-low px-1.5 py-0.5 text-xs font-mono border">
+                          {counts.low}L
                         </span>
                       )}
                       {counts.critical === 0 && counts.high === 0 && counts.medium === 0 && counts.low === 0 && (
-                        <span className="text-xs text-secondary">No findings</span>
+                        <span className="text-xs text-secondary">-</span>
                       )}
                     </div>
 
-                    <span className="text-xs text-secondary ml-auto">
-                      {scan.depth || 'balanced'} scan
+                    <span className="text-xs text-secondary ml-auto uppercase">
+                      {scan.depth || 'balanced'}
                     </span>
                   </div>
                 </div>

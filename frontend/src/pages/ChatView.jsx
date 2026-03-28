@@ -67,54 +67,54 @@ export default function ChatView() {
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <header className="flex items-center justify-between px-6 h-14 border-b border-border bg-background">
-        <h1 className="text-lg font-semibold">AI Assistant</h1>
-        <span className="text-sm text-secondary">
-          {scanContext ? `Context: Scan ${scanContext}` : 'No scan context'}
+      <header className="flex items-center justify-between px-4 h-10 border-b border-border bg-surface">
+        <h1 className="text-xs font-medium tracking-wider uppercase">CHAT</h1>
+        <span className="text-xs text-secondary font-mono">
+          {scanContext ? `CTX:${scanContext}` : 'NO CTX'}
         </span>
       </header>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-6 bg-surface">
-        <div className="max-w-3xl mx-auto space-y-6">
+      <div className="flex-1 overflow-y-auto p-4 bg-background">
+        <div className="max-w-3xl mx-auto space-y-4">
           {messages.map((message, i) => (
             <div
               key={i}
               className={clsx(
-                'flex gap-4',
+                'flex gap-3',
                 message.role === 'user' && 'justify-end'
               )}
             >
               {message.role === 'assistant' && (
-                <div className="w-8 h-8 rounded-lg bg-accent/10 flex items-center justify-center shrink-0">
-                  <Bot className="w-5 h-5 text-accent" />
+                <div className="w-6 h-6 border border-accent flex items-center justify-center shrink-0">
+                  <Bot className="w-3 h-3 text-accent" />
                 </div>
               )}
 
               <div className={clsx(
-                'max-w-[80%] p-4 rounded-xl',
+                'max-w-[80%] p-3 text-sm',
                 message.role === 'user'
-                  ? 'bg-accent text-white'
-                  : 'card'
+                  ? 'bg-accent text-background border border-accent'
+                  : 'bg-surface border border-border'
               )}>
                 <p className="whitespace-pre-wrap">{message.content}</p>
               </div>
 
               {message.role === 'user' && (
-                <div className="w-8 h-8 rounded-lg bg-secondary/10 flex items-center justify-center shrink-0">
-                  <User className="w-5 h-5 text-secondary" />
+                <div className="w-6 h-6 border border-border flex items-center justify-center shrink-0">
+                  <User className="w-3 h-3 text-secondary" />
                 </div>
               )}
             </div>
           ))}
 
           {isLoading && (
-            <div className="flex gap-4">
-              <div className="w-8 h-8 rounded-lg bg-accent/10 flex items-center justify-center shrink-0">
-                <Bot className="w-5 h-5 text-accent" />
+            <div className="flex gap-3">
+              <div className="w-6 h-6 border border-accent flex items-center justify-center shrink-0">
+                <Bot className="w-3 h-3 text-accent" />
               </div>
-              <div className="card p-4">
-                <Loader className="w-5 h-5 animate-spin text-secondary" />
+              <div className="p-3 bg-surface border border-border">
+                <Loader className="w-4 h-4 animate-spin text-secondary" />
               </div>
             </div>
           )}
@@ -124,23 +124,23 @@ export default function ChatView() {
       </div>
 
       {/* Input */}
-      <div className="p-4 border-t border-border bg-background">
-        <div className="max-w-3xl mx-auto flex gap-3">
+      <div className="p-3 border-t border-border bg-surface">
+        <div className="max-w-3xl mx-auto flex gap-2">
           <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyPress={handleKeyPress}
-            placeholder="Ask about vulnerabilities, exploitation techniques, or scan results..."
+            placeholder="Ask about vulnerabilities, exploitation, scan results..."
             rows={1}
-            className="flex-1 px-4 py-3 rounded-xl border border-border bg-surface resize-none focus:ring-2 focus:ring-accent/50"
-            style={{ minHeight: '48px', maxHeight: '200px' }}
+            className="flex-1 px-3 py-2 border border-border bg-background resize-none text-sm"
+            style={{ minHeight: '40px', maxHeight: '160px' }}
           />
           <button
             onClick={sendMessage}
             disabled={!input.trim() || isLoading}
-            className="btn btn-primary px-4 disabled:opacity-50"
+            className="btn btn-primary px-3 disabled:opacity-50"
           >
-            <Send className="w-5 h-5" />
+            <Send className="w-4 h-4" />
           </button>
         </div>
       </div>

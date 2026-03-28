@@ -146,20 +146,20 @@ export default function AgentView() {
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <header className="flex items-center justify-between px-6 h-14 border-b border-border bg-background">
+      <header className="flex items-center justify-between px-4 h-10 border-b border-border bg-surface">
         <div className="flex items-center gap-3">
-          <h1 className="text-lg font-semibold">OpenClaw AI</h1>
+          <h1 className="text-xs font-medium tracking-wider uppercase">OPENCLAW</h1>
           {events.length > 0 && !isRunning && (
-            <span className="text-xs px-2 py-0.5 rounded-full bg-green-500/10 text-green-400">
+            <span className="text-xs px-2 py-0.5 border border-accent text-accent">
               {findings.length} findings
             </span>
           )}
         </div>
         <div className="flex items-center gap-2">
           {isRunning && (
-            <span className="flex items-center gap-2 text-sm text-accent">
-              <Loader className="w-4 h-4 animate-spin" />
-              Agent Running...
+            <span className="flex items-center gap-2 text-xs text-accent">
+              <span className="w-1.5 h-1.5 bg-accent animate-pulse" />
+              RUNNING
             </span>
           )}
         </div>
@@ -169,24 +169,24 @@ export default function AgentView() {
         {/* Input Panel */}
         <div className="w-96 border-r border-border p-4 flex flex-col gap-4 bg-background">
           <div>
-            <label className="block text-sm font-medium mb-1.5">Target URL</label>
+            <label className="block text-xs font-medium mb-1.5 uppercase tracking-wider">TARGET URL</label>
             <input
               type="url"
               value={target}
               onChange={(e) => setTarget(e.target.value)}
               placeholder="https://example.com"
-              className="w-full px-3 py-2 rounded-lg border border-border bg-surface focus:ring-2 focus:ring-accent/50"
+              className="w-full px-3 py-2 border border-border bg-surface text-sm font-mono"
               disabled={isRunning}
             />
           </div>
 
           <div className="flex-1 flex flex-col">
-            <label className="block text-sm font-medium mb-1.5">Request</label>
+            <label className="block text-xs font-medium mb-1.5 uppercase tracking-wider">REQUEST</label>
             <textarea
               value={request}
               onChange={(e) => setRequest(e.target.value)}
               placeholder="Find all SQL injection vulnerabilities and attempt to chain them for RCE..."
-              className="flex-1 px-3 py-2 rounded-lg border border-border bg-surface resize-none focus:ring-2 focus:ring-accent/50"
+              className="flex-1 px-3 py-2 border border-border bg-surface resize-none text-sm"
               disabled={isRunning}
             />
           </div>
@@ -214,17 +214,17 @@ export default function AgentView() {
 
           {/* Summary */}
           <div className="grid grid-cols-3 gap-2 pt-4 border-t border-border">
-            <div className="text-center p-2 rounded-lg bg-surface">
-              <div className="text-2xl font-semibold">{reasoning.length}</div>
-              <div className="text-xs text-secondary">Steps</div>
+            <div className="text-center p-2 bg-surface border border-border">
+              <div className="text-xl font-mono">{reasoning.length}</div>
+              <div className="text-xs text-secondary uppercase">Steps</div>
             </div>
-            <div className="text-center p-2 rounded-lg bg-surface">
-              <div className="text-2xl font-semibold">{toolCalls.filter(t => t.type === 'tool_complete').length}</div>
-              <div className="text-xs text-secondary">Tools</div>
+            <div className="text-center p-2 bg-surface border border-border">
+              <div className="text-xl font-mono">{toolCalls.filter(t => t.type === 'tool_complete').length}</div>
+              <div className="text-xs text-secondary uppercase">Tools</div>
             </div>
-            <div className="text-center p-2 rounded-lg bg-surface">
-              <div className="text-2xl font-semibold text-critical">{findings.length}</div>
-              <div className="text-xs text-secondary">Findings</div>
+            <div className="text-center p-2 bg-surface border border-border">
+              <div className="text-xl font-mono text-critical">{findings.length}</div>
+              <div className="text-xs text-secondary uppercase">Findings</div>
             </div>
           </div>
         </div>
@@ -233,55 +233,55 @@ export default function AgentView() {
         <div className="flex-1 overflow-y-auto p-4 bg-surface">
           {events.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-secondary">
-              <Bot className="w-12 h-12 mb-4 opacity-50" />
-              <p>Enter a target and request to start the agent</p>
+              <Bot className="w-10 h-10 mb-4 opacity-50" />
+              <p className="text-sm uppercase tracking-wider">Enter target and request to start</p>
             </div>
           ) : (
             <div className="space-y-4">
               {/* Decision Engine Section */}
-              <section className="card">
+              <section className="card border border-border">
                 <button
                   onClick={() => toggleSection('decisionEngine')}
-                  className="flex items-center justify-between w-full p-4"
+                  className="flex items-center justify-between w-full p-3"
                 >
                   <div className="flex items-center gap-2">
-                    <Cpu className="w-5 h-5 text-purple-400" />
-                    <span className="font-medium">Decision Engine</span>
+                    <span className="text-xs text-accent font-mono">[ENG]</span>
+                    <span className="text-sm font-medium uppercase">Decision Engine</span>
                     {decisionEngine && (
-                      <span className="text-sm text-secondary">
-                        ({decisionEngine.total_tests} tests available)
+                      <span className="text-xs text-secondary">
+                        {decisionEngine.total_tests} tests
                       </span>
                     )}
                   </div>
                   <div className="flex items-center gap-2">
                     <button
                       onClick={(e) => { e.stopPropagation(); loadDecisionEngine(); }}
-                      className="p-1 hover:bg-hover rounded"
+                      className="p-1 hover:bg-hover"
                       title="Refresh"
                     >
-                      <RefreshCw className={clsx('w-4 h-4 text-secondary', loadingEngine && 'animate-spin')} />
+                      <RefreshCw className={clsx('w-3 h-3 text-secondary', loadingEngine && 'animate-spin')} />
                     </button>
                     {expandedSections.decisionEngine ? (
-                      <ChevronDown className="w-5 h-5 text-secondary" />
+                      <ChevronDown className="w-4 h-4 text-secondary" />
                     ) : (
-                      <ChevronRight className="w-5 h-5 text-secondary" />
+                      <ChevronRight className="w-4 h-4 text-secondary" />
                     )}
                   </div>
                 </button>
                 {expandedSections.decisionEngine && decisionEngine && (
-                  <div className="px-4 pb-4">
-                    <div className="grid grid-cols-2 gap-3">
+                  <div className="px-3 pb-3">
+                    <div className="grid grid-cols-2 gap-2">
                       {Object.entries(decisionEngine.categories).map(([category, tests]) => (
                         tests.length > 0 && (
-                          <div key={category} className="p-3 rounded-lg bg-background border border-border">
+                          <div key={category} className="p-2 bg-background border border-border">
                             <h4 className="text-xs font-medium text-secondary uppercase mb-2">
                               {category.replace('_', ' ')}
                             </h4>
                             <div className="space-y-1">
                               {tests.map((test, i) => (
-                                <div key={i} className="flex items-center gap-2 text-sm">
-                                  <div className="w-1.5 h-1.5 rounded-full bg-accent" />
-                                  <span className="font-mono text-xs">{test.name}</span>
+                                <div key={i} className="flex items-center gap-2 text-xs">
+                                  <span className="w-1 h-1 bg-accent" />
+                                  <span className="font-mono">{test.name}</span>
                                 </div>
                               ))}
                             </div>
@@ -289,13 +289,13 @@ export default function AgentView() {
                         )
                       ))}
                     </div>
-                    <div className="mt-3 pt-3 border-t border-border">
-                      <h4 className="text-xs font-medium text-secondary uppercase mb-2">All Available Tests</h4>
+                    <div className="mt-2 pt-2 border-t border-border">
+                      <h4 className="text-xs font-medium text-secondary uppercase mb-2">Available Tests</h4>
                       <div className="flex flex-wrap gap-1">
                         {decisionEngine.available_tests.map((test, i) => (
                           <span
                             key={i}
-                            className="px-2 py-1 text-xs font-mono bg-surface border border-border rounded"
+                            className="px-1.5 py-0.5 text-xs font-mono bg-surface border border-border"
                             title={test.description}
                           >
                             {test.name}
@@ -308,38 +308,38 @@ export default function AgentView() {
               </section>
 
               {/* Reasoning Section */}
-              <section className="card">
+              <section className="card border border-border">
                 <button
                   onClick={() => toggleSection('reasoning')}
-                  className="flex items-center justify-between w-full p-4"
+                  className="flex items-center justify-between w-full p-3"
                 >
                   <div className="flex items-center gap-2">
-                    <Brain className="w-5 h-5 text-accent" />
-                    <span className="font-medium">Reasoning</span>
-                    <span className="text-sm text-secondary">({reasoning.length})</span>
+                    <span className="text-xs text-accent font-mono">[RSN]</span>
+                    <span className="text-sm font-medium uppercase">Reasoning</span>
+                    <span className="text-xs text-secondary">{reasoning.length}</span>
                   </div>
                   {expandedSections.reasoning ? (
-                    <ChevronDown className="w-5 h-5 text-secondary" />
+                    <ChevronDown className="w-4 h-4 text-secondary" />
                   ) : (
-                    <ChevronRight className="w-5 h-5 text-secondary" />
+                    <ChevronRight className="w-4 h-4 text-secondary" />
                   )}
                 </button>
                 {expandedSections.reasoning && (
-                  <div className="px-4 pb-4 space-y-2">
+                  <div className="px-3 pb-3 space-y-2">
                     {reasoning.map((event, i) => (
-                      <div key={i} className="p-3 rounded-lg bg-background border border-border">
+                      <div key={i} className="p-2 bg-background border border-border">
                         <div className="flex items-center gap-2 mb-1">
                           <span className={clsx(
-                            'text-xs font-medium px-2 py-0.5 rounded',
-                            event.data?.step === 'thought' && 'bg-blue-500/10 text-blue-400',
-                            event.data?.step === 'plan' && 'bg-purple-500/10 text-purple-400',
-                            event.data?.step === 'observation' && 'bg-green-500/10 text-green-400',
-                            event.data?.step === 'decision' && 'bg-orange-500/10 text-orange-400'
+                            'text-xs font-mono uppercase px-1.5 py-0.5 border',
+                            event.data?.step === 'thought' && 'border-blue-500/50 text-blue-400',
+                            event.data?.step === 'plan' && 'border-purple-500/50 text-purple-400',
+                            event.data?.step === 'observation' && 'border-green-500/50 text-green-400',
+                            event.data?.step === 'decision' && 'border-orange-500/50 text-orange-400'
                           )}>
                             {event.data?.step}
                           </span>
                         </div>
-                        <p className="text-sm">{event.data?.content}</p>
+                        <p className="text-xs">{event.data?.content}</p>
                       </div>
                     ))}
                   </div>
@@ -347,26 +347,26 @@ export default function AgentView() {
               </section>
 
               {/* Tools Section */}
-              <section className="card">
+              <section className="card border border-border">
                 <button
                   onClick={() => toggleSection('tools')}
-                  className="flex items-center justify-between w-full p-4"
+                  className="flex items-center justify-between w-full p-3"
                 >
                   <div className="flex items-center gap-2">
-                    <Wrench className="w-5 h-5 text-accent" />
-                    <span className="font-medium">Tools</span>
-                    <span className="text-sm text-secondary">
-                      ({toolCalls.filter(t => t.type === 'tool_complete').length})
+                    <span className="text-xs text-accent font-mono">[TLS]</span>
+                    <span className="text-sm font-medium uppercase">Tools</span>
+                    <span className="text-xs text-secondary">
+                      {toolCalls.filter(t => t.type === 'tool_complete').length}
                     </span>
                   </div>
                   {expandedSections.tools ? (
-                    <ChevronDown className="w-5 h-5 text-secondary" />
+                    <ChevronDown className="w-4 h-4 text-secondary" />
                   ) : (
-                    <ChevronRight className="w-5 h-5 text-secondary" />
+                    <ChevronRight className="w-4 h-4 text-secondary" />
                   )}
                 </button>
                 {expandedSections.tools && (
-                  <div className="px-4 pb-4 space-y-2">
+                  <div className="px-3 pb-3 space-y-2">
                     {toolCalls.map((event, i) => {
                       const isStart = event.type === 'tool_start';
                       const isComplete = event.type === 'tool_complete';
@@ -375,19 +375,19 @@ export default function AgentView() {
                         <div
                           key={i}
                           className={clsx(
-                            'flex items-center gap-3 p-3 rounded-lg border',
-                            isStart && 'bg-yellow-500/5 border-yellow-500/20',
-                            isComplete && event.data?.success && 'bg-green-500/5 border-green-500/20',
-                            isComplete && !event.data?.success && 'bg-red-500/5 border-red-500/20'
+                            'flex items-center gap-3 p-2 border',
+                            isStart && 'bg-yellow-500/5 border-yellow-500/30',
+                            isComplete && event.data?.success && 'bg-green-500/5 border-green-500/30',
+                            isComplete && !event.data?.success && 'bg-red-500/5 border-red-500/30'
                           )}
                         >
-                          {isStart && <Loader className="w-4 h-4 animate-spin text-yellow-400" />}
-                          {isComplete && event.data?.success && <CheckCircle className="w-4 h-4 text-green-400" />}
-                          {isComplete && !event.data?.success && <XCircle className="w-4 h-4 text-red-400" />}
+                          {isStart && <Loader className="w-3 h-3 animate-spin text-yellow-400" />}
+                          {isComplete && event.data?.success && <CheckCircle className="w-3 h-3 text-green-400" />}
+                          {isComplete && !event.data?.success && <XCircle className="w-3 h-3 text-red-400" />}
 
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
-                              <span className="font-mono text-sm font-medium">{event.data?.tool}</span>
+                              <span className="font-mono text-xs">{event.data?.tool}</span>
                               {event.data?.duration_ms && (
                                 <span className="text-xs text-secondary">
                                   {(event.data.duration_ms / 1000).toFixed(2)}s
@@ -395,13 +395,13 @@ export default function AgentView() {
                               )}
                             </div>
                             {event.data?.description && (
-                              <p className="text-sm text-secondary truncate">{event.data.description}</p>
+                              <p className="text-xs text-secondary truncate">{event.data.description}</p>
                             )}
                             {event.data?.summary && (
-                              <p className="text-sm text-secondary">{event.data.summary}</p>
+                              <p className="text-xs text-secondary">{event.data.summary}</p>
                             )}
                             {event.data?.error && (
-                              <p className="text-sm text-red-400">{event.data.error}</p>
+                              <p className="text-xs text-red-400">{event.data.error}</p>
                             )}
                           </div>
                         </div>
@@ -413,46 +413,46 @@ export default function AgentView() {
 
               {/* Findings Section */}
               {findings.length > 0 && (
-                <section className="card">
+                <section className="card border border-border">
                   <button
                     onClick={() => toggleSection('findings')}
-                    className="flex items-center justify-between w-full p-4"
+                    className="flex items-center justify-between w-full p-3"
                   >
                     <div className="flex items-center gap-2">
-                      <AlertTriangle className="w-5 h-5 text-critical" />
-                      <span className="font-medium">Findings</span>
-                      <span className="text-sm text-secondary">({findings.length})</span>
+                      <span className="text-xs text-critical font-mono">[FND]</span>
+                      <span className="text-sm font-medium uppercase">Findings</span>
+                      <span className="text-xs text-secondary">{findings.length}</span>
                     </div>
                     {expandedSections.findings ? (
-                      <ChevronDown className="w-5 h-5 text-secondary" />
+                      <ChevronDown className="w-4 h-4 text-secondary" />
                     ) : (
-                      <ChevronRight className="w-5 h-5 text-secondary" />
+                      <ChevronRight className="w-4 h-4 text-secondary" />
                     )}
                   </button>
                   {expandedSections.findings && (
-                    <div className="px-4 pb-4 space-y-2">
+                    <div className="px-3 pb-3 space-y-2">
                       {findings.map((event, i) => (
                         <div
                           key={i}
                           className={clsx(
-                            'p-3 rounded-lg border',
+                            'p-2 border',
                             `severity-${event.data?.severity || 'medium'}`
                           )}
                         >
                           <div className="flex items-center justify-between mb-1">
-                            <span className="font-medium">{event.data?.title || event.data?.type}</span>
+                            <span className="text-sm font-medium">{event.data?.title || event.data?.type}</span>
                             <span className={clsx(
-                              'text-xs font-medium px-2 py-0.5 rounded uppercase',
+                              'text-xs font-mono px-1.5 py-0.5 border uppercase',
                               `severity-${event.data?.severity || 'medium'}`
                             )}>
                               {event.data?.severity}
                             </span>
                           </div>
                           {event.data?.url && (
-                            <p className="text-sm text-secondary font-mono truncate">{event.data.url}</p>
+                            <p className="text-xs text-secondary font-mono truncate">{event.data.url}</p>
                           )}
                           {event.data?.evidence && (
-                            <p className="text-sm mt-1">{event.data.evidence}</p>
+                            <p className="text-xs mt-1">{event.data.evidence}</p>
                           )}
                         </div>
                       ))}
