@@ -232,11 +232,9 @@ class SQLiTool(BaseTool):
                 metadata={"methods": methods}
             )
 
-        except ImportError:
-            # Fallback basic test
+        except Exception:
+            # Fallback to basic test (scanner may need dependencies)
             return await self._basic_sqli_test(url, parameter)
-        except Exception as e:
-            return ToolResult(success=False, error=str(e))
 
     async def _basic_sqli_test(self, url: str, parameter: str = None) -> ToolResult:
         """Basic SQLi detection fallback"""
@@ -335,10 +333,9 @@ class XSSTool(BaseTool):
                 findings=findings
             )
 
-        except ImportError:
+        except Exception:
+            # Fallback to basic test (scanner may need dependencies)
             return await self._basic_xss_test(url, parameter)
-        except Exception as e:
-            return ToolResult(success=False, error=str(e))
 
     async def _basic_xss_test(self, url: str, parameter: str = None) -> ToolResult:
         """Basic XSS detection fallback"""
@@ -429,10 +426,9 @@ class RCETool(BaseTool):
                 findings=findings
             )
 
-        except ImportError:
+        except Exception:
+            # Fallback to basic test
             return await self._basic_rce_test(url, parameter)
-        except Exception as e:
-            return ToolResult(success=False, error=str(e))
 
     async def _basic_rce_test(self, url: str, parameter: str = None) -> ToolResult:
         """Basic RCE detection using time-based technique"""
