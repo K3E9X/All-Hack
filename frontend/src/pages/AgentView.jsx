@@ -10,7 +10,9 @@ import {
   Zap,
   Brain,
   Wrench,
-  AlertTriangle
+  AlertTriangle,
+  Cpu,
+  RefreshCw
 } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -21,7 +23,10 @@ export default function AgentView() {
   const [request, setRequest] = useState('');
   const [isRunning, setIsRunning] = useState(false);
   const [events, setEvents] = useState([]);
+  const [decisionEngine, setDecisionEngine] = useState(null);
+  const [loadingEngine, setLoadingEngine] = useState(false);
   const [expandedSections, setExpandedSections] = useState({
+    decisionEngine: false,
     reasoning: true,
     tools: true,
     findings: true
@@ -33,6 +38,25 @@ export default function AgentView() {
   useEffect(() => {
     eventsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [events]);
+
+  const loadDecisionEngine = async () => {
+    setLoadingEngine(true);
+    try {
+      const res = await fetch(`${API_URL}/api/v1/agent/decision-engine`);
+      if (res.ok) {
+        const data = await res.json();
+        setDecisionEngine(data);
+      }
+    } catch (err) {
+      console.error('Failed to load DecisionEngine:', err);
+    } finally {
+      setLoadingEngine(false);
+    }
+  };
+
+  useEffect(() => {
+    loadDecisionEngine();
+  }, []);
 
   const startAgent = () => {
     if (!target || !request) return;
@@ -178,6 +202,75 @@ export default function AgentView() {
             </div>
           ) : (
             <div className="space-y-4">
+              {/* Decision Engine Section */}
+              <section className="card">
+                <button
+                  onClick={() => toggleSection('decisionEngine')}
+                  className="flex items-center justify-between w-full p-4"
+                >
+                  <div className="flex items-center gap-2">
+                    <Cpu className="w-5 h-5 text-purple-400" />
+                    <span className="font-medium">Decision Engine</span>
+                    {decisionEngine && (
+                      <span className="text-sm text-secondary">
+                        ({decisionEngine.total_tests} tests available)
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); loadDecisionEngine(); }}
+                      className="p-1 hover:bg-hover rounded"
+                      title="Refresh"
+                    >
+                      <RefreshCw className={clsx('w-4 h-4 text-secondary', loadingEngine && 'animate-spin')} />
+                    </button>
+                    {expandedSections.decisionEngine ? (
+                      <ChevronDown className="w-5 h-5 text-secondary" />
+                    ) : (
+                      <ChevronRight className="w-5 h-5 text-secondary" />
+                    )}
+                  </div>
+                </button>
+                {expandedSections.decisionEngine && decisionEngine && (
+                  <div className="px-4 pb-4">
+                    <div className="grid grid-cols-2 gap-3">
+                      {Object.entries(decisionEngine.categories).map(([category, tests]) => (
+                        tests.length > 0 && (
+                          <div key={category} className="p-3 rounded-lg bg-background border border-border">
+                            <h4 className="text-xs font-medium text-secondary uppercase mb-2">
+                              {category.replace('_', ' ')}
+                            </h4>
+                            <div className="space-y-1">
+                              {tests.map((test, i) => (
+                                <div key={i} className="flex items-center gap-2 text-sm">
+                                  <div className="w-1.5 h-1.5 rounded-full bg-accent" />
+                                  <span className="font-mono text-xs">{test.name}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )
+                      ))}
+                    </div>
+                    <div className="mt-3 pt-3 border-t border-border">
+                      <h4 className="text-xs font-medium text-secondary uppercase mb-2">All Available Tests</h4>
+                      <div className="flex flex-wrap gap-1">
+                        {decisionEngine.available_tests.map((test, i) => (
+                          <span
+                            key={i}
+                            className="px-2 py-1 text-xs font-mono bg-surface border border-border rounded"
+                            title={test.description}
+                          >
+                            {test.name}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </section>
+
               {/* Reasoning Section */}
               <section className="card">
                 <button
