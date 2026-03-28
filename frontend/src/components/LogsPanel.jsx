@@ -42,37 +42,37 @@ function LogsPanel({ results, status }) {
     return (
       <div className="space-y-1">
         {logs.map((log, idx) => (
-          <div
-            key={idx}
-            className={`flex gap-3 py-1.5 px-2 rounded text-xs font-mono hover:bg-neutral-800/50 ${
-              log.status === 'vulnerability' ? 'bg-red-500/5' :
-              log.status === 'warning' ? 'bg-yellow-500/5' :
-              log.status === 'error' ? 'bg-red-500/10' : ''
-            }`}
-          >
-            <span className="text-gray-600 flex-shrink-0 w-20">
-              {new Date(log.timestamp).toLocaleTimeString('en-US', { hour12: false })}
-            </span>
-            <span className="text-blue-400 flex-shrink-0 w-24 truncate">[{log.module}]</span>
-            <span className={getStatusColor(log.status)}>{log.action}</span>
-            {log.data && (
-              <button
-                onClick={() => toggleExpand(`log-${idx}`)}
-                className="text-gray-500 hover:text-gray-300 ml-auto"
-              >
-                {expandedItems[`log-${idx}`] ? '[-]' : '[+]'}
-              </button>
+          <div key={idx}>
+            <div
+              className={`flex gap-3 py-1.5 px-2 rounded text-xs font-mono hover:bg-neutral-800/50 ${
+                log.status === 'vulnerability' ? 'bg-red-500/5' :
+                log.status === 'warning' ? 'bg-yellow-500/5' :
+                log.status === 'error' ? 'bg-red-500/10' : ''
+              }`}
+            >
+              <span className="text-gray-600 flex-shrink-0 w-20">
+                {new Date(log.timestamp).toLocaleTimeString('en-US', { hour12: false })}
+              </span>
+              <span className="text-blue-400 flex-shrink-0 w-24 truncate">[{log.module}]</span>
+              <span className={getStatusColor(log.status)}>{log.action}</span>
+              {log.data && (
+                <button
+                  onClick={() => toggleExpand(`log-${idx}`)}
+                  className="text-gray-500 hover:text-gray-300 ml-auto"
+                >
+                  {expandedItems[`log-${idx}`] ? '[-]' : '[+]'}
+                </button>
+              )}
+            </div>
+            {/* Expanded content directly below the item */}
+            {log.data && expandedItems[`log-${idx}`] && (
+              <div className="ml-4 mb-2 mt-1 p-2 bg-neutral-950 rounded text-xs border-l-2 border-blue-500/30">
+                <pre className="text-gray-400 whitespace-pre-wrap overflow-x-auto">
+                  {JSON.stringify(log.data, null, 2)}
+                </pre>
+              </div>
             )}
           </div>
-        ))}
-        {logs.map((log, idx) => (
-          log.data && expandedItems[`log-${idx}`] && (
-            <div key={`data-${idx}`} className="ml-48 mb-2 p-2 bg-neutral-950 rounded text-xs">
-              <pre className="text-gray-400 whitespace-pre-wrap overflow-x-auto">
-                {JSON.stringify(log.data, null, 2)}
-              </pre>
-            </div>
-          )
         ))}
       </div>
     )
