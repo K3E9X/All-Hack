@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import { useTheme } from '../contexts/ThemeContext';
+import { useActiveScans } from '../contexts/ActiveScansContext';
 import clsx from 'clsx';
 import {
   Crosshair,
@@ -28,10 +29,14 @@ const navItems = [
 
 export default function Layout() {
   const { theme, toggleTheme } = useTheme();
+  const { moduleStates, activeScans } = useActiveScans();
   const [collapsed, setCollapsed] = useState(false);
 
+  // Check if any module is running
+  const hasRunningScans = Object.values(moduleStates).some(s => s.running) || activeScans.length > 0;
+
   return (
-    <div className="flex h-screen bg-surface text-primary">
+    <div className={clsx('flex h-screen bg-surface text-primary', hasRunningScans && 'pb-12')}
       {/* Sidebar */}
       <aside
         className={clsx(
@@ -51,25 +56,37 @@ export default function Layout() {
 
         {/* Navigation */}
         <nav className="flex-1 py-4 px-2 space-y-1">
-          {navItems.map(({ path, icon: Icon, label, exact }) => (
-            <NavLink
-              key={path}
-              to={path}
-              end={exact}
-              className={({ isActive }) =>
-                clsx(
-                  'flex items-center px-3 py-2.5 rounded-lg transition-colors',
-                  'hover:bg-hover',
-                  isActive
-                    ? 'bg-accent/10 text-accent'
-                    : 'text-secondary hover:text-primary'
-                )
-              }
-            >
-              <Icon className="w-5 h-5 shrink-0" />
-              {!collapsed && <span className="ml-3 text-sm font-medium">{label}</span>}
-            </NavLink>
-          ))}
+          {navItems.map(({ path, icon: Icon, label, exact }) => {
+            // Map paths to module names for running indicator
+            const moduleMap = { '/': 'scan', '/recon': 'recon', '/tools': 'tools', '/agent': 'agent' };
+            const moduleName = moduleMap[path];
+            const isModuleRunning = moduleName && moduleStates[moduleName]?.running;
+
+            return (
+              <NavLink
+                key={path}
+                to={path}
+                end={exact}
+                className={({ isActive }) =>
+                  clsx(
+                    'flex items-center px-3 py-2.5 rounded-lg transition-colors',
+                    'hover:bg-hover',
+                    isActive
+                      ? 'bg-accent/10 text-accent'
+                      : 'text-secondary hover:text-primary'
+                  )
+                }
+              >
+                <div className="relative">
+                  <Icon className="w-5 h-5 shrink-0" />
+                  {isModuleRunning && (
+                    <span className="absolute -top-1 -right-1 w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+                  )}
+                </div>
+                {!collapsed && <span className="ml-3 text-sm font-medium">{label}</span>}
+              </NavLink>
+            );
+          })}
         </nav>
 
         {/* Bottom actions */}
