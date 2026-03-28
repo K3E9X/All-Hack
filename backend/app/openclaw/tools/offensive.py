@@ -207,23 +207,24 @@ class SQLiTool(BaseTool):
         methods = methods or ["boolean", "error", "time"]
 
         try:
-            # Import SQLi scanner
             from app.scanners.owasp.sql_injection import SQLInjectionScanner
+            from app.utils import PentestHTTPClient
 
-            scanner = SQLInjectionScanner()
-            results = await scanner.scan(url, parameter=parameter)
+            async with PentestHTTPClient() as client:
+                scanner = SQLInjectionScanner(client=client, scan_depth="balanced")
+                results = await scanner.scan([url])
 
-            for vuln in results.get("vulnerabilities", []):
-                findings.append({
-                    "type": "sqli",
-                    "severity": vuln.get("severity", "high"),
-                    "title": f"SQL Injection in {vuln.get('parameter', 'unknown')}",
-                    "url": url,
-                    "parameter": vuln.get("parameter"),
-                    "payload": vuln.get("payload"),
-                    "evidence": vuln.get("evidence"),
-                    "technique": vuln.get("technique")
-                })
+                for vuln in results:
+                    findings.append({
+                        "type": "sqli",
+                        "severity": vuln.severity.value if hasattr(vuln, 'severity') else "high",
+                        "title": vuln.title if hasattr(vuln, 'title') else "SQL Injection",
+                        "url": url,
+                        "parameter": vuln.affected_parameter if hasattr(vuln, 'affected_parameter') else parameter,
+                        "payload": vuln.proof_of_concept if hasattr(vuln, 'proof_of_concept') else None,
+                        "evidence": vuln.description if hasattr(vuln, 'description') else None,
+                        "technique": "error-based"
+                    })
 
             return ToolResult(
                 success=True,
@@ -236,7 +237,8 @@ class SQLiTool(BaseTool):
             # Fallback basic test
             return await self._basic_sqli_test(url, parameter)
         except Exception as e:
-            return ToolResult(success=False, error=str(e))
+            # Fallback to basic test on any error
+            return await self._basic_sqli_test(url, parameter)
 
     async def _basic_sqli_test(self, url: str, parameter: str = None) -> ToolResult:
         """Basic SQLi detection fallback"""
@@ -313,21 +315,22 @@ class XSSTool(BaseTool):
 
         try:
             from app.scanners.owasp.xss_scanner import XSSScanner
+            from app.utils import PentestHTTPClient
 
-            scanner = XSSScanner()
-            results = await scanner.scan(url, parameter=parameter)
+            async with PentestHTTPClient() as client:
+                scanner = XSSScanner(client=client, scan_depth="balanced")
+                results = await scanner.scan([url])
 
-            for vuln in results.get("vulnerabilities", []):
-                findings.append({
-                    "type": "xss",
-                    "severity": vuln.get("severity", "medium"),
-                    "title": f"XSS in {vuln.get('parameter', 'unknown')}",
-                    "url": url,
-                    "parameter": vuln.get("parameter"),
-                    "payload": vuln.get("payload"),
-                    "context": vuln.get("context"),
-                    "evidence": vuln.get("evidence")
-                })
+                for vuln in results:
+                    findings.append({
+                        "type": "xss",
+                        "severity": vuln.severity.value if hasattr(vuln, 'severity') else "medium",
+                        "title": vuln.title if hasattr(vuln, 'title') else "XSS Vulnerability",
+                        "url": url,
+                        "parameter": vuln.affected_parameter if hasattr(vuln, 'affected_parameter') else parameter,
+                        "payload": vuln.proof_of_concept if hasattr(vuln, 'proof_of_concept') else None,
+                        "evidence": vuln.description if hasattr(vuln, 'description') else None
+                    })
 
             return ToolResult(
                 success=True,
@@ -338,7 +341,8 @@ class XSSTool(BaseTool):
         except ImportError:
             return await self._basic_xss_test(url, parameter)
         except Exception as e:
-            return ToolResult(success=False, error=str(e))
+            # Fallback to basic test on any error
+            return await self._basic_xss_test(url, parameter)
 
     async def _basic_xss_test(self, url: str, parameter: str = None) -> ToolResult:
         """Basic XSS detection fallback"""
