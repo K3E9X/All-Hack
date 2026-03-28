@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Globe,
   Server,
@@ -12,6 +12,7 @@ import {
   ChevronRight
 } from 'lucide-react';
 import clsx from 'clsx';
+import { useActiveScans } from '../contexts/ActiveScansContext';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001';
 
@@ -47,11 +48,20 @@ const SCAN_TYPES = [
 ];
 
 export default function ReconView() {
-  const [target, setTarget] = useState('');
-  const [selectedScans, setSelectedScans] = useState(['ports', 'ssl']);
+  const { moduleStates, updateModuleState, addEvent } = useActiveScans();
+  const savedState = moduleStates.recon || {};
+
+  // Restore state from context
+  const [target, setTarget] = useState(savedState.target || '');
+  const [selectedScans, setSelectedScans] = useState(savedState.selectedScans || ['ports', 'ssl']);
   const [running, setRunning] = useState({});
-  const [results, setResults] = useState({});
-  const [expanded, setExpanded] = useState({});
+  const [results, setResults] = useState(savedState.results || {});
+  const [expanded, setExpanded] = useState(savedState.expanded || {});
+
+  // Persist state changes to context
+  useEffect(() => {
+    updateModuleState('recon', { target, selectedScans, results, expanded });
+  }, [target, selectedScans, results, expanded]);
 
   const toggleScan = (id) => {
     setSelectedScans(prev =>
@@ -64,6 +74,7 @@ export default function ReconView() {
 
     setRunning(prev => ({ ...prev, [scanType.id]: true }));
     setResults(prev => ({ ...prev, [scanType.id]: null }));
+    addEvent('recon', scanType.id, `Running ${scanType.name} on ${target}`, 'info');
 
     try {
       const response = await fetch(`${API_URL}${scanType.endpoint}`, {
@@ -75,23 +86,26 @@ export default function ReconView() {
       const data = await response.json();
       setResults(prev => ({ ...prev, [scanType.id]: { success: true, data } }));
       setExpanded(prev => ({ ...prev, [scanType.id]: true }));
+      addEvent('recon', scanType.id, `${scanType.name} completed`, 'success', data);
     } catch (error) {
       setResults(prev => ({
         ...prev,
         [scanType.id]: { success: false, error: error.message }
       }));
+      addEvent('recon', scanType.id, `${scanType.name} failed: ${error.message}`, 'error');
     } finally {
       setRunning(prev => ({ ...prev, [scanType.id]: false }));
     }
   };
 
   const runAllSelected = async () => {
-    for (const id of selectedScans) {
+    addEvent('recon', 'batch', `Running ${selectedScans.length} recon scans`, 'info');
+    // Run in parallel instead of sequential
+    const promises = selectedScans.map(id => {
       const scanType = SCAN_TYPES.find(s => s.id === id);
-      if (scanType) {
-        await runScan(scanType);
-      }
-    }
+      return scanType ? runScan(scanType) : Promise.resolve();
+    });
+    await Promise.all(promises);
   };
 
   const toggleExpand = (id) => {

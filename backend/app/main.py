@@ -207,6 +207,82 @@ async def create_scan(scan_request: ScanRequest):
         logger.error(f"Error starting scan: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+
+@app.get(f"{settings.API_PREFIX}/scans")
+async def list_scans():
+    """
+    List all scans (persisted + in-memory)
+    """
+    from app.persistence.scan_storage import ScanStorage
+    storage = ScanStorage()
+
+    # Get persisted scans
+    persisted_scans = storage.get_all_scans()
+
+    # Get in-memory active scans from orchestrator
+    active_scans = []
+    for scan_id, status in orchestrator.scan_status.items():
+        if scan_id not in [s.get('scan_id') for s in persisted_scans]:
+            result = orchestrator.get_scan_result(scan_id)
+            if result:
+                active_scans.append({
+                    'scan_id': scan_id,
+                    'target_url': result.target_url,
+                    'status': status.get('status', 'unknown'),
+                    'start_time': result.start_time,
+                    'end_time': result.end_time,
+                    'progress': status.get('progress', 0),
+                    'phase': status.get('phase', 'unknown')
+                })
+
+    # Merge and add vulnerability counts
+    all_scans = []
+    for scan in persisted_scans + active_scans:
+        # Enrich with vulnerability counts if available
+        scan_id = scan.get('scan_id')
+        result = orchestrator.get_scan_result(scan_id) or storage.load_scan(scan_id)
+        if result:
+            vulns = result.vulnerabilities if hasattr(result, 'vulnerabilities') else []
+            scan['critical_count'] = sum(1 for v in vulns if hasattr(v, 'severity') and v.severity.value == 'critical')
+            scan['high_count'] = sum(1 for v in vulns if hasattr(v, 'severity') and v.severity.value == 'high')
+            scan['medium_count'] = sum(1 for v in vulns if hasattr(v, 'severity') and v.severity.value == 'medium')
+            scan['low_count'] = sum(1 for v in vulns if hasattr(v, 'severity') and v.severity.value == 'low')
+            scan['total_vulns'] = len(vulns)
+
+        # Map fields for frontend
+        scan['id'] = scan.get('scan_id')
+        scan['target'] = scan.get('target_url')
+        scan['started_at'] = scan.get('start_time')
+
+        all_scans.append(scan)
+
+    # Sort by start time (newest first)
+    all_scans.sort(key=lambda x: x.get('started_at') or '', reverse=True)
+
+    return {"scans": all_scans, "total": len(all_scans)}
+
+
+@app.get(f"{settings.API_PREFIX}/scans/active")
+async def get_active_scans():
+    """
+    Get all currently running scans across all modules
+    """
+    active = []
+    for scan_id, status in orchestrator.scan_status.items():
+        if status.get('status') in ['running', 'scanning', 'crawling']:
+            result = orchestrator.get_scan_result(scan_id)
+            active.append({
+                'scan_id': scan_id,
+                'target': result.target_url if result else 'Unknown',
+                'status': status.get('status'),
+                'phase': status.get('phase', 'scanning'),
+                'progress': status.get('progress', 0),
+                'started_at': result.start_time if result else None,
+                'module': status.get('module', 'scan')  # scan, recon, tools, agent
+            })
+    return {"active_scans": active, "count": len(active)}
+
+
 @app.get(f"{settings.API_PREFIX}/scans/{{scan_id}}", response_model=ScanResult)
 async def get_scan_result(scan_id: str):
     """

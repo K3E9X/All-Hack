@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Database,
   Scan,
@@ -12,13 +12,18 @@ import {
   ChevronRight
 } from 'lucide-react';
 import clsx from 'clsx';
+import { useActiveScans } from '../contexts/ActiveScansContext';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001';
 
 const VULN_TYPES = ['sqli', 'xss', 'rce', 'lfi', 'ssti', 'xxe', 'nosql', 'ssrf'];
 
 export default function ToolsView() {
+  const { moduleStates, updateModuleState, addEvent } = useActiveScans();
   const [activeTab, setActiveTab] = useState('sqlmap');
+
+  // Restore state from context on mount
+  const toolsState = moduleStates.tools;
 
   return (
     <div className="flex flex-col h-full">
@@ -68,15 +73,27 @@ export default function ToolsView() {
 }
 
 function SQLMapTool() {
-  const [target, setTarget] = useState('');
-  const [level, setLevel] = useState(1);
-  const [risk, setRisk] = useState(1);
+  const { moduleStates, updateModuleState, addEvent } = useActiveScans();
+  const savedState = moduleStates.tools?.sqlmap || {};
+
+  const [target, setTarget] = useState(savedState.target || '');
+  const [level, setLevel] = useState(savedState.level || 1);
+  const [risk, setRisk] = useState(savedState.risk || 1);
   const [running, setRunning] = useState(false);
-  const [result, setResult] = useState(null);
+  const [result, setResult] = useState(savedState.result || null);
+
+  // Persist state changes
+  useEffect(() => {
+    updateModuleState('tools', {
+      ...moduleStates.tools,
+      sqlmap: { target, level, risk, result }
+    });
+  }, [target, level, risk, result]);
 
   const runSQLMap = async () => {
     setRunning(true);
     setResult(null);
+    addEvent('tools', 'sqlmap', `Running SQLMap on ${target}`, 'info');
 
     try {
       const response = await fetch(`${API_URL}/api/v1/tools/sqlmap`, {
@@ -86,8 +103,10 @@ function SQLMapTool() {
       });
       const data = await response.json();
       setResult(data);
+      addEvent('tools', 'sqlmap', data.vulnerable ? 'SQL Injection found!' : 'No SQLi detected', data.vulnerable ? 'warning' : 'success');
     } catch (error) {
       setResult({ error: error.message });
+      addEvent('tools', 'sqlmap', `SQLMap error: ${error.message}`, 'error');
     } finally {
       setRunning(false);
     }
@@ -202,14 +221,26 @@ function SQLMapTool() {
 }
 
 function NucleiTool() {
-  const [target, setTarget] = useState('');
-  const [severity, setSeverity] = useState(['critical', 'high']);
+  const { moduleStates, updateModuleState, addEvent } = useActiveScans();
+  const savedState = moduleStates.tools?.nuclei || {};
+
+  const [target, setTarget] = useState(savedState.target || '');
+  const [severity, setSeverity] = useState(savedState.severity || ['critical', 'high']);
   const [running, setRunning] = useState(false);
-  const [result, setResult] = useState(null);
+  const [result, setResult] = useState(savedState.result || null);
+
+  // Persist state changes
+  useEffect(() => {
+    updateModuleState('tools', {
+      ...moduleStates.tools,
+      nuclei: { target, severity, result }
+    });
+  }, [target, severity, result]);
 
   const runNuclei = async () => {
     setRunning(true);
     setResult(null);
+    addEvent('tools', 'nuclei', `Running Nuclei templates on ${target}`, 'info');
 
     try {
       const response = await fetch(`${API_URL}/api/v1/tools/nuclei`, {
@@ -219,8 +250,10 @@ function NucleiTool() {
       });
       const data = await response.json();
       setResult(data);
+      addEvent('tools', 'nuclei', `Nuclei completed: ${data.vulnerabilities_found || 0} findings`, data.vulnerabilities_found > 0 ? 'warning' : 'success');
     } catch (error) {
       setResult({ error: error.message });
+      addEvent('tools', 'nuclei', `Nuclei error: ${error.message}`, 'error');
     } finally {
       setRunning(false);
     }
@@ -325,20 +358,34 @@ function NucleiTool() {
 }
 
 function PayloadsTool() {
-  const [vulnType, setVulnType] = useState('sqli');
-  const [count, setCount] = useState(20);
+  const { moduleStates, updateModuleState, addEvent } = useActiveScans();
+  const savedState = moduleStates.tools?.payloads || {};
+
+  const [vulnType, setVulnType] = useState(savedState.vulnType || 'sqli');
+  const [count, setCount] = useState(savedState.count || 20);
   const [loading, setLoading] = useState(false);
-  const [payloads, setPayloads] = useState([]);
+  const [payloads, setPayloads] = useState(savedState.payloads || []);
   const [copied, setCopied] = useState(null);
+
+  // Persist state changes
+  useEffect(() => {
+    updateModuleState('tools', {
+      ...moduleStates.tools,
+      payloads: { vulnType, count, payloads }
+    });
+  }, [vulnType, count, payloads]);
 
   const fetchPayloads = async () => {
     setLoading(true);
+    addEvent('tools', 'payloads', `Loading ${vulnType} payloads`, 'info');
     try {
       const response = await fetch(`${API_URL}/api/v1/tools/payloads/${vulnType}?limit=${count}`);
       const data = await response.json();
       setPayloads(data.payloads || []);
+      addEvent('tools', 'payloads', `Loaded ${data.payloads?.length || 0} ${vulnType} payloads`, 'success');
     } catch (error) {
       console.error('Failed to fetch payloads:', error);
+      addEvent('tools', 'payloads', `Failed to load payloads: ${error.message}`, 'error');
     } finally {
       setLoading(false);
     }
@@ -346,6 +393,7 @@ function PayloadsTool() {
 
   const generatePayloads = async () => {
     setLoading(true);
+    addEvent('tools', 'payloads', `Generating AI ${vulnType} payloads`, 'info');
     try {
       const response = await fetch(`${API_URL}/api/v1/tools/payloads`, {
         method: 'POST',
@@ -354,8 +402,10 @@ function PayloadsTool() {
       });
       const data = await response.json();
       setPayloads(data.payloads || []);
+      addEvent('tools', 'payloads', `Generated ${data.payloads?.length || 0} AI payloads`, 'success');
     } catch (error) {
       console.error('Failed to generate payloads:', error);
+      addEvent('tools', 'payloads', `Failed to generate payloads: ${error.message}`, 'error');
     } finally {
       setLoading(false);
     }
@@ -458,21 +508,35 @@ function PayloadsTool() {
 }
 
 function ExploitAssistTool() {
-  const [vulnType, setVulnType] = useState('sqli');
-  const [target, setTarget] = useState('');
+  const { moduleStates, updateModuleState, addEvent } = useActiveScans();
+  const savedState = moduleStates.tools?.exploitAssist || {};
+
+  const [vulnType, setVulnType] = useState(savedState.vulnType || 'sqli');
+  const [target, setTarget] = useState(savedState.target || '');
   const [loading, setLoading] = useState(false);
-  const [guidance, setGuidance] = useState(null);
+  const [guidance, setGuidance] = useState(savedState.guidance || null);
+
+  // Persist state changes
+  useEffect(() => {
+    updateModuleState('tools', {
+      ...moduleStates.tools,
+      exploitAssist: { vulnType, target, guidance }
+    });
+  }, [vulnType, target, guidance]);
 
   const getGuidance = async () => {
     setLoading(true);
+    addEvent('tools', 'exploit-assist', `Getting exploitation guidance for ${vulnType}`, 'info');
     try {
       const response = await fetch(`${API_URL}/api/v1/tools/exploit-assist?vuln_type=${vulnType}&target=${encodeURIComponent(target)}`, {
         method: 'POST'
       });
       const data = await response.json();
       setGuidance(data.guidance);
+      addEvent('tools', 'exploit-assist', `Received ${vulnType} exploitation guide`, 'success');
     } catch (error) {
       console.error('Failed to get guidance:', error);
+      addEvent('tools', 'exploit-assist', `Failed to get guidance: ${error.message}`, 'error');
     } finally {
       setLoading(false);
     }

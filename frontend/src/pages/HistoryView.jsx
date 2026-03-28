@@ -1,22 +1,20 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Clock, ExternalLink, Trash2, Search, Filter } from 'lucide-react';
+import { Clock, ExternalLink, Trash2, Search, Filter, RefreshCw, Activity } from 'lucide-react';
 import clsx from 'clsx';
+import { useActiveScans } from '../contexts/ActiveScansContext';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001';
 
 export default function HistoryView() {
+  const { activeScans, fetchActiveScans } = useActiveScans();
   const [scans, setScans] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [filter, setFilter] = useState('all');
   const navigate = useNavigate();
 
-  useEffect(() => {
-    fetchScans();
-  }, []);
-
-  const fetchScans = async () => {
+  const fetchScans = useCallback(async () => {
     try {
       const response = await fetch(`${API_URL}/api/v1/scans`);
       if (response.ok) {
@@ -28,6 +26,23 @@ export default function HistoryView() {
     } finally {
       setLoading(false);
     }
+  }, []);
+
+  useEffect(() => {
+    fetchScans();
+    // Refresh every 10 seconds if there are active scans
+    const interval = setInterval(() => {
+      if (activeScans.length > 0) {
+        fetchScans();
+      }
+    }, 10000);
+    return () => clearInterval(interval);
+  }, [fetchScans, activeScans.length]);
+
+  const refresh = () => {
+    setLoading(true);
+    fetchScans();
+    fetchActiveScans();
   };
 
   const filteredScans = scans.filter(scan => {
@@ -57,7 +72,23 @@ export default function HistoryView() {
     <div className="flex flex-col h-full">
       {/* Header */}
       <header className="flex items-center justify-between px-6 h-14 border-b border-border bg-background">
-        <h1 className="text-lg font-semibold">Scan History</h1>
+        <div className="flex items-center gap-3">
+          <h1 className="text-lg font-semibold">Scan History</h1>
+          {activeScans.length > 0 && (
+            <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-accent/10 text-accent text-xs">
+              <Activity className="w-3 h-3 animate-pulse" />
+              {activeScans.length} running
+            </span>
+          )}
+        </div>
+        <button
+          onClick={refresh}
+          disabled={loading}
+          className="btn btn-secondary"
+        >
+          <RefreshCw className={clsx('w-4 h-4 mr-2', loading && 'animate-spin')} />
+          Refresh
+        </button>
       </header>
 
       {/* Filters */}
