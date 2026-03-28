@@ -39,6 +39,9 @@ export default function SettingsView() {
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState(null);
 
+  // Track originally configured keys (to know whether to preserve them)
+  const [originalKeys, setOriginalKeys] = useState({ groq: false, dashscope: false, openrouter: false });
+
   // Multi-agent state
   const [providers, setProviders] = useState([]);
   const [newProvider, setNewProvider] = useState({ name: '', type: 'groq', api_key: '', model: '', role: 'general' });
@@ -57,6 +60,12 @@ export default function SettingsView() {
       if (response.ok) {
         const data = await response.json();
         setSettings(prev => ({ ...prev, ...data }));
+        // Track which keys are already configured
+        setOriginalKeys({
+          groq: data.groq_api_key === '***',
+          dashscope: data.dashscope_api_key === '***',
+          openrouter: data.openrouter_api_key === '***'
+        });
       }
     } catch (err) {
       // Settings endpoint might not exist yet
@@ -143,15 +152,31 @@ export default function SettingsView() {
     setSaved(false);
 
     try {
+      // Prepare settings - keep "***" for configured keys that weren't changed
+      const settingsToSave = { ...settings };
+
+      // If the input is empty but was originally "***", send "***" to keep existing key
+      if (!settingsToSave.groq_api_key && originalKeys.groq) {
+        settingsToSave.groq_api_key = '***';
+      }
+      if (!settingsToSave.dashscope_api_key && originalKeys.dashscope) {
+        settingsToSave.dashscope_api_key = '***';
+      }
+      if (!settingsToSave.openrouter_api_key && originalKeys.openrouter) {
+        settingsToSave.openrouter_api_key = '***';
+      }
+
       const response = await fetch(`${API_URL}/api/v1/settings`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(settings)
+        body: JSON.stringify(settingsToSave)
       });
 
       if (response.ok) {
         setSaved(true);
         setTimeout(() => setSaved(false), 3000);
+        // Refresh to get updated masked keys
+        fetchSettings();
       } else {
         throw new Error('Failed to save');
       }
@@ -234,18 +259,30 @@ export default function SettingsView() {
               <h2 className="font-semibold">API Keys</h2>
             </div>
 
+            <p className="text-xs text-secondary mb-4">
+              Keys are saved securely in the database. Configured keys show a green indicator.
+            </p>
+
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium mb-1.5">
+                <label className="block text-sm font-medium mb-1.5 flex items-center gap-2">
                   Groq API Key
-                  <span className="text-secondary font-normal ml-2">(Recommended)</span>
+                  <span className="text-secondary font-normal">(Recommended)</span>
+                  {settings.groq_api_key === '***' && (
+                    <span className="text-green-400 text-xs flex items-center gap-1">
+                      <CheckCircle className="w-3 h-3" /> Configured
+                    </span>
+                  )}
                 </label>
                 <input
                   type="password"
-                  value={settings.groq_api_key}
+                  value={settings.groq_api_key === '***' ? '' : settings.groq_api_key}
                   onChange={(e) => updateSetting('groq_api_key', e.target.value)}
-                  placeholder="gsk_..."
-                  className="w-full px-3 py-2 rounded-lg border border-border bg-surface font-mono text-sm"
+                  placeholder={settings.groq_api_key === '***' ? '••••••• (keep current key)' : 'gsk_...'}
+                  className={clsx(
+                    'w-full px-3 py-2 rounded-lg border bg-surface font-mono text-sm',
+                    settings.groq_api_key === '***' ? 'border-green-500/30' : 'border-border'
+                  )}
                 />
                 <p className="text-xs text-secondary mt-1">
                   Free at console.groq.com - 30 requests/minute
@@ -253,16 +290,24 @@ export default function SettingsView() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-1.5">
+                <label className="block text-sm font-medium mb-1.5 flex items-center gap-2">
                   DashScope API Key
-                  <span className="text-secondary font-normal ml-2">(Qwen)</span>
+                  <span className="text-secondary font-normal">(Qwen)</span>
+                  {settings.dashscope_api_key === '***' && (
+                    <span className="text-green-400 text-xs flex items-center gap-1">
+                      <CheckCircle className="w-3 h-3" /> Configured
+                    </span>
+                  )}
                 </label>
                 <input
                   type="password"
-                  value={settings.dashscope_api_key}
+                  value={settings.dashscope_api_key === '***' ? '' : settings.dashscope_api_key}
                   onChange={(e) => updateSetting('dashscope_api_key', e.target.value)}
-                  placeholder="sk-..."
-                  className="w-full px-3 py-2 rounded-lg border border-border bg-surface font-mono text-sm"
+                  placeholder={settings.dashscope_api_key === '***' ? '••••••• (keep current key)' : 'sk-...'}
+                  className={clsx(
+                    'w-full px-3 py-2 rounded-lg border bg-surface font-mono text-sm',
+                    settings.dashscope_api_key === '***' ? 'border-green-500/30' : 'border-border'
+                  )}
                 />
                 <p className="text-xs text-secondary mt-1">
                   Free at dashscope.aliyun.com - 1M tokens/month
@@ -270,15 +315,23 @@ export default function SettingsView() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-1.5">
+                <label className="block text-sm font-medium mb-1.5 flex items-center gap-2">
                   OpenRouter API Key
+                  {settings.openrouter_api_key === '***' && (
+                    <span className="text-green-400 text-xs flex items-center gap-1">
+                      <CheckCircle className="w-3 h-3" /> Configured
+                    </span>
+                  )}
                 </label>
                 <input
                   type="password"
-                  value={settings.openrouter_api_key}
+                  value={settings.openrouter_api_key === '***' ? '' : settings.openrouter_api_key}
                   onChange={(e) => updateSetting('openrouter_api_key', e.target.value)}
-                  placeholder="sk-or-..."
-                  className="w-full px-3 py-2 rounded-lg border border-border bg-surface font-mono text-sm"
+                  placeholder={settings.openrouter_api_key === '***' ? '••••••• (keep current key)' : 'sk-or-...'}
+                  className={clsx(
+                    'w-full px-3 py-2 rounded-lg border bg-surface font-mono text-sm',
+                    settings.openrouter_api_key === '***' ? 'border-green-500/30' : 'border-border'
+                  )}
                 />
               </div>
             </div>
@@ -289,7 +342,7 @@ export default function SettingsView() {
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
                 <Bot className="w-5 h-5 text-accent" />
-                <h2 className="font-semibold">Multi-Agent LLM</h2>
+                <h2 className="font-semibold">Multi-Agent LLM (OpenClaw)</h2>
               </div>
               <button
                 onClick={checkProviders}
@@ -303,6 +356,7 @@ export default function SettingsView() {
 
             <p className="text-sm text-secondary mb-4">
               Configure multiple LLM providers for consensus-based security decisions.
+              These providers power the <strong className="text-primary">Agent tab</strong> for autonomous scanning.
             </p>
 
             {/* Consensus Mode */}
