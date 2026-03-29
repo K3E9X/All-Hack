@@ -19,12 +19,12 @@ import {
 } from 'lucide-react';
 
 const navItems = [
-  { path: '/', icon: Crosshair, label: 'SCAN', exact: true },
-  { path: '/recon', icon: Radar, label: 'RECON' },
-  { path: '/tools', icon: Wrench, label: 'TOOLS' },
-  { path: '/agent', icon: Bot, label: 'OPENCLAW' },
-  { path: '/history', icon: History, label: 'HISTORY' },
-  { path: '/chat', icon: MessageSquare, label: 'CHAT' },
+  { path: '/', icon: Crosshair, label: 'Scan', exact: true },
+  { path: '/recon', icon: Radar, label: 'Recon' },
+  { path: '/tools', icon: Wrench, label: 'Tools' },
+  { path: '/agent', icon: Bot, label: 'OpenClaw' },
+  { path: '/history', icon: History, label: 'History' },
+  { path: '/chat', icon: MessageSquare, label: 'Chat' },
 ];
 
 export default function Layout() {
@@ -44,17 +44,19 @@ export default function Layout() {
         )}
       >
         {/* Logo */}
-        <div className="flex items-center h-12 px-3 border-b border-border">
-          <Terminal className="w-5 h-5 text-accent shrink-0" />
+        <div className="flex items-center h-14 px-4 border-b border-border">
+          <div className="w-8 h-8 rounded-lg bg-accent/10 flex items-center justify-center">
+            <Terminal className="w-4 h-4 text-accent" />
+          </div>
           {!collapsed && (
-            <span className="ml-2 font-medium text-sm tracking-wider text-accent">
-              ALL-HACK
+            <span className="ml-3 font-semibold text-sm text-primary">
+              All-Hack
             </span>
           )}
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 py-2 px-1">
+        <nav className="flex-1 py-3 px-2 space-y-1">
           {navItems.map(({ path, icon: Icon, label, exact }) => {
             const moduleMap = { '/': 'scan', '/recon': 'recon', '/tools': 'tools', '/agent': 'agent' };
             const moduleName = moduleMap[path];
@@ -67,70 +69,68 @@ export default function Layout() {
                 end={exact}
                 className={({ isActive }) =>
                   clsx(
-                    'flex items-center px-2 py-2 transition-colors text-xs',
-                    'hover:bg-hover border-l-2',
+                    'flex items-center px-3 py-2 rounded-lg transition-colors text-sm',
                     isActive
-                      ? 'border-accent text-accent bg-hover'
-                      : 'border-transparent text-secondary hover:text-primary hover:border-border'
+                      ? 'bg-accent/10 text-accent'
+                      : 'text-secondary hover:text-primary hover:bg-hover'
                   )
                 }
               >
                 <div className="relative">
-                  <Icon className="w-4 h-4 shrink-0" strokeWidth={1.5} />
+                  <Icon className="w-5 h-5 shrink-0" strokeWidth={1.5} />
                   {isModuleRunning && (
-                    <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-accent" />
+                    <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-accent rounded-full" />
                   )}
                 </div>
-                {!collapsed && <span className="ml-2 tracking-wide">{label}</span>}
+                {!collapsed && <span className="ml-3 font-medium">{label}</span>}
               </NavLink>
             );
           })}
         </nav>
 
         {/* Bottom */}
-        <div className="px-1 py-2 border-t border-border">
+        <div className="px-2 py-3 border-t border-border space-y-1">
           <NavLink
             to="/settings"
             className={({ isActive }) =>
               clsx(
-                'flex items-center px-2 py-2 transition-colors text-xs',
-                'hover:bg-hover border-l-2',
+                'flex items-center px-3 py-2 rounded-lg transition-colors text-sm',
                 isActive
-                  ? 'border-accent text-accent bg-hover'
-                  : 'border-transparent text-secondary hover:text-primary'
+                  ? 'bg-accent/10 text-accent'
+                  : 'text-secondary hover:text-primary hover:bg-hover'
               )
             }
           >
-            <Settings className="w-4 h-4 shrink-0" strokeWidth={1.5} />
-            {!collapsed && <span className="ml-2 tracking-wide">SETTINGS</span>}
+            <Settings className="w-5 h-5 shrink-0" strokeWidth={1.5} />
+            {!collapsed && <span className="ml-3 font-medium">Settings</span>}
           </NavLink>
 
           <button
             onClick={toggleTheme}
-            className="flex items-center w-full px-2 py-2 transition-colors hover:bg-hover text-secondary hover:text-primary text-xs border-l-2 border-transparent"
+            className="flex items-center w-full px-3 py-2 rounded-lg transition-colors hover:bg-hover text-secondary hover:text-primary text-sm"
           >
             {theme === 'dark' ? (
-              <Sun className="w-4 h-4 shrink-0" strokeWidth={1.5} />
+              <Sun className="w-5 h-5 shrink-0" strokeWidth={1.5} />
             ) : (
-              <Moon className="w-4 h-4 shrink-0" strokeWidth={1.5} />
+              <Moon className="w-5 h-5 shrink-0" strokeWidth={1.5} />
             )}
             {!collapsed && (
-              <span className="ml-2 tracking-wide">
-                {theme === 'dark' ? 'LIGHT' : 'DARK'}
+              <span className="ml-3 font-medium">
+                {theme === 'dark' ? 'Light' : 'Dark'}
               </span>
             )}
           </button>
 
           <button
             onClick={() => setCollapsed(!collapsed)}
-            className="flex items-center w-full px-2 py-2 transition-colors hover:bg-hover text-secondary hover:text-primary text-xs border-l-2 border-transparent"
+            className="flex items-center w-full px-3 py-2 rounded-lg transition-colors hover:bg-hover text-secondary hover:text-primary text-sm"
           >
             {collapsed ? (
-              <ChevronRight className="w-4 h-4 shrink-0" strokeWidth={1.5} />
+              <ChevronRight className="w-5 h-5 shrink-0" strokeWidth={1.5} />
             ) : (
               <>
-                <ChevronLeft className="w-4 h-4 shrink-0" strokeWidth={1.5} />
-                <span className="ml-2 tracking-wide">COLLAPSE</span>
+                <ChevronLeft className="w-5 h-5 shrink-0" strokeWidth={1.5} />
+                <span className="ml-3 font-medium">Collapse</span>
               </>
             )}
           </button>
