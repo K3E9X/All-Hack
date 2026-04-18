@@ -19,7 +19,13 @@ export default function Home() {
       if (!r.ok) {
         setPingStatus({ state: 'error', text: body.detail || 'Error' });
       } else {
-        setPingStatus({ state: 'ok', text: `${body.model} replied: ${body.reply}` });
+        const note = body.fallback_used
+          ? ` (fallback from ${body.primary_model})`
+          : '';
+        setPingStatus({
+          state: 'ok',
+          text: `${body.model_used} replied: ${body.reply}${note}`,
+        });
       }
     } catch (err) {
       setPingStatus({ state: 'error', text: String(err) });
@@ -38,6 +44,12 @@ export default function Home() {
             <dd>{config.llm_configured ? 'yes' : 'no (set OPENROUTER_API_KEY)'}</dd>
             <dt>LLM model</dt>
             <dd className="mono">{config.llm_model}</dd>
+            <dt>LLM fallbacks</dt>
+            <dd className="mono">
+              {config.llm_fallback_models?.length
+                ? config.llm_fallback_models.join(', ')
+                : '(none)'}
+            </dd>
             <dt>MITM proxy port</dt>
             <dd className="mono">{config.mitm_port}</dd>
             <dt>Data directory</dt>

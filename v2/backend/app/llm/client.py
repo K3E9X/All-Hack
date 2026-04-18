@@ -1,8 +1,17 @@
 """OpenRouter client (OpenAI-compatible Chat Completions API).
 
-The client is thin on purpose: one `chat()` for sync replies, one `stream()`
-for incremental tokens. Higher-level helpers (analyze, suggest, report) live
-in sibling modules and call into this.
+Two public methods:
+  - chat()   : single turn, returns the full assistant string.
+  - stream() : SSE, yields chunks as they arrive.
+
+Both methods automatically fall back to alternative free models when the
+upstream provider returns 429 / 5xx ("temporarily rate-limited", "provider
+unavailable", etc.). The fallback chain is:
+
+    [self.model] + settings.openrouter_fallback_list
+
+After a successful call, `self.last_used_model` records which model
+actually answered, so the UI can show it.
 """
 from __future__ import annotations
 
@@ -18,6 +27,11 @@ class LLMError(RuntimeError):
     pass
 
 
+# HTTP status codes for which we should try the next model in the chain.
+# 429: provider rate-limited. 5xx: provider transient failure.
+_FALLBACK_STATUS_CODES = {429, 500, 502, 503, 504}
+
+
 class LLMClient:
     def __init__(
         self,
@@ -25,13 +39,21 @@ class LLMClient:
         model: Optional[str] = None,
         base_url: Optional[str] = None,
         app_name: Optional[str] = None,
+        fallback_models: Optional[List[str]] = None,
         timeout: float = 120.0,
     ) -> None:
         self.api_key = api_key or settings.openrouter_api_key
         self.model = model or settings.openrouter_model
         self.base_url = (base_url or settings.openrouter_base_url).rstrip("/")
         self.app_name = app_name or settings.openrouter_app_name
+        self.fallback_models = (
+            list(fallback_models)
+            if fallback_models is not None
+            else list(settings.openrouter_fallback_list)
+        )
         self.timeout = timeout
+        # Updated by chat()/stream() after a successful call.
+        self.last_used_model: Optional[str] = None
 
     @property
     def configured(self) -> bool:
@@ -50,6 +72,31 @@ class LLMClient:
             "X-Title": self.app_name,
         }
 
+    def _models_chain(self, override: Optional[str]) -> List[str]:
+        """Models to try in order. If override is set, it takes precedence and
+        no fallback is attempted (caller knows what they want)."""
+        if override:
+            return [override]
+        chain = [self.model] + [m for m in self.fallback_models if m != self.model]
+        # Deduplicate while preserving order.
+        seen: set = set()
+        return [m for m in chain if not (m in seen or seen.add(m))]
+
+    @staticmethod
+    def _is_fallback_error(exc: BaseException) -> bool:
+        if not isinstance(exc, LLMError):
+            return False
+        msg = str(exc)
+        # Our LLMError messages start with "OpenRouter <status>:"; parse the code.
+        for code in _FALLBACK_STATUS_CODES:
+            if f"OpenRouter {code}:" in msg:
+                return True
+        # Some providers return 200 OK with an error envelope; catch a few keywords.
+        lowered = msg.lower()
+        if "rate-lim" in lowered or "temporarily" in lowered or "provider returned error" in lowered:
+            return True
+        return False
+
     async def chat(
         self,
         messages: List[Dict[str, str]],
@@ -58,9 +105,34 @@ class LLMClient:
         temperature: float = 0.2,
         max_tokens: Optional[int] = None,
     ) -> str:
-        """Return the full assistant message as a single string."""
+        """Return the full assistant message. Tries fallback models on 429/5xx."""
+        last_exc: Optional[LLMError] = None
+        for candidate in self._models_chain(model):
+            try:
+                reply = await self._chat_once(
+                    messages,
+                    model=candidate,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                )
+                self.last_used_model = candidate
+                return reply
+            except LLMError as exc:
+                last_exc = exc
+                if not self._is_fallback_error(exc):
+                    raise
+        raise last_exc or LLMError("no model in chain succeeded")
+
+    async def _chat_once(
+        self,
+        messages: List[Dict[str, str]],
+        *,
+        model: str,
+        temperature: float,
+        max_tokens: Optional[int],
+    ) -> str:
         payload: Dict[str, object] = {
-            "model": model or self.model,
+            "model": model,
             "messages": messages,
             "temperature": temperature,
         }
@@ -77,6 +149,9 @@ class LLMClient:
             raise LLMError(f"OpenRouter {response.status_code}: {response.text[:500]}")
 
         data = response.json()
+        # Some providers wrap a logical error in a 200 response.
+        if isinstance(data, dict) and "error" in data and "choices" not in data:
+            raise LLMError(f"OpenRouter error envelope: {json.dumps(data)[:500]}")
         try:
             return data["choices"][0]["message"]["content"]
         except (KeyError, IndexError) as exc:
@@ -89,9 +164,33 @@ class LLMClient:
         model: Optional[str] = None,
         temperature: float = 0.2,
     ) -> AsyncIterator[str]:
-        """Yield incremental text chunks as they arrive (SSE from OpenRouter)."""
+        """Yield text chunks. Falls back to the next model only if the failure
+        happens before any chunk has been yielded; otherwise re-raises so the
+        caller does not see duplicated text from two providers."""
+        last_exc: Optional[LLMError] = None
+        for candidate in self._models_chain(model):
+            yielded = False
+            try:
+                async for chunk in self._stream_once(messages, model=candidate, temperature=temperature):
+                    yielded = True
+                    yield chunk
+                self.last_used_model = candidate
+                return
+            except LLMError as exc:
+                last_exc = exc
+                if yielded or not self._is_fallback_error(exc):
+                    raise
+        raise last_exc or LLMError("no model in chain succeeded")
+
+    async def _stream_once(
+        self,
+        messages: List[Dict[str, str]],
+        *,
+        model: str,
+        temperature: float,
+    ) -> AsyncIterator[str]:
         payload = {
-            "model": model or self.model,
+            "model": model,
             "messages": messages,
             "temperature": temperature,
             "stream": True,

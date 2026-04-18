@@ -49,6 +49,7 @@ async def config() -> dict:
     return {
         "llm_configured": llm.configured,
         "llm_model": llm.model,
+        "llm_fallback_models": llm.fallback_models,
         "mitm_port": settings.mitm_port,
         "data_dir": str(settings.data_dir),
     }
@@ -68,7 +69,12 @@ async def llm_ping() -> dict:
         )
     except LLMError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
-    return {"model": llm.model, "reply": reply.strip()}
+    return {
+        "primary_model": llm.model,
+        "model_used": llm.last_used_model or llm.model,
+        "fallback_used": (llm.last_used_model or llm.model) != llm.model,
+        "reply": reply.strip(),
+    }
 
 
 app.include_router(proxy_router)

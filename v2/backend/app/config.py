@@ -13,6 +13,11 @@ class Settings(BaseSettings):
     # OpenRouter
     openrouter_api_key: str = ""
     openrouter_model: str = "qwen/qwen3-coder:free"
+    openrouter_fallback_models: str = (
+        "meta-llama/llama-3.3-70b-instruct:free,"
+        "openai/gpt-oss-120b:free,"
+        "qwen/qwen3-next-80b-a3b-instruct:free"
+    )
     openrouter_app_name: str = "allhack"
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
 
@@ -28,6 +33,10 @@ class Settings(BaseSettings):
     @property
     def cors_origins_list(self) -> List[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
+
+    @property
+    def openrouter_fallback_list(self) -> List[str]:
+        return [m.strip() for m in self.openrouter_fallback_models.split(",") if m.strip()]
 
     @property
     def sqlite_path(self) -> Path:

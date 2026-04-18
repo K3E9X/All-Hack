@@ -77,6 +77,7 @@ Services after `./start.sh`:
 | ---------------------- | -------------------------------------------- | ------------------------------------------- |
 | `OPENROUTER_API_KEY`   | (empty)                                      | Required to use any LLM feature.            |
 | `OPENROUTER_MODEL`     | `qwen/qwen3-coder:free`                      | Any OpenRouter model slug.                  |
+| `OPENROUTER_FALLBACK_MODELS` | `meta-llama/llama-3.3-70b-instruct:free,openai/gpt-oss-120b:free,qwen/qwen3-next-80b-a3b-instruct:free` | Comma-separated chain tried on 429/5xx from the primary. |
 | `OPENROUTER_APP_NAME`  | `allhack`                                    | Sent as `X-Title` header.                   |
 | `CORS_ORIGINS`         | `http://localhost:3000,http://127.0.0.1:3000`| For direct-API access during dev.           |
 
@@ -171,11 +172,15 @@ POST   /api/llm/report                    - { title?, scope?, job_ids? }
 
 Notes:
 - The model default is `qwen/qwen3-coder:free` (see `.env.example`). It
-  handles the JSON-only output constraint reliably. OpenRouter rotates
-  which `:free` variants are offered; if the default disappears, list
-  available ones with
+  handles the JSON-only output constraint reliably.
+- When the upstream provider rate-limits (429) or 5xx-fails, the client
+  automatically retries with the next model in `OPENROUTER_FALLBACK_MODELS`.
+  The Home page and the `/api/llm/ping` endpoint show which model actually
+  answered (and whether a fallback kicked in).
+- OpenRouter rotates which `:free` variants are offered; list the current
+  ones with
   `curl -s https://openrouter.ai/api/v1/models | jq -r '.data[] | select(.id | endswith(":free")) | .id'`
-  and set `OPENROUTER_MODEL` in `.env` accordingly.
+  and update `OPENROUTER_MODEL` / `OPENROUTER_FALLBACK_MODELS` if needed.
 - Requests are capped: request/response body previews, finding lists and
   header lists are truncated before being sent to the model to fit in
   the free-tier context window.
