@@ -117,13 +117,18 @@ add extra CLI flags, click **Run**. The job appears in the list, polls every
 
 Tool-specific notes:
 
-| Tool     | Target form                       | Extra options example                         |
-| -------- | --------------------------------- | --------------------------------------------- |
-| nuclei   | `https://target.com`              | `-tags cve,exposure -rl 50`                   |
-| sqlmap   | `https://target.com/p?id=1`       | `--level=3 --risk=3 --technique=BEUSTQ`       |
-| ffuf     | `https://target.com/FUZZ` or just `https://target.com` (auto `/FUZZ`) | `-w /opt/wordlists/common.txt -mc 200,204` |
-| dalfox   | `https://target.com/p?x=hi`       | `-p x --deep-domxss`                          |
-| nmap     | `example.com` or URL (hostname extracted) | `-p 1-65535 --script vuln`          |
+| Tool      | Target form                       | Extra options example                         |
+| --------- | --------------------------------- | --------------------------------------------- |
+| nuclei    | `https://target.com`              | `-tags cve,exposure -rl 50`                   |
+| sqlmap    | `https://target.com/p?id=1`       | `--level=3 --risk=3 --technique=BEUSTQ`       |
+| ffuf      | `https://target.com/FUZZ` or just `https://target.com` (auto `/FUZZ`) | `-w /opt/wordlists/common.txt -mc 200,204` |
+| dalfox    | `https://target.com/p?x=hi`       | `-p x --deep-domxss`                          |
+| nmap      | `example.com` or URL (hostname extracted) | `-p 1-65535 --script vuln`          |
+| subfinder | `example.com` or URL (hostname extracted) | `-all -recursive`                    |
+| httpx     | `example.com` or URL              | `-status-code -title -tech-detect -ports 80,443,8080` |
+| katana    | `https://target.com`              | `-d 4 -jc -kf all` (deeper, JS crawl, known files) |
+| testssl   | `example.com[:port]` or URL       | `--full` for deep audit (slow)                |
+| wpscan    | `https://wordpress-target.com`    | `--api-token <token>` for CVE correlation     |
 
 FFUF uses `/opt/wordlists/common.txt` (~4.6k entries, dirb classic) by
 default. Override with `FFUF_WORDLIST=/path/in/container` in `.env` and a
@@ -188,10 +193,15 @@ Notes:
 ## Bundled tools (inside the backend image)
 
 - `nuclei` (ProjectDiscovery)
-- `ffuf`
-- `dalfox`
-- `nmap`
-- `sqlmap`
+- `subfinder` (ProjectDiscovery) - passive subdomain enumeration
+- `httpx` (ProjectDiscovery) - HTTP probe + tech fingerprint
+- `katana` (ProjectDiscovery) - crawler / spider
+- `ffuf` - directory / parameter fuzzing
+- `dalfox` - XSS scanner
+- `nmap` - ports + service fingerprint
+- `sqlmap` - SQL injection
+- `testssl.sh` - TLS / SSL audit
+- `wpscan` - WordPress scanner (set `WPSCAN_API_TOKEN` in `.env` for CVE correlation)
 - `mitmproxy` (Python library, used by the backend)
 
 You do not need to install any of these on your host.
