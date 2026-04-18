@@ -8,6 +8,7 @@
 #   - subfinder  (ProjectDiscovery, Go binary)
 #   - httpx      (ProjectDiscovery, Go binary)
 #   - katana     (ProjectDiscovery, Go binary)
+#   - testssl.sh (git clone - bash + openssl)
 #   - nmap       (apt)
 #   - sqlmap     (apt)
 #   - mitmproxy  (pip)
@@ -31,6 +32,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         nmap \
         sqlmap \
         libssl-dev \
+        openssl \
+        bsdmainutils \
+        procps \
+        dnsutils \
     && rm -rf /var/lib/apt/lists/*
 
 # Pinned versions (updated manually). Matches the official release naming.
@@ -96,6 +101,13 @@ RUN set -eux; \
 
 # Pre-download nuclei templates so first scan is fast.
 RUN nuclei -update-templates -silent || true
+
+# testssl.sh (bash script + openssl). Pin to v3.2 (last stable).
+ARG TESTSSL_VERSION=3.2
+RUN set -eux; \
+    git clone --depth 1 --branch ${TESTSSL_VERSION} https://github.com/drwetter/testssl.sh.git /opt/testssl.sh; \
+    ln -sf /opt/testssl.sh/testssl.sh /usr/local/bin/testssl.sh; \
+    testssl.sh --help >/dev/null 2>&1 || true
 
 # Bundle a small, sane default wordlist for ffuf (dirb's classic common.txt,
 # ~4600 entries). Users can override via the FFUF_WORDLIST env var and
