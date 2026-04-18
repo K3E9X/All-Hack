@@ -13,9 +13,10 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, AsyncIterator, Dict, List, Optional
 
 import aiosqlite
 
@@ -132,11 +133,19 @@ class FlowRepository:
     def __init__(self, db_path: Path) -> None:
         self.db_path = db_path
 
-    async def _connect(self) -> aiosqlite.Connection:
+    @asynccontextmanager
+    async def _connect(self) -> AsyncIterator[aiosqlite.Connection]:
+        # aiosqlite.connect() is both awaitable and a context manager; using
+        # `async with await ...` would start its background thread twice and
+        # raise "threads can only be started once" on subsequent calls. Own
+        # the lifecycle here and close explicitly.
         conn = await aiosqlite.connect(str(self.db_path))
-        await conn.execute("PRAGMA journal_mode=WAL;")
-        conn.row_factory = aiosqlite.Row
-        return conn
+        try:
+            await conn.execute("PRAGMA journal_mode=WAL;")
+            conn.row_factory = aiosqlite.Row
+            yield conn
+        finally:
+            await conn.close()
 
     async def list_flows(
         self,
@@ -177,20 +186,20 @@ class FlowRepository:
             f"FROM flows{where_sql} ORDER BY timestamp DESC LIMIT ? OFFSET ?"
         )
 
-        async with await self._connect() as conn:
+        async with self._connect() as conn:
             cursor = await conn.execute(sql, params)
             rows = await cursor.fetchall()
 
         return [FlowSummary(**dict(row)) for row in rows]
 
     async def count_flows(self) -> int:
-        async with await self._connect() as conn:
+        async with self._connect() as conn:
             cursor = await conn.execute("SELECT COUNT(*) FROM flows")
             (n,) = await cursor.fetchone()
             return int(n)
 
     async def list_hosts(self) -> List[Dict[str, Any]]:
-        async with await self._connect() as conn:
+        async with self._connect() as conn:
             cursor = await conn.execute(
                 "SELECT host, COUNT(*) AS count FROM flows GROUP BY host ORDER BY count DESC"
             )
@@ -198,7 +207,7 @@ class FlowRepository:
         return [{"host": row["host"], "count": row["count"]} for row in rows]
 
     async def get_flow(self, flow_id: str) -> Optional[Dict[str, Any]]:
-        async with await self._connect() as conn:
+        async with self._connect() as conn:
             cursor = await conn.execute("SELECT * FROM flows WHERE id = ?", (flow_id,))
             row = await cursor.fetchone()
         if row is None:
@@ -221,7 +230,7 @@ class FlowRepository:
         return data
 
     async def delete_all(self) -> int:
-        async with await self._connect() as conn:
+        async with self._connect() as conn:
             cursor = await conn.execute("DELETE FROM flows")
             await conn.commit()
             return cursor.rowcount or 0

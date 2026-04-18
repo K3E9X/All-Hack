@@ -4,8 +4,9 @@ from __future__ import annotations
 import json
 import sqlite3
 import time
+from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import List, Optional
+from typing import AsyncIterator, List, Optional
 
 import aiosqlite
 
@@ -49,14 +50,23 @@ class JobRepository:
     def __init__(self, db_path: Path) -> None:
         self.db_path = db_path
 
-    async def _connect(self) -> aiosqlite.Connection:
+    @asynccontextmanager
+    async def _connect(self) -> AsyncIterator[aiosqlite.Connection]:
+        # aiosqlite's connect() returns an awaitable-and-context-manager. If we
+        # both `await` it here AND wrap it in an `async with` at the call site,
+        # aiosqlite's background thread gets `.start()` twice, raising
+        # "threads can only be started once". Use this helper as the single
+        # async context manager and call sites do `async with self._connect()`.
         conn = await aiosqlite.connect(str(self.db_path))
-        await conn.execute("PRAGMA journal_mode=WAL;")
-        conn.row_factory = aiosqlite.Row
-        return conn
+        try:
+            await conn.execute("PRAGMA journal_mode=WAL;")
+            conn.row_factory = aiosqlite.Row
+            yield conn
+        finally:
+            await conn.close()
 
     async def create(self, job: Job) -> None:
-        async with await self._connect() as conn:
+        async with self._connect() as conn:
             await conn.execute(
                 """
                 INSERT INTO jobs (
@@ -84,7 +94,7 @@ class JobRepository:
             await conn.commit()
 
     async def update(self, job: Job) -> None:
-        async with await self._connect() as conn:
+        async with self._connect() as conn:
             await conn.execute(
                 """
                 UPDATE jobs SET
@@ -113,13 +123,13 @@ class JobRepository:
             await conn.commit()
 
     async def get(self, job_id: str) -> Optional[Job]:
-        async with await self._connect() as conn:
+        async with self._connect() as conn:
             cursor = await conn.execute("SELECT * FROM jobs WHERE id = ?", (job_id,))
             row = await cursor.fetchone()
         return _row_to_job(row) if row else None
 
     async def list(self, *, limit: int = 100, offset: int = 0) -> List[Job]:
-        async with await self._connect() as conn:
+        async with self._connect() as conn:
             cursor = await conn.execute(
                 "SELECT * FROM jobs ORDER BY created_at DESC LIMIT ? OFFSET ?",
                 (limit, offset),
@@ -128,13 +138,13 @@ class JobRepository:
         return [_row_to_job(row) for row in rows]
 
     async def count(self) -> int:
-        async with await self._connect() as conn:
+        async with self._connect() as conn:
             cursor = await conn.execute("SELECT COUNT(*) FROM jobs")
             (n,) = await cursor.fetchone()
             return int(n)
 
     async def delete(self, job_id: str) -> bool:
-        async with await self._connect() as conn:
+        async with self._connect() as conn:
             cursor = await conn.execute("DELETE FROM jobs WHERE id = ?", (job_id,))
             await conn.commit()
             return (cursor.rowcount or 0) > 0
