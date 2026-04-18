@@ -51,4 +51,14 @@ export const api = {
     cancel: (id) => request(`/api/scans/${id}/cancel`, { method: 'POST' }),
     delete: (id) => request(`/api/scans/${id}`, { method: 'DELETE' }),
   },
+
+  llm: {
+    suggestForFlow: (flowId) => request(`/api/llm/flows/${flowId}/suggest`, { method: 'POST' }),
+    explainJob: (jobId) => request(`/api/llm/jobs/${jobId}/explain`, { method: 'POST' }),
+    report: (payload) => request('/api/llm/report', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }),
+  },
 };

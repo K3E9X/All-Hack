@@ -16,13 +16,20 @@ Phase 0: repo scaffolding, Docker stack, OpenRouter client wired up.
 Phase 1: MITM proxy capture with mitmproxy, flows persisted to SQLite,
 list + inspector UI with filters (host, method, URL).
 
-Phase 2 (this commit): CLI tool wrappers for `nuclei`, `sqlmap`, `ffuf`,
-`dalfox`, `nmap`. Each job is launched async, stdout/stderr are stored in
-SQLite, output is parsed into normalized `Finding` objects, and the UI
-shows jobs list + inspector with findings / raw logs.
+Phase 2: CLI tool wrappers for `nuclei`, `sqlmap`, `ffuf`, `dalfox`, `nmap`.
+Each job is launched async, stdout/stderr are stored in SQLite, output is
+parsed into normalized `Finding` objects.
 
-Later phases: LLM analysis/suggestions over captured traffic and scan
-findings, PDF reports.
+Phase 3 (this commit): LLM copilot powered by OpenRouter.
+  - Per-flow attack suggestions: the model looks at a captured request
+    and proposes concrete scans to run (tool + target + options) as
+    structured JSON; one click launches any suggestion as a real job.
+  - Per-job explanation: plain-language write-up of scan findings with
+    exploitation paths and remediation hints.
+  - Markdown pentest report: compiles selected jobs and captured hosts
+    into a client-ready document, downloadable as `.md`.
+
+Later: PDF export, HTML rendering of the report preview, template customization.
 
 ## Requirements
 
@@ -133,6 +140,42 @@ POST   /api/scans/{id}/cancel          SIGTERM the subprocess
 DELETE /api/scans/{id}                 remove the record
 ```
 
+## LLM copilot (Phase 3)
+
+All copilot features call OpenRouter; they return 503 with a clear error
+if `OPENROUTER_API_KEY` is not set.
+
+- **Suggest attacks** — in the Proxy inspector, any selected flow has a
+  "Suggest attacks" button. The model analyzes the captured request and
+  returns JSON with: a short summary, the auth scheme it detected, a
+  list of suspicious parameters, and a list of concrete scan proposals
+  (tool / target / options / rationale). Each proposal has a "Run"
+  button that submits a real scan via `POST /api/scans` and takes you to
+  the freshly-created job.
+- **Explain findings** — in the Scans inspector, "Explain findings"
+  produces a markdown write-up per finding: description, exploitation
+  path, remediation hints, next steps. The output is a plain pre block
+  you can copy.
+- **Report** — the /reports page lets you pick jobs to include (all by
+  default), add a title and scope note, and generate a markdown pentest
+  report compiling proxy hosts + jobs + findings. You can download the
+  `.md` or copy it to the clipboard.
+
+API:
+
+```
+POST   /api/llm/flows/{flow_id}/suggest   - returns { parsed, raw, parse_error }
+POST   /api/llm/jobs/{job_id}/explain     - returns { markdown }
+POST   /api/llm/report                    - { title?, scope?, job_ids? }
+```
+
+Notes:
+- The model default is `qwen/qwen-2.5-coder-32b-instruct:free` (see
+  `.env.example`). It handles the JSON-only output constraint reliably.
+- Requests are capped: request/response body previews, finding lists and
+  header lists are truncated before being sent to the model to fit in
+  the free-tier context window.
+
 ## Bundled tools (inside the backend image)
 
 - `nuclei` (ProjectDiscovery)
@@ -159,7 +202,11 @@ v2/
         storage.py     JobRepository (shared SQLite)
         runner.py      async subprocess runner
         wrappers/      nuclei / sqlmap / ffuf / dalfox / nmap
-      api/             FastAPI routers (proxy, scans)
+      llm/
+        client.py      OpenRouter chat + stream
+        prompts.py     prompt templates (suggest / explain / report)
+        analyzer.py    Analyzer (flow -> JSON, findings -> md, report -> md)
+      api/             FastAPI routers (proxy, scans, llm)
     Dockerfile         multi-arch, bundles all binaries
     requirements.txt
   frontend/

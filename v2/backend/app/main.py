@@ -10,6 +10,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.llm import router as llm_router
 from app.api.proxy import router as proxy_router
 from app.api.scans import router as scans_router
 from app.config import settings
@@ -72,3 +73,4 @@ async def llm_ping() -> dict:
 
 app.include_router(proxy_router)
 app.include_router(scans_router)
+app.include_router(llm_router)

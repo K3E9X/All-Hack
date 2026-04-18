@@ -1,13 +1,21 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { api } from '../lib/api.js';
 
 const POLL_MS = 2000;
 
 export default function Scans() {
+  const [searchParams] = useSearchParams();
   const [tools, setTools] = useState([]);
   const [jobs, setJobs] = useState([]);
   const [total, setTotal] = useState(0);
-  const [selectedId, setSelectedId] = useState(null);
+  const [selectedId, setSelectedId] = useState(() => searchParams.get('job'));
+
+  // Keep selection in sync if the URL changes (e.g. navigating from Proxy).
+  useEffect(() => {
+    const fromUrl = searchParams.get('job');
+    if (fromUrl) setSelectedId(fromUrl);
+  }, [searchParams]);
   const [form, setForm] = useState({ tool: '', target: '', options: '' });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
@@ -167,6 +175,7 @@ function JobInspector({ jobId, onClose }) {
   const [job, setJob] = useState(null);
   const [tab, setTab] = useState('findings');
   const [err, setErr] = useState(null);
+  const [explain, setExplain] = useState({ loading: false, markdown: null, error: null });
 
   const load = useCallback(async () => {
     try {
@@ -193,6 +202,15 @@ function JobInspector({ jobId, onClose }) {
   async function onDelete() {
     if (!confirm('Delete this job?')) return;
     try { await api.scans.delete(jobId); onClose(); } catch (e) { setErr(e.message); }
+  }
+  async function onExplain() {
+    setExplain({ loading: true, markdown: null, error: null });
+    try {
+      const res = await api.llm.explainJob(jobId);
+      setExplain({ loading: false, markdown: res.markdown, error: null });
+    } catch (e) {
+      setExplain({ loading: false, markdown: null, error: e.message });
+    }
   }
 
   return (
@@ -235,6 +253,17 @@ function JobInspector({ jobId, onClose }) {
           {tab === 'findings' && <FindingsList findings={job.findings} />}
           {tab === 'stdout' && <pre className="body mono">{job.stdout_tail || '(empty)'}</pre>}
           {tab === 'stderr' && <pre className="body mono">{job.stderr_tail || '(empty)'}</pre>}
+
+          <div className="explain-wrap">
+            <div className="row-between">
+              <h3 className="msg-h">LLM explanation</h3>
+              <button className="btn ghost" onClick={onExplain} disabled={explain.loading}>
+                {explain.loading ? 'Generating...' : 'Explain findings'}
+              </button>
+            </div>
+            {explain.error && <p className="result error">{explain.error}</p>}
+            {explain.markdown && <pre className="body mono">{explain.markdown}</pre>}
+          </div>
         </>
       )}
     </section>

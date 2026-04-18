@@ -416,3 +416,46 @@ body {
 .sev-medium   { color: #c9a400; }
 .sev-low      { color: #0b84ff; }
 .sev-info     { color: var(--muted); }
+
+/* ---- LLM suggestions / explain / report ---- */
+
+.stack-sm > * + * { margin-top: 10px; }
+
+.suggestions-wrap,
+.explain-wrap {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--border);
+}
+
+.suggestion-card {
+  border: 1px solid var(--border);
+  padding: 10px 12px;
+  background: var(--bg);
+}
+
+.suggestion-tool {
+  text-transform: lowercase;
+  border: 1px solid var(--fg);
+  padding: 1px 8px;
+  font-size: 11px;
+}
+
+.report-jobs-head {
+  margin: 14px 0 6px;
+}
+
+.report-preview {
+  max-height: 720px;
+}
+
+textarea {
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--fg);
+  padding: 6px 8px;
+  font-family: inherit;
+  font-size: 13px;
+  resize: vertical;
+  width: 100%;
+}

@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { api } from '../lib/api.js';
+import Suggestions from '../components/Suggestions.jsx';
 
 const POLL_MS = 2000;
 
@@ -127,6 +129,16 @@ export default function Proxy() {
   );
 }
 
+function SuggestionsWrapper({ flowId }) {
+  const navigate = useNavigate();
+  return (
+    <Suggestions
+      flowId={flowId}
+      onLaunched={(jobId) => navigate(`/scans?job=${jobId}`)}
+    />
+  );
+}
+
 function FlowTable({ flows, selectedId, onSelect }) {
   if (flows.length === 0) {
     return <p className="muted small">No captured flows yet.</p>;
@@ -220,6 +232,10 @@ function FlowInspector({ flowId, onClose }) {
               contentType={flow.response_content_type}
             />
           )}
+
+          <div className="suggestions-wrap">
+            <SuggestionsWrapper flowId={flow.id} />
+          </div>
         </>
       )}
     </section>
