@@ -13,6 +13,7 @@ from app.scans.wrappers.nuclei import NucleiWrapper
 from app.scans.wrappers.sqlmap import SqlmapWrapper
 from app.scans.wrappers.subfinder import SubfinderWrapper
 from app.scans.wrappers.testssl import TestsslWrapper
+from app.scans.wrappers.wpscan import WpscanWrapper
 
 _WRAPPERS: Dict[str, BaseWrapper] = {
     "nuclei": NucleiWrapper(),
@@ -24,6 +25,7 @@ _WRAPPERS: Dict[str, BaseWrapper] = {
     "httpx": HttpxWrapper(),
     "katana": KatanaWrapper(),
     "testssl": TestsslWrapper(),
+    "wpscan": WpscanWrapper(),
 }
 
 

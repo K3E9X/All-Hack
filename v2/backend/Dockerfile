@@ -9,6 +9,7 @@
 #   - httpx      (ProjectDiscovery, Go binary)
 #   - katana     (ProjectDiscovery, Go binary)
 #   - testssl.sh (git clone - bash + openssl)
+#   - wpscan     (gem install - ruby)
 #   - nmap       (apt)
 #   - sqlmap     (apt)
 #   - mitmproxy  (pip)
@@ -108,6 +109,25 @@ RUN set -eux; \
     git clone --depth 1 --branch ${TESTSSL_VERSION} https://github.com/drwetter/testssl.sh.git /opt/testssl.sh; \
     ln -sf /opt/testssl.sh/testssl.sh /usr/local/bin/testssl.sh; \
     testssl.sh --help >/dev/null 2>&1 || true
+
+# wpscan (Ruby gem). We install ruby + the build deps, install the gem,
+# then purge the build deps to keep the image smaller. Runtime keeps
+# ruby, libcurl and libxml2 which are needed for wpscan's gems at runtime.
+RUN set -eux; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends \
+        ruby ruby-dev \
+        build-essential \
+        libcurl4-openssl-dev \
+        libxml2-dev libxslt-dev zlib1g-dev; \
+    gem install --no-document wpscan; \
+    apt-get purge -y --auto-remove \
+        build-essential \
+        ruby-dev \
+        libxml2-dev libxslt-dev zlib1g-dev; \
+    apt-get install -y --no-install-recommends libcurl4 libxml2 libxslt1.1; \
+    rm -rf /var/lib/apt/lists/*; \
+    wpscan --version >/dev/null 2>&1 || true
 
 # Bundle a small, sane default wordlist for ffuf (dirb's classic common.txt,
 # ~4600 entries). Users can override via the FFUF_WORDLIST env var and
