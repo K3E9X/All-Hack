@@ -5,6 +5,7 @@
 #   - nuclei     (ProjectDiscovery, Go binary)
 #   - ffuf       (Go binary)
 #   - dalfox     (Go binary)
+#   - subfinder  (ProjectDiscovery, Go binary)
 #   - nmap       (apt)
 #   - sqlmap     (apt)
 #   - mitmproxy  (pip)
@@ -34,6 +35,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 ARG NUCLEI_VERSION=3.3.5
 ARG FFUF_VERSION=2.1.0
 ARG DALFOX_VERSION=2.9.2
+ARG SUBFINDER_VERSION=2.6.7
 
 # Map Docker TARGETARCH to the suffix each project uses in its release archive.
 #   amd64 -> amd64
@@ -65,7 +67,14 @@ RUN set -eux; \
         "https://github.com/hahwul/dalfox/releases/download/v${DALFOX_VERSION}/dalfox_${DALFOX_VERSION}_linux_${ARCH_SUFFIX}.tar.gz"; \
     tar -xzf dalfox.tar.gz; \
     install -m 0755 dalfox /usr/local/bin/dalfox; \
-    rm -f dalfox dalfox.tar.gz LICENSE README*.md
+    rm -f dalfox dalfox.tar.gz LICENSE README*.md; \
+    \
+    # subfinder
+    curl -fsSL -o subfinder.zip \
+        "https://github.com/projectdiscovery/subfinder/releases/download/v${SUBFINDER_VERSION}/subfinder_${SUBFINDER_VERSION}_linux_${ARCH_SUFFIX}.zip"; \
+    unzip -q subfinder.zip; \
+    install -m 0755 subfinder /usr/local/bin/subfinder; \
+    rm -f subfinder subfinder.zip LICENSE.md README*.md
 
 # Pre-download nuclei templates so first scan is fast.
 RUN nuclei -update-templates -silent || true

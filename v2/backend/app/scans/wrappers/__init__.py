@@ -9,6 +9,7 @@ from app.scans.wrappers.ffuf import FfufWrapper
 from app.scans.wrappers.nmap import NmapWrapper
 from app.scans.wrappers.nuclei import NucleiWrapper
 from app.scans.wrappers.sqlmap import SqlmapWrapper
+from app.scans.wrappers.subfinder import SubfinderWrapper
 
 _WRAPPERS: Dict[str, BaseWrapper] = {
     "nuclei": NucleiWrapper(),
@@ -16,6 +17,7 @@ _WRAPPERS: Dict[str, BaseWrapper] = {
     "ffuf": FfufWrapper(),
     "dalfox": DalfoxWrapper(),
     "nmap": NmapWrapper(),
+    "subfinder": SubfinderWrapper(),
 }
 
 
