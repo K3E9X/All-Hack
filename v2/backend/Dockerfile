@@ -7,6 +7,7 @@
 #   - dalfox     (Go binary)
 #   - subfinder  (ProjectDiscovery, Go binary)
 #   - httpx      (ProjectDiscovery, Go binary)
+#   - katana     (ProjectDiscovery, Go binary)
 #   - nmap       (apt)
 #   - sqlmap     (apt)
 #   - mitmproxy  (pip)
@@ -38,6 +39,7 @@ ARG FFUF_VERSION=2.1.0
 ARG DALFOX_VERSION=2.9.2
 ARG SUBFINDER_VERSION=2.6.7
 ARG HTTPX_VERSION=1.6.9
+ARG KATANA_VERSION=1.1.2
 
 # Map Docker TARGETARCH to the suffix each project uses in its release archive.
 #   amd64 -> amd64
@@ -83,7 +85,14 @@ RUN set -eux; \
         "https://github.com/projectdiscovery/httpx/releases/download/v${HTTPX_VERSION}/httpx_${HTTPX_VERSION}_linux_${ARCH_SUFFIX}.zip"; \
     unzip -q httpx.zip; \
     install -m 0755 httpx /usr/local/bin/httpx; \
-    rm -f httpx httpx.zip LICENSE.md README*.md
+    rm -f httpx httpx.zip LICENSE.md README*.md; \
+    \
+    # katana
+    curl -fsSL -o katana.zip \
+        "https://github.com/projectdiscovery/katana/releases/download/v${KATANA_VERSION}/katana_${KATANA_VERSION}_linux_${ARCH_SUFFIX}.zip"; \
+    unzip -q katana.zip; \
+    install -m 0755 katana /usr/local/bin/katana; \
+    rm -f katana katana.zip LICENSE.md README*.md
 
 # Pre-download nuclei templates so first scan is fast.
 RUN nuclei -update-templates -silent || true
