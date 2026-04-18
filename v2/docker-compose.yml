@@ -1,0 +1,37 @@
+# docker-compose for v2.
+# Two services only: backend (FastAPI + pentest tools + MITM proxy) and frontend (nginx).
+# Data persists in ./data (SQLite).
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: allhack-backend
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - DATA_DIR=/data
+      - MITM_PORT=8080
+    ports:
+      # API
+      - "8000:8000"
+      # MITM proxy (configure your browser to use this)
+      - "8080:8080"
+    volumes:
+      - ./data:/data
+    # Give mitmproxy permission to bind high ports and inspect TLS.
+    cap_add:
+      - NET_ADMIN
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: allhack-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "3000:80"
