@@ -74,7 +74,7 @@ Jobs run async with per-wrapper timeouts, cooperative cancel, stdout/
 stderr capped at 1 MiB each.
 
 **Phase 3** — LLM copilot over OpenRouter (default
-`qwen/qwen-2.5-coder-32b-instruct:free`):
+`qwen/qwen3-coder:free`):
 - one-click "Suggest attacks" on any captured flow returning structured
   JSON (suspicious parameters, auth scheme, scan proposals) that can be
   launched as real jobs with a click,

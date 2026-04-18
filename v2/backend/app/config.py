@@ -12,7 +12,7 @@ class Settings(BaseSettings):
 
     # OpenRouter
     openrouter_api_key: str = ""
-    openrouter_model: str = "qwen/qwen-2.5-coder-32b-instruct:free"
+    openrouter_model: str = "qwen/qwen3-coder:free"
     openrouter_app_name: str = "allhack"
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
 

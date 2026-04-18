@@ -76,7 +76,7 @@ Services after `./start.sh`:
 | Variable               | Default                                      | Purpose                                     |
 | ---------------------- | -------------------------------------------- | ------------------------------------------- |
 | `OPENROUTER_API_KEY`   | (empty)                                      | Required to use any LLM feature.            |
-| `OPENROUTER_MODEL`     | `qwen/qwen-2.5-coder-32b-instruct:free`      | Any OpenRouter model slug.                  |
+| `OPENROUTER_MODEL`     | `qwen/qwen3-coder:free`                      | Any OpenRouter model slug.                  |
 | `OPENROUTER_APP_NAME`  | `allhack`                                    | Sent as `X-Title` header.                   |
 | `CORS_ORIGINS`         | `http://localhost:3000,http://127.0.0.1:3000`| For direct-API access during dev.           |
 
@@ -170,8 +170,12 @@ POST   /api/llm/report                    - { title?, scope?, job_ids? }
 ```
 
 Notes:
-- The model default is `qwen/qwen-2.5-coder-32b-instruct:free` (see
-  `.env.example`). It handles the JSON-only output constraint reliably.
+- The model default is `qwen/qwen3-coder:free` (see `.env.example`). It
+  handles the JSON-only output constraint reliably. OpenRouter rotates
+  which `:free` variants are offered; if the default disappears, list
+  available ones with
+  `curl -s https://openrouter.ai/api/v1/models | jq -r '.data[] | select(.id | endswith(":free")) | .id'`
+  and set `OPENROUTER_MODEL` in `.env` accordingly.
 - Requests are capped: request/response body previews, finding lists and
   header lists are truncated before being sent to the model to fit in
   the free-tier context window.
