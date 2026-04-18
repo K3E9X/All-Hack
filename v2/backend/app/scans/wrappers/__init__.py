@@ -6,6 +6,7 @@ from typing import Dict, List
 from app.scans.wrappers.base import BaseWrapper
 from app.scans.wrappers.dalfox import DalfoxWrapper
 from app.scans.wrappers.ffuf import FfufWrapper
+from app.scans.wrappers.httpx import HttpxWrapper
 from app.scans.wrappers.nmap import NmapWrapper
 from app.scans.wrappers.nuclei import NucleiWrapper
 from app.scans.wrappers.sqlmap import SqlmapWrapper
@@ -18,6 +19,7 @@ _WRAPPERS: Dict[str, BaseWrapper] = {
     "dalfox": DalfoxWrapper(),
     "nmap": NmapWrapper(),
     "subfinder": SubfinderWrapper(),
+    "httpx": HttpxWrapper(),
 }
 
 

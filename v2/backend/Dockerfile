@@ -6,6 +6,7 @@
 #   - ffuf       (Go binary)
 #   - dalfox     (Go binary)
 #   - subfinder  (ProjectDiscovery, Go binary)
+#   - httpx      (ProjectDiscovery, Go binary)
 #   - nmap       (apt)
 #   - sqlmap     (apt)
 #   - mitmproxy  (pip)
@@ -36,6 +37,7 @@ ARG NUCLEI_VERSION=3.3.5
 ARG FFUF_VERSION=2.1.0
 ARG DALFOX_VERSION=2.9.2
 ARG SUBFINDER_VERSION=2.6.7
+ARG HTTPX_VERSION=1.6.9
 
 # Map Docker TARGETARCH to the suffix each project uses in its release archive.
 #   amd64 -> amd64
@@ -74,7 +76,14 @@ RUN set -eux; \
         "https://github.com/projectdiscovery/subfinder/releases/download/v${SUBFINDER_VERSION}/subfinder_${SUBFINDER_VERSION}_linux_${ARCH_SUFFIX}.zip"; \
     unzip -q subfinder.zip; \
     install -m 0755 subfinder /usr/local/bin/subfinder; \
-    rm -f subfinder subfinder.zip LICENSE.md README*.md
+    rm -f subfinder subfinder.zip LICENSE.md README*.md; \
+    \
+    # httpx (ProjectDiscovery - not to be confused with the Python httpx library)
+    curl -fsSL -o httpx.zip \
+        "https://github.com/projectdiscovery/httpx/releases/download/v${HTTPX_VERSION}/httpx_${HTTPX_VERSION}_linux_${ARCH_SUFFIX}.zip"; \
+    unzip -q httpx.zip; \
+    install -m 0755 httpx /usr/local/bin/httpx; \
+    rm -f httpx httpx.zip LICENSE.md README*.md
 
 # Pre-download nuclei templates so first scan is fast.
 RUN nuclei -update-templates -silent || true
