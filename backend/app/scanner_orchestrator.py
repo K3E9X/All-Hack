@@ -558,35 +558,29 @@ class ScanOrchestrator:
                 # SQL Injection
                 logger.info(f"🗃️  Testing for SQL Injection on {len(endpoint_urls_to_test)} endpoints...")
                 sql_scanner = SQLInjectionScanner(client, scan_depth=scan_request.scan_depth, progress_callback=progress_callback)
-                sql_vulns = await self.robust_scanner.execute_batch_safe(
-                    endpoint_urls_to_test,
-                    lambda urls: sql_scanner.scan(urls),
-                    max_concurrent=5
+                sql_vulns = await self.robust_scanner.execute_with_retry(
+                    sql_scanner.scan, endpoint_urls_to_test
                 )
-                vulnerabilities.extend([v for v in sql_vulns if v])
-                logger.info(f"✅ SQL Injection: Found {len([v for v in sql_vulns if v])} vulnerabilities")
+                vulnerabilities.extend(sql_vulns or [])
+                logger.info(f"✅ SQL Injection: Found {len(sql_vulns or [])} vulnerabilities")
 
                 # XSS
                 logger.info(f"🎨 Testing for Cross-Site Scripting (XSS) on {len(endpoint_urls_to_test)} endpoints...")
                 xss_scanner = XSSScanner(client, scan_depth=scan_request.scan_depth, progress_callback=progress_callback)
-                xss_vulns = await self.robust_scanner.execute_batch_safe(
-                    endpoint_urls_to_test,
-                    lambda urls: xss_scanner.scan(urls),
-                    max_concurrent=5
+                xss_vulns = await self.robust_scanner.execute_with_retry(
+                    xss_scanner.scan, endpoint_urls_to_test
                 )
-                vulnerabilities.extend([v for v in xss_vulns if v])
-                logger.info(f"✅ XSS: Found {len([v for v in xss_vulns if v])} vulnerabilities")
+                vulnerabilities.extend(xss_vulns or [])
+                logger.info(f"✅ XSS: Found {len(xss_vulns or [])} vulnerabilities")
 
                 # Command Injection
                 logger.info(f"💻 Testing for Command Injection on {len(endpoint_urls_to_test)} endpoints...")
                 cmd_scanner = CommandInjectionScanner(client, scan_depth=scan_request.scan_depth, progress_callback=progress_callback)
-                cmd_vulns = await self.robust_scanner.execute_batch_safe(
-                    endpoint_urls_to_test,
-                    lambda urls: cmd_scanner.scan(urls),
-                    max_concurrent=3
+                cmd_vulns = await self.robust_scanner.execute_with_retry(
+                    cmd_scanner.scan, endpoint_urls_to_test
                 )
-                vulnerabilities.extend([v for v in cmd_vulns if v])
-                logger.info(f"✅ Command Injection: Found {len([v for v in cmd_vulns if v])} vulnerabilities")
+                vulnerabilities.extend(cmd_vulns or [])
+                logger.info(f"✅ Command Injection: Found {len(cmd_vulns or [])} vulnerabilities")
 
                 # CSRF
                 logger.info(f"🔒 Testing for CSRF on {len(endpoint_urls_to_test)} endpoints...")
@@ -615,14 +609,14 @@ class ScanOrchestrator:
                 vulnerabilities.extend(xxe_vulns or [])
                 logger.info(f"✅ XXE: Found {len(xxe_vulns or [])} vulnerabilities")
 
-            # SSRF
-            logger.info(f"🌐 Testing for SSRF on {len(endpoint_urls_to_test)} endpoints...")
-            ssrf_scanner = SSRFScanner(client, scan_depth=scan_request.scan_depth, progress_callback=progress_callback)
-            ssrf_vulns = await self.robust_scanner.execute_with_retry(
-                ssrf_scanner.scan, endpoint_urls_to_test
-            )
-            vulnerabilities.extend(ssrf_vulns or [])
-            logger.info(f"✅ SSRF: Found {len(ssrf_vulns or [])} vulnerabilities")
+                # SSRF
+                logger.info(f"🌐 Testing for SSRF on {len(endpoint_urls_to_test)} endpoints...")
+                ssrf_scanner = SSRFScanner(client, scan_depth=scan_request.scan_depth, progress_callback=progress_callback)
+                ssrf_vulns = await self.robust_scanner.execute_with_retry(
+                    ssrf_scanner.scan, endpoint_urls_to_test
+                )
+                vulnerabilities.extend(ssrf_vulns or [])
+                logger.info(f"✅ SSRF: Found {len(ssrf_vulns or [])} vulnerabilities")
 
             # 🧠 INTELLIGENT ANALYSIS: Vulnerabilities Found
             logger.info(f"\n🧠 [BRAIN] Analyzing found vulnerabilities...")
