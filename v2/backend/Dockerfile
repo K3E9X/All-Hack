@@ -72,11 +72,32 @@ RUN nuclei -update-templates -silent || true
 
 # Bundle a small, sane default wordlist for ffuf (dirb's classic common.txt,
 # ~4600 entries). Users can override via the FFUF_WORDLIST env var and
-# mounting their own list into the container.
-ARG COMMON_WORDLIST_URL=https://raw.githubusercontent.com/v0re/dirb/master/wordlists/common.txt
+# mounting their own list into the container. We try a few well-known
+# mirrors and fall back to a tiny built-in list if none are reachable,
+# so the build never fails because of a wordlist CDN hiccup.
 RUN set -eux; \
     mkdir -p /opt/wordlists; \
-    curl -fsSL "$COMMON_WORDLIST_URL" -o /opt/wordlists/common.txt; \
+    for url in \
+        "https://raw.githubusercontent.com/danielmiessler/SecLists/master/Discovery/Web-Content/common.txt" \
+        "https://raw.githubusercontent.com/3ndG4me/KaliLists/master/dirb/common.txt" \
+        "https://raw.githubusercontent.com/daviddias/node-dirbuster/master/lists/directory-list-2.3-small.txt" \
+    ; do \
+        if curl -fsSL --max-time 45 "$url" -o /opt/wordlists/common.txt; then \
+            echo "wordlist: downloaded from $url"; break; \
+        fi; \
+        echo "wordlist: failed $url"; \
+        rm -f /opt/wordlists/common.txt; \
+    done; \
+    if [ ! -s /opt/wordlists/common.txt ]; then \
+        echo "wordlist: all mirrors failed, writing minimal built-in list"; \
+        printf '%s\n' \
+            admin administrator api backup backups bin cgi-bin config console \
+            data db debug dev docs download downloads env files images img \
+            includes install js log login logout logs old phpmyadmin private \
+            public repo robots.txt sitemap.xml static stats status test tests \
+            tmp upload uploads user users v1 v2 wp-admin wp-content wp-login.php \
+            > /opt/wordlists/common.txt; \
+    fi; \
     wc -l /opt/wordlists/common.txt
 
 WORKDIR /app
