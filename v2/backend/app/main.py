@@ -1,18 +1,29 @@
 """FastAPI entrypoint for v2.
 
-Phase 0 scope: health endpoint, config introspection, LLM ping.
-Subsequent phases will add: /api/proxy (MITM session mgmt), /api/scans (wrappers),
-/api/llm (analysis/suggestion helpers), /ws/proxy (live request stream).
+Phase 0: health, config, LLM ping.
+Phase 1: MITM proxy capture + flow inspection (see app/api/proxy.py).
 """
 from __future__ import annotations
+
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.proxy import router as proxy_router
 from app.config import settings
-from app.llm import get_llm, LLMError
+from app.llm import LLMError, get_llm
+from app.proxy import init_schema
 
-app = FastAPI(title="allhack v2", version="2.0.0")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):  # noqa: ARG001
+    # Make sure the shared SQLite DB exists before the addon or the API touches it.
+    init_schema(settings.sqlite_path)
+    yield
+
+
+app = FastAPI(title="allhack v2", version="2.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -30,7 +41,6 @@ async def health() -> dict:
 
 @app.get("/api/config")
 async def config() -> dict:
-    """Non-sensitive config view used by the frontend for status indicators."""
     llm = get_llm()
     return {
         "llm_configured": llm.configured,
@@ -42,7 +52,6 @@ async def config() -> dict:
 
 @app.post("/api/llm/ping")
 async def llm_ping() -> dict:
-    """Sanity check: ask the LLM to respond with a fixed string."""
     llm = get_llm()
     try:
         reply = await llm.chat(
@@ -56,3 +65,6 @@ async def llm_ping() -> dict:
     except LLMError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     return {"model": llm.model, "reply": reply.strip()}
+
+
+app.include_router(proxy_router)

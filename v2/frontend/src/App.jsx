@@ -7,7 +7,8 @@ export default function App() {
         <div className="brand">allhack</div>
         <nav className="nav">
           <NavLink to="/" end>Home</NavLink>
-          {/* Phase 1+: Proxy / Scans / Reports */}
+          <NavLink to="/proxy">Proxy</NavLink>
+          {/* Phase 2+: Scans / Reports */}
         </nav>
       </header>
       <main className="content">

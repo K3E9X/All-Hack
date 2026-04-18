@@ -76,7 +76,9 @@ COPY requirements.txt ./
 RUN pip install -r requirements.txt
 
 COPY app ./app
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
 
 EXPOSE 8000 8080
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
