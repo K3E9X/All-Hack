@@ -8,7 +8,8 @@ export default function App() {
         <nav className="nav">
           <NavLink to="/" end>Home</NavLink>
           <NavLink to="/proxy">Proxy</NavLink>
-          {/* Phase 2+: Scans / Reports */}
+          <NavLink to="/scans">Scans</NavLink>
+          {/* Phase 3+: Reports */}
         </nav>
       </header>
       <main className="content">

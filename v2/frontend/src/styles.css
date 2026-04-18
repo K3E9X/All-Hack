@@ -337,3 +337,82 @@ body {
   white-space: pre-wrap;
   word-break: break-all;
 }
+
+/* ---- Scans page ---- */
+
+.scan-form {
+  display: grid;
+  grid-template-columns: 140px 1fr 1fr auto;
+  gap: 10px;
+  align-items: end;
+}
+
+.scan-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.scan-form select,
+.scan-form input {
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--fg);
+  padding: 6px 8px;
+  font-size: 13px;
+  font-family: inherit;
+}
+
+.scan-form .grow input {
+  width: 100%;
+}
+
+@media (max-width: 720px) {
+  .scan-form {
+    grid-template-columns: 1fr;
+  }
+}
+
+.status-queued    { color: var(--muted); }
+.status-running   { color: #c9a400; }
+.status-succeeded { color: var(--ok); }
+.status-failed    { color: var(--error); font-weight: 700; }
+.status-cancelled { color: var(--muted); font-style: italic; }
+
+.finding {
+  border: 1px solid var(--border);
+  padding: 10px 12px;
+  background: var(--bg);
+}
+
+.finding-title {
+  font-weight: 600;
+  margin: 4px 0 2px;
+}
+
+.finding-desc {
+  color: var(--muted);
+  font-size: 13px;
+  margin-bottom: 6px;
+}
+
+.finding-meta summary {
+  cursor: pointer;
+  margin-top: 6px;
+}
+
+.sev {
+  display: inline-block;
+  padding: 1px 8px;
+  border: 1px solid currentColor;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.sev-critical { color: #ff3b30; }
+.sev-high     { color: var(--error); }
+.sev-medium   { color: #c9a400; }
+.sev-low      { color: #0b84ff; }
+.sev-info     { color: var(--muted); }

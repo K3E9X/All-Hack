@@ -11,15 +11,18 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.proxy import router as proxy_router
+from app.api.scans import router as scans_router
 from app.config import settings
 from app.llm import LLMError, get_llm
 from app.proxy import init_schema
+from app.scans import init_jobs_schema
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):  # noqa: ARG001
     # Make sure the shared SQLite DB exists before the addon or the API touches it.
     init_schema(settings.sqlite_path)
+    init_jobs_schema(settings.sqlite_path)
     yield
 
 
@@ -68,3 +71,4 @@ async def llm_ping() -> dict:
 
 
 app.include_router(proxy_router)
+app.include_router(scans_router)

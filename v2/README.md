@@ -13,13 +13,16 @@ everything for you". Just a solid bench for manual + assisted pentesting.
 
 Phase 0: repo scaffolding, Docker stack, OpenRouter client wired up.
 
-Phase 1 (this commit): MITM proxy capture with mitmproxy, flows persisted
-to SQLite, list + inspector UI with filters (host, method, URL).
+Phase 1: MITM proxy capture with mitmproxy, flows persisted to SQLite,
+list + inspector UI with filters (host, method, URL).
 
-Phase 2 (next): CLI tool wrappers (`nuclei`, `sqlmap`, `ffuf`, `dalfox`,
-`nmap`) launched on demand against captured flows.
+Phase 2 (this commit): CLI tool wrappers for `nuclei`, `sqlmap`, `ffuf`,
+`dalfox`, `nmap`. Each job is launched async, stdout/stderr are stored in
+SQLite, output is parsed into normalized `Finding` objects, and the UI
+shows jobs list + inspector with findings / raw logs.
 
-Later phases: LLM analysis/suggestions on captured traffic, PDF reports.
+Later phases: LLM analysis/suggestions over captured traffic and scan
+findings, PDF reports.
 
 ## Requirements
 
@@ -98,6 +101,38 @@ Once the cert is trusted, browse the target normally. Every request appears
 in the Proxy page with headers, body, status, response size and latency.
 You can filter by host / method / URL substring and inspect any flow.
 
+## Running scans (Phase 2)
+
+Go to <http://localhost:3000/scans>. Pick a tool, enter a target, optionally
+add extra CLI flags, click **Run**. The job appears in the list, polls every
+2 s, and the inspector shows parsed findings plus raw stdout/stderr.
+
+Tool-specific notes:
+
+| Tool     | Target form                       | Extra options example                         |
+| -------- | --------------------------------- | --------------------------------------------- |
+| nuclei   | `https://target.com`              | `-tags cve,exposure -rl 50`                   |
+| sqlmap   | `https://target.com/p?id=1`       | `--level=3 --risk=3 --technique=BEUSTQ`       |
+| ffuf     | `https://target.com/FUZZ` or just `https://target.com` (auto `/FUZZ`) | `-w /opt/wordlists/common.txt -mc 200,204` |
+| dalfox   | `https://target.com/p?x=hi`       | `-p x --deep-domxss`                          |
+| nmap     | `example.com` or URL (hostname extracted) | `-p 1-65535 --script vuln`          |
+
+FFUF uses `/opt/wordlists/common.txt` (~4.6k entries, dirb classic) by
+default. Override with `FFUF_WORDLIST=/path/in/container` in `.env` and a
+volume mount in `docker-compose.yml` if you want a larger list (SecLists,
+etc.).
+
+API (same endpoints the UI uses):
+
+```
+GET    /api/scans/tools                list wrappers + availability
+POST   /api/scans                      {"tool":"nuclei","target":"...","options":[]}
+GET    /api/scans                      paginated list
+GET    /api/scans/{id}                 detail + findings + stdout/stderr tail
+POST   /api/scans/{id}/cancel          SIGTERM the subprocess
+DELETE /api/scans/{id}                 remove the record
+```
+
 ## Bundled tools (inside the backend image)
 
 - `nuclei` (ProjectDiscovery)
@@ -118,9 +153,13 @@ v2/
       config.py        runtime config from .env
       llm/client.py    OpenRouter client (chat + stream)
       main.py          FastAPI entrypoint
-      proxy/           (phase 1) mitmproxy hooks + session storage
-      wrappers/        (phase 2) nuclei/sqlmap/ffuf/dalfox/nmap wrappers
-      api/             (future) route modules
+      proxy/           mitmproxy addon + flow storage
+      scans/
+        models.py      Finding / Job dataclasses
+        storage.py     JobRepository (shared SQLite)
+        runner.py      async subprocess runner
+        wrappers/      nuclei / sqlmap / ffuf / dalfox / nmap
+      api/             FastAPI routers (proxy, scans)
     Dockerfile         multi-arch, bundles all binaries
     requirements.txt
   frontend/

@@ -70,6 +70,15 @@ RUN set -eux; \
 # Pre-download nuclei templates so first scan is fast.
 RUN nuclei -update-templates -silent || true
 
+# Bundle a small, sane default wordlist for ffuf (dirb's classic common.txt,
+# ~4600 entries). Users can override via the FFUF_WORDLIST env var and
+# mounting their own list into the container.
+ARG COMMON_WORDLIST_URL=https://raw.githubusercontent.com/v0re/dirb/master/wordlists/common.txt
+RUN set -eux; \
+    mkdir -p /opt/wordlists; \
+    curl -fsSL "$COMMON_WORDLIST_URL" -o /opt/wordlists/common.txt; \
+    wc -l /opt/wordlists/common.txt
+
 WORKDIR /app
 
 COPY requirements.txt ./

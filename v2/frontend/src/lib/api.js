@@ -33,4 +33,22 @@ export const api = {
     clear: () => request('/api/proxy/flows', { method: 'DELETE' }),
     caUrl: () => '/api/proxy/ca.pem',
   },
+
+  scans: {
+    tools: () => request('/api/scans/tools'),
+    list: (params = {}) => {
+      const qs = new URLSearchParams(
+        Object.entries(params).filter(([, v]) => v !== undefined && v !== '' && v !== null)
+      ).toString();
+      return request(`/api/scans${qs ? `?${qs}` : ''}`);
+    },
+    submit: (payload) => request('/api/scans', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }),
+    get: (id) => request(`/api/scans/${id}`),
+    cancel: (id) => request(`/api/scans/${id}/cancel`, { method: 'POST' }),
+    delete: (id) => request(`/api/scans/${id}`, { method: 'DELETE' }),
+  },
 };
