@@ -4,6 +4,17 @@ import { api } from '../lib/api.js';
 
 const PHASES = ['recon', 'mapping', 'vuln_analysis', 'exploitation', 'validation'];
 
+// Fallback category taxonomy (the backend sends the authoritative one in state).
+const DEFAULT_CATEGORIES = [
+  { key: 'recon', label: 'Reconnaissance' },
+  { key: 'enumeration', label: 'Mapping & enumeration' },
+  { key: 'access_control', label: 'Access control' },
+  { key: 'injection', label: 'Injection & exploitation' },
+  { key: 'auth_secrets', label: 'Auth & secrets' },
+  { key: 'config', label: 'Server & config' },
+  { key: 'other', label: 'Other' },
+];
+
 export default function LiveView() {
   const { id } = useParams();
   const [state, setState] = useState(null);
@@ -14,6 +25,8 @@ export default function LiveView() {
   const lastIdRef = useRef(0);
   const consoleRef = useRef(null);
   const verboseRef = useRef(null);
+  const [activeCat, setActiveCat] = useState('all');
+  const [analyzing, setAnalyzing] = useState(false);
 
   const loadState = useCallback(async () => {
     try {
@@ -72,13 +85,19 @@ export default function LiveView() {
   async function stop() {
     try { await api.engagements.stop(id); await loadState(); } catch (e) { setErr(e.message); }
   }
-  const [analyzing, setAnalyzing] = useState(false);
   async function analyzeTraffic() {
     setAnalyzing(true);
     try {
       const r = await api.engagements.analyzeTraffic(id);
       await loadState();
-      alert(`Analyzed ${r.flows_analyzed} captured flows: ${r.idor} IDOR, ${r.csrf} CSRF candidate(s).`);
+      const lg = r.logic || {}, js = r.js_recon || {}, jw = r.jwt || {}, ac = r.access_control || {};
+      alert(
+        `Deep analysis complete:\n` +
+        `· Logic: ${lg.idor || 0} IDOR, ${lg.csrf || 0} CSRF, ${lg.bfla || 0} BFLA/privesc\n` +
+        `· JS mining: ${js.secrets || 0} secret(s), ${js.endpoints || 0} endpoint(s)\n` +
+        `· JWT: ${jw.findings || 0} issue(s) on ${jw.jwt_tokens || 0} token(s)\n` +
+        `· Access control: ${ac.broken_access_control || 0} broken, ${ac.flagged || 0} to review`
+      );
     } catch (e) { setErr(e.message); }
     finally { setAnalyzing(false); }
   }
@@ -93,6 +112,18 @@ export default function LiveView() {
   const infoEvents = eventsList.filter((ev) => ev.level !== 'verbose');
   const verboseEvents = eventsList.filter((ev) => ev.level === 'verbose');
 
+  // Partition validated findings by the backend's canonical category taxonomy,
+  // so recon / enumeration / access-control / injection / ... are homogeneous.
+  const catMeta = state?.categories || DEFAULT_CATEGORIES;
+  const byCategory = {};
+  for (const f of validated) {
+    const c = f.category || 'other';
+    (byCategory[c] = byCategory[c] || []).push(f);
+  }
+  const activeCats = catMeta.filter((c) => (byCategory[c.key] || []).length > 0);
+  const shownFindings =
+    activeCat === 'all' ? validated : (byCategory[activeCat] || []);
+
   return (
     <div className="stack">
       <div className="row-between">
@@ -102,7 +133,7 @@ export default function LiveView() {
           {!active && <button className="btn" onClick={run}>Run</button>}
           {active && <button className="btn ghost danger" onClick={stop}>Stop</button>}
           <button className="btn ghost" onClick={analyzeTraffic} disabled={analyzing}>
-            {analyzing ? 'Analyzing...' : 'Analyze traffic (IDOR/CSRF)'}
+            {analyzing ? 'Analyzing...' : 'Deep analysis (logic / JS / JWT)'}
           </button>
           <a className="btn ghost" href={`/api/engagements/${id}/report.md`} target="_blank" rel="noreferrer">Report .md</a>
           <a className="btn ghost" href={`/api/engagements/${id}/report.html`} target="_blank" rel="noreferrer">Report (print)</a>
@@ -217,12 +248,29 @@ export default function LiveView() {
         </section>
       )}
 
-      {/* Validated findings */}
+      {/* Validated findings, partitioned by test category (homogeneous tabs) */}
       {validated.length > 0 && (
         <section className="card">
-          <h3 className="msg-h">Validated findings ({validated.length})</h3>
+          <h3 className="msg-h">Findings by category ({validated.length})</h3>
+          <div className="tabs">
+            <button
+              className={activeCat === 'all' ? 'active' : ''}
+              onClick={() => setActiveCat('all')}
+            >
+              All <span className="tab-count">{validated.length}</span>
+            </button>
+            {activeCats.map((c) => (
+              <button
+                key={c.key}
+                className={activeCat === c.key ? 'active' : ''}
+                onClick={() => setActiveCat(c.key)}
+              >
+                {c.label} <span className="tab-count">{byCategory[c.key].length}</span>
+              </button>
+            ))}
+          </div>
           <div className="stack-sm">
-            {validated.slice(0, 80).map((f) => (
+            {shownFindings.slice(0, 120).map((f) => (
               <div key={f.id} className="finding">
                 <div className="row-between">
                   <span className={`sev sev-${(f.severity || 'info').toLowerCase()}`}>{f.severity}</span>
@@ -230,10 +278,11 @@ export default function LiveView() {
                 </div>
                 <div className="finding-title">{f.title}</div>
                 <div className="mono small truncate" title={f.target}>{f.target}</div>
-                <div className="muted small">{f.tool} · {f.method}</div>
+                <div className="muted small">{f.tool} · {f.vuln_class}{f.method ? ` · ${f.method}` : ''}</div>
                 {f.poc && <pre className="body mono small">{f.poc}</pre>}
               </div>
             ))}
+            {shownFindings.length === 0 && <div className="muted small">No findings in this category.</div>}
           </div>
         </section>
       )}

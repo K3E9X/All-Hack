@@ -277,10 +277,22 @@ body {
 
 .tabs {
   display: flex;
+  flex-wrap: wrap;
   gap: 4px;
   border-bottom: 1px solid var(--border);
   margin-bottom: 10px;
 }
+
+.tab-count {
+  display: inline-block;
+  margin-left: 5px;
+  padding: 0 5px;
+  font-size: 11px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  opacity: 0.8;
+}
+.tabs button.active .tab-count { border-color: var(--bg); }
 
 .tabs button {
   background: transparent;

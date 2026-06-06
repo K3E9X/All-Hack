@@ -172,10 +172,11 @@ async def run_engagement_loop(run_id: str) -> dict:
         await events.emit(engagement.id, events.PHASE_CHANGED, "Phase: validation",
                           run_id=run.id, phase="validation")
         try:
-            # Logic analysis (IDOR/CSRF) over any traffic captured via the proxy.
-            # Runs before validation so its findings get validated + reported too.
-            from app.analysis import analyze_logic
-            await analyze_logic(engagement.id)
+            # Traffic-driven analysis (logic/IDOR/CSRF/BFLA, JS secrets+endpoints,
+            # JWT, access-control) over anything captured via the proxy. Runs
+            # before validation so its findings get validated + reported too.
+            from app.analysis import run_analysis
+            await run_analysis(engagement.id)
             stats = await validate_engagement(engagement.id)
             chains = await build_chains(engagement.id)
             await audit(

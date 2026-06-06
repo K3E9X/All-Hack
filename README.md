@@ -82,12 +82,28 @@ For real coverage, run it authenticated:
   while logged in; the autonomous run seeds those captured (parameterized)
   requests as scan targets, so sqlmap/dalfox/nuclei-dast hit the endpoints
   you actually exercised.
-- **Grey-box IDOR/BOLA** - add a *second* identity's headers; the logic
-  analysis replays a captured request as the other user to prove broken
-  object-level authorization.
+- **Grey-box IDOR/BOLA/BFLA** - add a *second* (low-privilege) identity's
+  headers; the analysis replays captured requests as the other user to prove
+  broken object-level authorization and privilege escalation (BFLA).
 - **Out-of-band (blind) confirmation** - nuclei confirms blind SSRF/XXE/RCE
   via interactsh. By default it uses ProjectDiscovery's free public servers
   (no infra); set `INTERACTSH_SERVER` in `.env` to self-host.
+
+The **deep analysis** pass (autorun in the validation phase, or on demand via
+*Deep analysis* on the live view) mines everything captured through the proxy:
+
+- **JavaScript mining** - pulls secrets (cloud keys, tokens, private keys) and
+  hidden API endpoints out of JS bundles; discovered endpoints are seeded as
+  new scan targets.
+- **JWT analysis** - flags `alg=none`, cracks weak/known HMAC secrets offline,
+  spots `kid`/`jku` injection surface, missing `exp`, and authz claims.
+- **Access control in depth** - replays authenticated GETs anonymously to find
+  missing-auth/broken-access-control, and flags method-tampering and
+  mass-assignment candidates for manual review (writes are never executed).
+
+Findings are partitioned into homogeneous categories (recon, enumeration,
+access control, injection, auth & secrets, server & config) in both the live
+view and the report.
 
 ## How it works
 

@@ -24,16 +24,15 @@ from __future__ import annotations
 
 import json
 import logging
-import time
 from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 from app import events
+from app.analysis._store import save_analysis_job
 from app.engagements import EngagementRepository
 from app.llm import ROLE_VALIDATOR, LLMError, get_router
 from app.proxy import FlowRepository
-from app.scans.models import Finding, Job, JobStatus
-from app.scans.storage import JobRepository, new_job_id
+from app.scans.models import Finding
 from app.validation.safe_poc import SafePoC, ScopeError
 
 logger = logging.getLogger("allhack.analysis.logic")
@@ -442,23 +441,7 @@ def _parse_items(reply: str) -> Dict[int, Dict[str, Any]]:
 # --------------------------------------------------------------------------- #
 
 async def _save_logic_job(engagement_id: str, findings: List[Finding]) -> None:
-    repo = JobRepository()
-    await repo.delete_by_tool(engagement_id, "logic")
-    now = time.time()
-    job = Job(
-        id=new_job_id(),
-        tool="logic",
-        target="(captured traffic)",
-        args=[],
-        status=JobStatus.SUCCEEDED,
-        created_at=now,
-        started_at=now,
-        finished_at=now,
-        exit_code=0,
-        findings=findings,
-        engagement_id=engagement_id,
-    )
-    await repo.create(job)
+    await save_analysis_job(engagement_id, "logic", findings, target="(captured traffic)")
 
 
 def _host(url: str) -> str:

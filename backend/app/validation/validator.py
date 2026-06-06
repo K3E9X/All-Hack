@@ -33,6 +33,10 @@ logger = logging.getLogger("allhack.validation.validator")
 # Tools whose positive findings are already actively proven.
 _TOOL_CONFIRMED = {"sqlmap", "commix", "dalfox"}
 
+# Traffic-driven analyzers that precompute their own status/confidence/PoC in
+# finding.metadata (see app/analysis/*). We trust that verdict verbatim.
+_ANALYSIS_TOOLS = {"logic", "js-recon", "jwt", "access-control"}
+
 # path-signature pairs: if the finding target ends with <path>, fetching it
 # should contain <signature> to confirm the exposure.
 _EXPOSED_SIGNATURES = [
@@ -56,9 +60,10 @@ class FindingValidator:
         self.safe = safe_poc
 
     async def validate(self, finding: Finding, tool: str, vuln_class: str) -> ValidationResult:
-        # 0. logic analysis (IDOR/CSRF) already decided its own status from the
-        # captured traffic + safe re-fetch; trust the precomputed verdict.
-        if tool == "logic":
+        # 0. traffic-driven analyzers (logic/IDOR/CSRF/BFLA, JS secrets, JWT,
+        # access-control) already decided their status from captured traffic +
+        # safe re-fetch; trust the precomputed verdict.
+        if tool in _ANALYSIS_TOOLS:
             md = finding.metadata or {}
             status_str = str(md.get("status", "likely"))
             conf = float(md.get("confidence", 0.55))
@@ -67,8 +72,8 @@ class FindingValidator:
             except ValueError:
                 status = ValidationStatus.LIKELY
             return ValidationResult(
-                status=status, confidence=conf, method="logic-analysis",
-                poc=finding.evidence or "", detail="From captured authenticated traffic.",
+                status=status, confidence=conf, method=f"analysis ({tool})",
+                poc=finding.evidence or "", detail="From captured traffic analysis.",
             )
 
         # 1. tool already proved it

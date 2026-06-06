@@ -13,7 +13,7 @@ from typing import Any, Dict, List
 
 from app.engagements import EngagementRepository
 from app.orchestrator.state import EngagementState
-from app.reporting.mappings import for_class
+from app.reporting.mappings import CATEGORY_LABELS, for_class
 from app.scans.storage import JobRepository
 from app.validation import ChainRepository, ValidatedFindingRepository
 
@@ -135,9 +135,11 @@ def _markdown(e, findings, chains, tools, hosts, tech, cov, vsum, overall) -> st
             L.append("")
             for f in group:
                 m = for_class(f.vuln_class)
+                cat = CATEGORY_LABELS.get(m.get("category", "other"), "Other")
                 L.append(f"#### {f.title}")
                 L.append("")
                 L.append(f"- **Severity:** {f.severity}")
+                L.append(f"- **Category:** {cat}")
                 L.append(f"- **Status:** {f.status} (confidence {int(f.confidence*100)}%)")
                 L.append(f"- **Affected:** `{f.target}`")
                 L.append(f"- **Tool / method:** {f.tool} / {f.method}")
