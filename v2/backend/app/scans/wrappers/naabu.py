@@ -17,6 +17,7 @@ class NaabuWrapper(BaseWrapper):
     name = "naabu"
     binary = "naabu"
     description = "Fast TCP port scanner (connect mode, top ports by default)."
+    category = "recon"
     timeout_seconds = 20 * 60
 
     def build_command(self, target: str, options: Sequence[str]) -> List[str]:

@@ -15,6 +15,7 @@ class NucleiWrapper(BaseWrapper):
     name = "nuclei"
     binary = "nuclei"
     description = "Template-based vulnerability scanner (4000+ community templates)."
+    category = "vuln"
     timeout_seconds = 30 * 60
 
     def build_command(self, target: str, options: Sequence[str]) -> List[str]:

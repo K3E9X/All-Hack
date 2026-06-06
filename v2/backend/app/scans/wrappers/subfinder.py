@@ -13,6 +13,7 @@ class SubfinderWrapper(BaseWrapper):
     name = "subfinder"
     binary = "subfinder"
     description = "Passive subdomain enumeration via dozens of sources."
+    category = "recon"
     timeout_seconds = 15 * 60
 
     def build_command(self, target: str, options: Sequence[str]) -> List[str]:

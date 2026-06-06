@@ -27,6 +27,10 @@ class BaseWrapper:
     name: str = ""
     binary: str = ""
     description: str = ""
+    # Coarse grouping for the UI and the methodology engine. One of:
+    # recon | fingerprint | content_discovery | vuln | injection | xss |
+    # tls | cms | waf
+    category: str = "vuln"
 
     # Hard cap on runtime (seconds). Subclasses can override.
     timeout_seconds: int = 30 * 60

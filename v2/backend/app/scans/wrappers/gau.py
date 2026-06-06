@@ -19,6 +19,7 @@ class GauWrapper(BaseWrapper):
     name = "gau"
     binary = "gau"
     description = "Fetch known URLs from Wayback/Common Crawl/OTX for a domain."
+    category = "recon"
     timeout_seconds = 15 * 60
 
     def build_command(self, target: str, options: Sequence[str]) -> List[str]:

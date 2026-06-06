@@ -17,6 +17,7 @@ class KatanaWrapper(BaseWrapper):
     name = "katana"
     binary = "katana"
     description = "Crawler / spider that maps routes on classic and SPA apps."
+    category = "recon"
     timeout_seconds = 20 * 60
 
     def build_command(self, target: str, options: Sequence[str]) -> List[str]:

@@ -35,6 +35,7 @@ class TestsslWrapper(BaseWrapper):
     name = "testssl"
     binary = "testssl.sh"
     description = "TLS/SSL audit: ciphers, protocol versions, TLS CVEs, cert info."
+    category = "tls"
     timeout_seconds = 30 * 60
 
     def build_command(self, target: str, options: Sequence[str]) -> List[str]:

@@ -25,6 +25,7 @@ class CommixWrapper(BaseWrapper):
     name = "commix"
     binary = "commix"
     description = "Automated OS command-injection detection and exploitation."
+    category = "injection"
     timeout_seconds = 30 * 60
 
     def build_command(self, target: str, options: Sequence[str]) -> List[str]:

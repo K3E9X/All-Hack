@@ -16,6 +16,7 @@ class HttpxWrapper(BaseWrapper):
     name = "httpx"
     binary = "httpx"
     description = "HTTP probe: status, title, tech fingerprint, server, TLS."
+    category = "fingerprint"
     timeout_seconds = 15 * 60
 
     def build_command(self, target: str, options: Sequence[str]) -> List[str]:

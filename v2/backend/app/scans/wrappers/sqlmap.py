@@ -23,6 +23,7 @@ class SqlmapWrapper(BaseWrapper):
     name = "sqlmap"
     binary = "sqlmap"
     description = "Automatic SQL injection and database takeover tool."
+    category = "injection"
     timeout_seconds = 45 * 60
 
     def build_command(self, target: str, options: Sequence[str]) -> List[str]:

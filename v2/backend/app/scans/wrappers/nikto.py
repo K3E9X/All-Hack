@@ -17,6 +17,7 @@ class NiktoWrapper(BaseWrapper):
     name = "nikto"
     binary = "nikto"
     description = "Web server scanner: misconfig, dangerous files/methods, banners."
+    category = "vuln"
     timeout_seconds = 30 * 60
 
     def build_command(self, target: str, options: Sequence[str]) -> List[str]:

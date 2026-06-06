@@ -21,6 +21,7 @@ class Wafw00fWrapper(BaseWrapper):
     name = "wafw00f"
     binary = "wafw00f"
     description = "Detect and fingerprint Web Application Firewalls."
+    category = "waf"
     timeout_seconds = 5 * 60
 
     def build_command(self, target: str, options: Sequence[str]) -> List[str]:

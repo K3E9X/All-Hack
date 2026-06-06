@@ -12,6 +12,7 @@ class DalfoxWrapper(BaseWrapper):
     name = "dalfox"
     binary = "dalfox"
     description = "Context-aware XSS scanner for URLs and pipelines."
+    category = "xss"
     timeout_seconds = 20 * 60
 
     def build_command(self, target: str, options: Sequence[str]) -> List[str]:

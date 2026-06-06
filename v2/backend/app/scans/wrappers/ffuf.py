@@ -20,6 +20,7 @@ class FfufWrapper(BaseWrapper):
     name = "ffuf"
     binary = "ffuf"
     description = "Fast web fuzzer for directories, parameters and vhosts."
+    category = "content_discovery"
     timeout_seconds = 20 * 60
 
     def build_command(self, target: str, options: Sequence[str]) -> List[str]:

@@ -17,6 +17,7 @@ class NmapWrapper(BaseWrapper):
     name = "nmap"
     binary = "nmap"
     description = "Port scanner and service fingerprinter."
+    category = "recon"
     timeout_seconds = 20 * 60
 
     def build_command(self, target: str, options: Sequence[str]) -> List[str]:

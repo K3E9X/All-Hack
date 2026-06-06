@@ -19,6 +19,7 @@ class WpscanWrapper(BaseWrapper):
     name = "wpscan"
     binary = "wpscan"
     description = "WordPress scanner: plugins, themes, users, vulnerabilities."
+    category = "cms"
     timeout_seconds = 30 * 60
 
     def build_command(self, target: str, options: Sequence[str]) -> List[str]:

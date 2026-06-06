@@ -57,6 +57,7 @@ def available_wrappers() -> List[Dict[str, object]]:
             "binary": w.binary,
             "available": w.is_available(),
             "description": w.description,
+            "category": w.category,
         }
         for w in _WRAPPERS.values()
     ]

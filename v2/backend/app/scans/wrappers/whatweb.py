@@ -17,6 +17,7 @@ class WhatwebWrapper(BaseWrapper):
     name = "whatweb"
     binary = "whatweb"
     description = "Identify web technologies: CMS, framework, server, language."
+    category = "fingerprint"
     timeout_seconds = 10 * 60
 
     def build_command(self, target: str, options: Sequence[str]) -> List[str]:

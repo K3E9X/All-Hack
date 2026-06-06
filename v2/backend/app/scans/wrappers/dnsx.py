@@ -17,6 +17,7 @@ class DnsxWrapper(BaseWrapper):
     name = "dnsx"
     binary = "dnsx"
     description = "DNS toolkit: resolve A/AAAA/CNAME and other records."
+    category = "recon"
     timeout_seconds = 10 * 60
 
     def build_command(self, target: str, options: Sequence[str]) -> List[str]:
