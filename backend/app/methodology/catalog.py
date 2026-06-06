@@ -352,6 +352,18 @@ CATALOG: List[CatalogItem] = [
         default_options=["-dast", "-tags", "redirect"],
         applies_when={"requires_params": True},
     ),
+    CatalogItem(
+        id="EXP-CRLF",
+        wstg_id="WSTG-INPV-15",
+        attack_techniques=["T1190"],
+        vuln_class="crlf_injection",
+        phase=PHASE_EXPLOIT,
+        tool="nuclei",
+        description="Fuzz parameters for CRLF / HTTP response splitting.",
+        severity_default="medium",
+        default_options=["-dast", "-tags", "crlf"],
+        applies_when={"requires_params": True},
+    ),
 ]
 
 

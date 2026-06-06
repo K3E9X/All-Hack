@@ -31,7 +31,7 @@ def test_classes_emitted_by_analyzers_are_mapped():
         "broken_access_control", "access_control_review", "mass_assignment",
         "secret_exposure", "endpoint_discovery", "jwt", "auth",
         "exposed_resource", "weak_tls", "cms_vulnerability", "misconfiguration",
-        "subdomain_takeover", "param_discovery", "graphql",
+        "subdomain_takeover", "param_discovery", "graphql", "crlf_injection",
     ]
     for vclass in emitted:
         assert vclass in m.MAPPING, f"{vclass} is not mapped"

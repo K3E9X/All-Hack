@@ -77,6 +77,12 @@ MAPPING: Dict[str, Dict[str, Any]] = {
         "remediation": "Don't redirect to user-supplied URLs; use an allow-list or "
                        "indirect (mapped) redirect targets.",
     },
+    "crlf_injection": {
+        "category": "injection",
+        "wstg": "WSTG-INPV-15", "attack": ["T1190"], "cwe": "CWE-93",
+        "remediation": "Strip/encode CR and LF in any user input reflected into "
+                       "response headers; use the framework's header APIs.",
+    },
     "cors": {
         "category": "access_control",
         "wstg": "WSTG-CLNT-07", "attack": ["T1190"], "cwe": "CWE-942",

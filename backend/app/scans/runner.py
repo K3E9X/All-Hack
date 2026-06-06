@@ -50,6 +50,18 @@ class Runner:
                     options = auth_args(tool, eng.primary_auth) + options
             except Exception:  # noqa: BLE001 - never block a scan on auth wiring
                 logger.exception("auth injection failed for %s", tool)
+
+            # WAF-aware exploitation: if a WAF was fingerprinted, prepend
+            # evasion/throttle options so active tools adapt.
+            try:
+                from app.orchestrator.state import EngagementState
+                from app.scans.waf import is_waf_tech, waf_args
+
+                techs = await EngagementState(engagement_id).technologies()
+                if is_waf_tech(techs):
+                    options = waf_args(tool) + options
+            except Exception:  # noqa: BLE001 - never block a scan on WAF wiring
+                logger.exception("waf adaptation failed for %s", tool)
         job = Job(
             id=new_job_id(),
             tool=tool,

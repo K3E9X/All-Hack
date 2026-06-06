@@ -15,6 +15,7 @@ from app.scans.wrappers.nuclei import _classify
     ("traversal", "lfi"),
     ("cve,redirect", "open_redirect"),
     ("cors", "cors"),
+    ("crlf", "crlf_injection"),
     ("takeover", "subdomain_takeover"),
     ("config,exposure", "exposed_resource"),
     ("default-login", "auth"),

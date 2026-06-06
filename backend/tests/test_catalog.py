@@ -33,7 +33,8 @@ def test_exploitation_phase_covers_injection_family():
 
 
 def test_dedicated_exploit_items_exist():
-    for iid in ("EXP-SSRF", "EXP-SSTI", "EXP-LFI", "EXP-XXE", "EXP-REDIRECT"):
+    for iid in ("EXP-SSRF", "EXP-SSTI", "EXP-LFI", "EXP-XXE", "EXP-REDIRECT",
+                "EXP-CRLF"):
         assert iid in CATALOG_BY_ID
 
 

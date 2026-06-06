@@ -99,6 +99,9 @@ class Executor:
                 techs.append(str(meta["server"]))
         elif tool == "wpscan":
             techs.append("wordpress")
+        elif tool == "wafw00f" and meta.get("waf"):
+            # Record the WAF so later exploitation adapts (see app/scans/waf.py).
+            techs.append(f"waf:{meta['waf']}")
         for tech in techs:
             await self.state.add_fingerprint(tech, source=tool)
             await events.emit(
