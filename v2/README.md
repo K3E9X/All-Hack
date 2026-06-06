@@ -51,9 +51,43 @@ injection (`commix`), web-server misconfig (`nikto`), WAF detection
 `dnsx`, `gau`). Each wrapper is tagged with a category surfaced by
 `/api/scans/tools`.
 
-Next phases (specced, not yet built): test catalog (OWASP WSTG x MITRE
-ATT&CK) + the planner/executor/validator agent loop, safe-PoC validation,
-kill-chain analysis, and the live operator UI.
+**Phase 4 (this commit family)** is the brain - the agent system that turns
+the bench into an autonomous pentester (spec §4-5):
+
+  - **Methodology engine**: a declarative test catalog (`GET
+    /api/methodology/catalog`) of 16 items, each mapping an OWASP WSTG test
+    to its MITRE ATT&CK technique(s), the wrapper that runs it, and an
+    `applies_when` condition. Phases are walked in PTES order: recon ->
+    mapping -> vuln_analysis -> exploitation.
+  - **Engagement state / memory**: discovered assets (hosts/endpoints/
+    params), fingerprints, and a (catalog item x asset) coverage matrix.
+  - **Planner -> Executor loop**: the planner builds candidate tasks from
+    the catalog filtered by the live state, advances one phase at a time,
+    and (optionally) has the planner LLM reorder the batch. The executor
+    runs each task through the normal scan queue and folds findings back
+    into state (fingerprints unlock tech-gated tests; crawled/archived
+    URLs unlock parameter-gated tests). It loops until coverage saturates,
+    the budget is hit, or you stop it.
+  - **Control + state API**: `POST /api/engagements/{id}/run`,
+    `/stop`, and `GET /api/engagements/{id}/state` (assets, technologies,
+    coverage, aggregated findings). The Engagements tab gets Run/Stop
+    buttons and a live state panel.
+
+The loop is fully functional with **no LLM** (pure methodology); a planner
+model only reorders batches.
+
+### Running an autonomous engagement
+
+After an engagement is authorized (see above), open its inspector and click
+**Run autonomous test**. The loop seeds the verified host + base URL, then
+recon/mapping populate assets and fingerprints, which unlock the vuln and
+exploitation catalog items. Watch assets, technologies, coverage and
+findings update live; click **Stop** at any time.
+
+Next phases (specced, not yet built): the validator agent + safe-PoC
+confirmation, kill-chain analysis, the full live operator view (agent
+reasoning console, kill-chain graph, approval checkpoints), and the
+client report generator.
 
 ### Authorization workflow
 
