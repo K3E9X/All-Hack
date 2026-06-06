@@ -69,6 +69,9 @@ class Engagement:
     allow_active_exploit: bool = False
     # Sub-flag: also allow OS command execution *through SQLi* (sqlmap --os-cmd).
     allow_sql_os_cmd: bool = False
+    # Sub-flag: prove a DATA BREACH by dumping a small, bounded sample (<=3 rows)
+    # of likely-sensitive tables via a confirmed SQLi. Off by default.
+    allow_data_proof: bool = False
     # Grey-box: HTTP headers of a SECOND identity (e.g. Cookie / Authorization),
     # used to prove IDOR/BOLA by replaying a captured request as another user.
     # List of {"name": ..., "value": ...}. Never returned to the client.
@@ -100,6 +103,7 @@ class Engagement:
         require_exploit_approval: bool = False,
         allow_active_exploit: bool = False,
         allow_sql_os_cmd: bool = False,
+        allow_data_proof: bool = False,
         secondary_auth: Optional[List[Dict[str, str]]] = None,
         primary_auth: Optional[List[Dict[str, str]]] = None,
     ) -> "Engagement":
@@ -132,6 +136,7 @@ class Engagement:
             require_exploit_approval=require_exploit_approval,
             allow_active_exploit=allow_active_exploit,
             allow_sql_os_cmd=allow_sql_os_cmd,
+            allow_data_proof=allow_data_proof,
             secondary_auth=list(secondary_auth or []),
             primary_auth=list(primary_auth or []),
         )

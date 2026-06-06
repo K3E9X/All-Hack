@@ -125,6 +125,128 @@ def _deterministic_chains(findings: List[ValidatedFinding]) -> List[Dict[str, An
             steps=steps,
         ))
 
+    # Pattern: leaked secret -> server/account compromise (secret -> RCE/access).
+    secret = has("secret_exposure")
+    if secret:
+        steps = [{"finding_id": secret[0].id, "action": "Recover the leaked secret",
+                  "reason": secret[0].title}]
+        rce = cmdi or has("sql_injection")
+        if rce:
+            steps.append({"finding_id": rce[0].id,
+                          "action": "Use the secret to reach a code-exec primitive",
+                          "reason": "Leaked creds/keys unlock the injectable surface or admin"})
+            steps.append({"action": "Execute code / control the server",
+                          "reason": "Combined access yields full compromise"})
+            chains.append(_chain(
+                title="Leaked secret to server compromise",
+                severity="critical",
+                summary="A secret exposed in client code/responses unlocks access that, "
+                        "combined with a code-exec bug, compromises the server.",
+                steps=steps,
+            ))
+        else:
+            steps.append({"action": "Authenticate to the cloud/API/admin with the secret",
+                          "reason": "Live keys/tokens grant privileged access off-app"})
+            chains.append(_chain(
+                title="Leaked secret to account/infrastructure takeover",
+                severity="high",
+                summary="A live credential exposed to the client grants privileged "
+                        "access to the API, cloud or admin surface.",
+                steps=steps,
+            ))
+
+    # Pattern: broken access control / IDOR / BFLA -> bulk data exposure.
+    access = has("idor", "broken_access_control", "privilege_escalation")
+    if access:
+        steps = [
+            {"finding_id": access[0].id, "action": "Abuse the access-control flaw",
+             "reason": access[0].title},
+            {"action": "Enumerate other users' / privileged objects",
+             "reason": "Missing authorization lets one identity reach others' data"},
+            {"action": "Harvest sensitive records at scale", "reason": "Bulk data exposure"},
+        ]
+        chains.append(_chain(
+            title="Broken access control to bulk data exposure",
+            severity="high",
+            summary="An object/function-level authorization flaw allows reaching data "
+                    "and actions belonging to other users.",
+            steps=steps,
+        ))
+
+    # Pattern: weak JWT -> token forgery -> account takeover.
+    jwt = has("jwt")
+    if jwt:
+        priv = has("privilege_escalation", "broken_access_control")
+        steps = [{"finding_id": jwt[0].id, "action": "Exploit the JWT weakness",
+                  "reason": jwt[0].title},
+                 {"action": "Forge a token with elevated claims (role/admin)",
+                  "reason": "alg=none / weak secret lets the attacker mint tokens"}]
+        if priv:
+            steps.append({"finding_id": priv[0].id, "action": "Reach privileged functions",
+                          "reason": priv[0].title})
+        chains.append(_chain(
+            title="Weak JWT to account takeover",
+            severity="critical" if priv else "high",
+            summary="A forgeable JWT lets an attacker impersonate any user and assume "
+                    "elevated roles.",
+            steps=steps,
+        ))
+
+    # Pattern: SSRF -> cloud metadata -> credential theft.
+    ssrf = has("ssrf")
+    if ssrf:
+        steps = [
+            {"finding_id": ssrf[0].id, "action": "Exploit SSRF", "reason": ssrf[0].title},
+            {"action": "Reach the cloud metadata endpoint (169.254.169.254)",
+             "reason": "SSRF can target internal-only metadata services"},
+            {"action": "Steal temporary cloud credentials / pivot internally",
+             "reason": "Metadata creds grant access to cloud resources"},
+        ]
+        chains.append(_chain(
+            title="SSRF to cloud credential theft",
+            severity="critical",
+            summary="Server-side request forgery can reach internal metadata services "
+                    "and recover cloud credentials.",
+            steps=steps,
+        ))
+
+    # Pattern: subdomain takeover -> session/credential theft.
+    takeover = has("subdomain_takeover")
+    if takeover:
+        steps = [
+            {"finding_id": takeover[0].id, "action": "Claim the dangling subdomain",
+             "reason": takeover[0].title},
+            {"action": "Serve attacker content on a trusted subdomain",
+             "reason": "Control of an in-scope host enables phishing / cookie scoping"},
+            {"action": "Steal sessions or credentials from users",
+             "reason": "Same-site trust and cookie scope are abused"},
+        ]
+        chains.append(_chain(
+            title="Subdomain takeover to session/credential theft",
+            severity="high",
+            summary="A dangling subdomain can be claimed and used to phish users or "
+                    "capture cookies scoped to the parent domain.",
+            steps=steps,
+        ))
+
+    # Pattern: GraphQL introspection -> authorization abuse.
+    graphql = [f for f in by_class.get("graphql", [])
+               if "introspection" in (f.title or "").lower()]
+    if graphql and access:
+        steps = [
+            {"finding_id": graphql[0].id, "action": "Read the full GraphQL schema",
+             "reason": graphql[0].title},
+            {"finding_id": access[0].id, "action": "Invoke hidden/privileged operations",
+             "reason": "Introspection reveals operations the UI never exposes"},
+        ]
+        chains.append(_chain(
+            title="GraphQL introspection to authorization abuse",
+            severity="high",
+            summary="A readable GraphQL schema maps hidden operations that an "
+                    "access-control flaw then lets the attacker call.",
+            steps=steps,
+        ))
+
     return chains
 
 

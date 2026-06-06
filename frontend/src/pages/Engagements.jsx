@@ -7,7 +7,7 @@ const POLL_MS = 5000;
 export default function Engagements() {
   const [items, setItems] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
-  const [form, setForm] = useState({ target_url: '', scope_hosts: '', attest: false, require_approval: false, auth: '', secondary_auth: '', allow_active_exploit: false, allow_sql_os_cmd: false });
+  const [form, setForm] = useState({ target_url: '', scope_hosts: '', attest: false, require_approval: false, auth: '', secondary_auth: '', allow_active_exploit: false, allow_sql_os_cmd: false, allow_data_proof: false });
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState(null);
 
@@ -44,10 +44,11 @@ export default function Engagements() {
         require_exploit_approval: form.require_approval,
         allow_active_exploit: form.allow_active_exploit,
         allow_sql_os_cmd: form.allow_active_exploit && form.allow_sql_os_cmd,
+        allow_data_proof: form.allow_active_exploit && form.allow_data_proof,
         auth_headers: form.auth || undefined,
         secondary_auth_headers: form.secondary_auth || undefined,
       });
-      setForm({ target_url: '', scope_hosts: '', attest: false, require_approval: false, auth: '', secondary_auth: '', allow_active_exploit: false, allow_sql_os_cmd: false });
+      setForm({ target_url: '', scope_hosts: '', attest: false, require_approval: false, auth: '', secondary_auth: '', allow_active_exploit: false, allow_sql_os_cmd: false, allow_data_proof: false });
       setSelectedId(res.engagement.id);
       load();
     } catch (err) {
@@ -144,6 +145,19 @@ export default function Engagements() {
               />
               <span className="small">
                 Also attempt OS command execution through SQLi (sqlmap --os-cmd).
+              </span>
+            </label>
+          )}
+          {form.allow_active_exploit && (
+            <label className="checkbox-row" style={{ marginLeft: 24 }}>
+              <input
+                type="checkbox"
+                checked={form.allow_data_proof}
+                onChange={(e) => setForm((f) => ({ ...f, allow_data_proof: e.target.checked }))}
+              />
+              <span className="small">
+                Prove a data breach: retrieve a small bounded sample (≤3 rows) of
+                sensitive tables via confirmed SQLi.
               </span>
             </label>
           )}

@@ -34,7 +34,8 @@ CREATE TABLE IF NOT EXISTS engagements (
     secondary_auth_json  TEXT,
     primary_auth_json    TEXT,
     allow_active_exploit BOOLEAN NOT NULL DEFAULT FALSE,
-    allow_sql_os_cmd     BOOLEAN NOT NULL DEFAULT FALSE
+    allow_sql_os_cmd     BOOLEAN NOT NULL DEFAULT FALSE,
+    allow_data_proof     BOOLEAN NOT NULL DEFAULT FALSE
 );
 
 ALTER TABLE engagements ADD COLUMN IF NOT EXISTS require_exploit_approval BOOLEAN NOT NULL DEFAULT FALSE;
@@ -42,6 +43,7 @@ ALTER TABLE engagements ADD COLUMN IF NOT EXISTS secondary_auth_json TEXT;
 ALTER TABLE engagements ADD COLUMN IF NOT EXISTS primary_auth_json TEXT;
 ALTER TABLE engagements ADD COLUMN IF NOT EXISTS allow_active_exploit BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE engagements ADD COLUMN IF NOT EXISTS allow_sql_os_cmd BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE engagements ADD COLUMN IF NOT EXISTS allow_data_proof BOOLEAN NOT NULL DEFAULT FALSE;
 
 CREATE INDEX IF NOT EXISTS idx_engagements_created ON engagements(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_engagements_status  ON engagements(status);
@@ -62,8 +64,8 @@ class EngagementRepository:
                     created_at, verified_at, closed_at, attested_at,
                     budget_requests, budget_seconds, require_exploit_approval,
                     secondary_auth_json, primary_auth_json,
-                    allow_active_exploit, allow_sql_os_cmd
-                ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
+                    allow_active_exploit, allow_sql_os_cmd, allow_data_proof
+                ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
                 """,
                 e.id,
                 e.target_url,
@@ -85,6 +87,7 @@ class EngagementRepository:
                 json.dumps(e.primary_auth or []),
                 e.allow_active_exploit,
                 e.allow_sql_os_cmd,
+                e.allow_data_proof,
             )
 
     async def update(self, e: Engagement) -> None:
@@ -107,8 +110,9 @@ class EngagementRepository:
                     budget_seconds = $13,
                     require_exploit_approval = $14,
                     allow_active_exploit = $15,
-                    allow_sql_os_cmd = $16
-                WHERE id = $17
+                    allow_sql_os_cmd = $16,
+                    allow_data_proof = $17
+                WHERE id = $18
                 """,
                 e.target_url,
                 e.target_host,
@@ -126,6 +130,7 @@ class EngagementRepository:
                 e.require_exploit_approval,
                 e.allow_active_exploit,
                 e.allow_sql_os_cmd,
+                e.allow_data_proof,
                 e.id,
             )
 
@@ -179,6 +184,9 @@ def _row_to_engagement(row) -> Engagement:
         ),
         allow_sql_os_cmd=(
             row["allow_sql_os_cmd"] if "allow_sql_os_cmd" in row else False
+        ),
+        allow_data_proof=(
+            row["allow_data_proof"] if "allow_data_proof" in row else False
         ),
         secondary_auth=_load_auth(row, "secondary_auth_json"),
         primary_auth=_load_auth(row, "primary_auth_json"),

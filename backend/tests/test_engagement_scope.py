@@ -46,11 +46,14 @@ def test_active_exploit_flags_default_off():
 
 def test_active_exploit_flags_opt_in():
     e = Engagement.create("https://example.com", attested=True,
-                          allow_active_exploit=True, allow_sql_os_cmd=True)
+                          allow_active_exploit=True, allow_sql_os_cmd=True,
+                          allow_data_proof=True)
     assert e.allow_active_exploit is True
     assert e.allow_sql_os_cmd is True
+    assert e.allow_data_proof is True
     # exposed as flags in the public view
     assert e.to_public()["allow_active_exploit"] is True
+    assert e.to_public()["allow_data_proof"] is True
 
 
 def test_public_view_hides_credentials():

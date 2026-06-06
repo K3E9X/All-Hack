@@ -66,6 +66,8 @@ class CreateEngagementRequest(BaseModel):
     allow_active_exploit: bool = False
     # Sub-flag: also allow OS command execution through SQLi (sqlmap --os-cmd).
     allow_sql_os_cmd: bool = False
+    # Sub-flag: prove a data breach with a small bounded SQLi dump (<=3 rows).
+    allow_data_proof: bool = False
 
 
 @router.post("", status_code=201)
@@ -90,6 +92,7 @@ async def create_engagement(req: CreateEngagementRequest) -> dict:
         require_exploit_approval=req.require_exploit_approval,
         allow_active_exploit=req.allow_active_exploit,
         allow_sql_os_cmd=req.allow_sql_os_cmd,
+        allow_data_proof=req.allow_data_proof,
         secondary_auth=_parse_headers_blob(req.secondary_auth_headers),
         primary_auth=_parse_headers_blob(req.auth_headers),
     )

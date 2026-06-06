@@ -118,11 +118,20 @@ a tool *confirms* an injection the agent demonstrates real impact by running a
 - **SQLi** - re-runs sqlmap in read-only context mode (`--current-user`,
   `--is-dba`, `--banner`, ...); OS command execution through the DB is a
   separate sub-opt-in.
+- **Data-breach proof** (separate sub-opt-in) - retrieves a small, **bounded
+  sample (≤3 rows)** of likely-sensitive tables via a confirmed SQLi to prove a
+  real data exposure - far from a mass exfiltration.
 
 It is **double-gated** (the opt-in flag *and* the exploitation approval
 checkpoint), in-scope only, and strictly non-destructive: no writes, deletes,
-persistence, exfiltration or lateral movement. The exact command and its raw
-output are visible in the Jobs tab.
+persistence or lateral movement. The exact command and its raw output are
+visible in the Jobs tab.
+
+Confirmed findings are then linked into **kill-chains** automatically:
+leaked-secret → server compromise, broken-access-control → bulk data exposure,
+weak-JWT → account takeover, SSRF → cloud credential theft, subdomain takeover
+→ session theft, GraphQL introspection → authorization abuse (plus an optional
+LLM pass for additional chains).
 
 ## How it works
 

@@ -4,6 +4,8 @@ from types import SimpleNamespace
 
 from app.exploit.proof import (
     _NIX_PROOF,
+    _data_proof_options,
+    _extract_dump,
     _extract_proof,
     _injection_targets,
     _proof_options,
@@ -71,3 +73,20 @@ def test_extract_proof_sqlmap_success():
     out = "current user: 'root@localhost'\ncurrent database: 'app'\n"
     ok, snippet = _extract_proof("sqlmap", out)
     assert ok and "current user" in snippet.lower()
+
+
+def test_data_proof_options_are_bounded():
+    opts = _data_proof_options()
+    assert "--dump" in opts
+    assert "--stop=3" in opts          # at most 3 rows
+    assert "--exclude-sysdbs" in opts  # no system databases
+    # no mass-dump flags
+    assert "--dump-all" not in opts
+
+
+def test_extract_dump_success_and_failure():
+    out = "Database: app\nTable: users\n[3 entries]\n| id | email |\n"
+    ok, snippet = _extract_dump(out)
+    assert ok and "Table:" in snippet
+    ok2, _ = _extract_dump("no rows retrieved")
+    assert not ok2
