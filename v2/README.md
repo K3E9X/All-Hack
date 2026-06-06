@@ -30,10 +30,35 @@ foundation for the agent system that comes next:
     key fall back to OpenRouter so existing Phase 0-3 flows keep
     working with zero config changes.
 
-Next phases (specced, not yet built): authorization gate (DNS TXT /
-.well-known verification), test catalog (OWASP WSTG x MITRE ATT&CK),
-the planner/executor/validator agent loop, kill-chain analysis, and
-the live operator UI.
+**Phase 2 (this commit family)** adds the authorization gate (spec §8):
+
+  - **Engagements**: a scan can only run against a target tied to an
+    AUTHORIZED engagement whose scope allow-list covers the host. The
+    backend rejects un-authorized or out-of-scope scans with 403.
+  - **Ownership verification**: prove control of the target by DNS TXT
+    (`allhack-verify=<token>`) or a `.well-known/allhack-<token>.txt`
+    file. The verifier is side-effect free and tries DNS first.
+  - **Append-only audit log**: every engagement create/authorize/verify-
+    fail/close and every scan submit/cancel/block is recorded. Read it
+    at `GET /api/audit`.
+  - **UI**: a new Engagements tab to create, see the challenge, and
+    verify; the Scans tab now requires picking an authorized engagement.
+
+Next phases (specced, not yet built): test catalog (OWASP WSTG x MITRE
+ATT&CK), the planner/executor/validator agent loop, safe-PoC validation,
+kill-chain analysis, and the live operator UI.
+
+### Authorization workflow
+
+1. Open the **Engagements** tab, enter the target URL, tick the
+   "I am authorized" attestation, create.
+2. The engagement shows two proof options. Do **one**:
+   - add a DNS TXT record `allhack-verify=<token>` on the target host, or
+   - serve `https://<host>/.well-known/allhack-<token>.txt` containing the token.
+3. Click **Verify ownership**. On success the engagement becomes
+   `authorized`.
+4. Go to **Scans**, pick the engagement, and launch tools. Anything
+   targeting a host outside the engagement scope is blocked and audited.
 
 ## Requirements
 
