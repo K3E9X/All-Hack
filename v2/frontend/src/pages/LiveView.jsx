@@ -86,6 +86,8 @@ export default function LiveView() {
           <Link className="btn ghost" to="/engagements">Back</Link>
           {!active && <button className="btn" onClick={run}>Run</button>}
           {active && <button className="btn ghost danger" onClick={stop}>Stop</button>}
+          <a className="btn ghost" href={`/api/engagements/${id}/report.md`} target="_blank" rel="noreferrer">Report .md</a>
+          <a className="btn ghost" href={`/api/engagements/${id}/report.html`} target="_blank" rel="noreferrer">Report (print)</a>
         </div>
       </div>
       {err && <p className="result error small">{err}</p>}
