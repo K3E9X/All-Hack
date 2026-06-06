@@ -64,11 +64,14 @@ async def create_engagement(req: CreateEngagementRequest) -> dict:
         engagement_id=e.id,
         target=e.target_url,
         scope=e.scope_hosts,
+        status=e.status.value,
     )
-    return {
-        "engagement": e.to_public(),
-        "challenge": e.challenge(),
-    }
+    out = {"engagement": e.to_public()}
+    # Only surface the ownership-proof challenge when authorization is still
+    # pending (i.e. the operator did not attest). Attestation auto-authorizes.
+    if e.status == EngagementStatus.PENDING_AUTHORIZATION:
+        out["challenge"] = e.challenge()
+    return out
 
 
 @router.get("")

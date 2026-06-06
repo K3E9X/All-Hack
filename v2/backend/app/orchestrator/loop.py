@@ -84,6 +84,7 @@ async def run_engagement_loop(run_id: str) -> dict:
         for iteration in range(MAX_ITERATIONS):
             if await runs.stop_requested(run.id):
                 run.status = "stopped"
+                await runs.update(run)
                 break
             if time.time() > deadline:
                 logger.info("[%s] time budget reached", run.id)
@@ -113,6 +114,7 @@ async def run_engagement_loop(run_id: str) -> dict:
                 if not approved:
                     # Stop requested or denied: end the active testing loop.
                     run.status = "stopped"
+                    await runs.update(run)
                     break
 
             # Launch the batch (respecting the remaining job budget).

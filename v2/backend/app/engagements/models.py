@@ -27,6 +27,7 @@ class EngagementStatus(str, enum.Enum):
 
 
 class VerificationMethod(str, enum.Enum):
+    ATTESTATION = "attestation"   # operator attested they own/may test the target
     DNS_TXT = "dns_txt"            # TXT record allhack-verify=<token> on the apex
     WELL_KNOWN = "well_known"      # GET https://host/.well-known/allhack-<token>.txt
     MANUAL = "manual"             # operator uploaded signed written authorization
@@ -82,19 +83,27 @@ class Engagement:
         # Always include the primary host in scope.
         if host not in scope:
             scope = [host] + scope
+        # This tool targets domains the operator owns. The legal attestation is
+        # the authorization: when attested, the engagement is authorized
+        # immediately (verification_method = "attestation"). The DNS /
+        # .well-known proof flow still exists (verifier + /verify endpoint) for
+        # cases where you want third-party-style proof, but it is not required.
+        now = time.time()
         return cls(
             id=new_engagement_id(),
             target_url=target_url,
             target_host=host,
             scope_hosts=scope,
-            status=EngagementStatus.PENDING_AUTHORIZATION,
+            status=EngagementStatus.AUTHORIZED if attested else EngagementStatus.PENDING_AUTHORIZATION,
             verification_token=_new_token(),
-            created_at=time.time(),
+            verification_method=VerificationMethod.ATTESTATION if attested else None,
+            verified_at=now if attested else None,
+            created_at=now,
             title=title or host,
             notes=notes,
             budget_requests=budget_requests,
             budget_seconds=budget_seconds,
-            attested_at=time.time() if attested else None,
+            attested_at=now if attested else None,
             require_exploit_approval=require_exploit_approval,
         )
 

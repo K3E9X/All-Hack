@@ -215,3 +215,7 @@ class WorkerSettings:
     max_tries = 1
     # The orchestrator loop can run for a long time; raise the per-task ceiling.
     job_timeout = 3 * 60 * 60
+    # Required for ArqRedis.abort_job() to actually cancel a running task
+    # (the Stop button on scans and engagement runs). Without this, abort
+    # requests are silently ignored.
+    allow_abort_jobs = True
