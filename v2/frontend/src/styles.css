@@ -463,6 +463,17 @@ body {
   .grid-stats { grid-template-columns: repeat(2, 1fr); }
 }
 
+.vstatus-confirmed      { color: var(--ok); }
+.vstatus-likely         { color: #c9a400; }
+.vstatus-unconfirmed    { color: var(--muted); }
+.vstatus-false_positive { color: var(--error); text-decoration: line-through; }
+
+.chain-steps {
+  margin: 6px 0 0 0;
+  padding-left: 18px;
+}
+.chain-steps li { margin-bottom: 3px; }
+
 /* ---- LLM suggestions / explain / report ---- */
 
 .stack-sm > * + * { margin-top: 10px; }

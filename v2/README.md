@@ -84,10 +84,27 @@ recon/mapping populate assets and fingerprints, which unlock the vuln and
 exploitation catalog items. Watch assets, technologies, coverage and
 findings update live; click **Stop** at any time.
 
-Next phases (specced, not yet built): the validator agent + safe-PoC
-confirmation, kill-chain analysis, the full live operator view (agent
-reasoning console, kill-chain graph, approval checkpoints), and the
-client report generator.
+**Phase 5 (this commit family)** adds validation + chaining (spec §7):
+
+  - **Safe-PoC validation**: after the loop saturates, every candidate
+    finding is confirmed/disproven. sqlmap/commix/dalfox findings are
+    tool-confirmed (their payload is the PoC); exposed resources
+    (.git/.env/phpinfo/...) are re-fetched and matched against a content
+    signature; reflected XSS is checked with a benign unique marker. All
+    target access goes through a single safety layer: GET/HEAD only, one
+    request, in-scope hosts only, no destructive payloads.
+  - **Status + confidence**: confirmed / likely / unconfirmed /
+    false_positive, with a tracked false-positive rate.
+  - **Kill-chains**: confirmed/likely findings are linked into multi-step
+    attack paths (deterministic rules + optional LLM pass constrained to
+    real findings). This is the scanner-vs-reasoning-system difference.
+  - The Engagements panel shows validation counts, FP rate, kill-chains,
+    and validated findings with their status, confidence and PoC. A
+    `POST /engagements/{id}/validate` re-runs validation after manual scans.
+
+Next phases (specced, not yet built): the full live operator view (agent
+reasoning console, kill-chain graph, approval checkpoints) and the
+client report generator (Markdown/PDF, WSTG/ATT&CK/CWE mapped).
 
 ### Authorization workflow
 

@@ -306,32 +306,92 @@ function AutonomousPanel({ engagementId }) {
         <p className="muted small">No run yet. Launch one to start autonomous coverage.</p>
       )}
 
-      <div className="grid-stats">
-        <div className="stat"><div className="muted small">Assets</div><div className="mono">{state?.assets?.length || 0}</div></div>
-        <div className="stat"><div className="muted small">Technologies</div><div className="mono">{state?.technologies?.length || 0}</div></div>
-        <div className="stat"><div className="muted small">Findings</div><div className="mono">{state?.findings_count || 0}</div></div>
-        <div className="stat"><div className="muted small">Coverage done</div><div className="mono">{cov.done || 0}</div></div>
-      </div>
-
-      {state?.technologies?.length > 0 && (
-        <p className="small"><strong>Tech:</strong> <span className="mono">{state.technologies.join(', ')}</span></p>
-      )}
-
-      {state?.findings?.length > 0 && (
-        <div className="stack-sm">
-          <div className="msg-h">Findings ({state.findings.length})</div>
-          {state.findings.slice(0, 50).map((f, i) => (
-            <div key={i} className="finding">
-              <div className="row-between">
-                <span className={`sev sev-${(f.severity || 'info').toLowerCase()}`}>{f.severity}</span>
-                <span className="muted small mono">{f.tool}</span>
-              </div>
-              <div className="finding-title">{f.title}</div>
-              <div className="mono small truncate" title={f.target}>{f.target}</div>
+      {(() => {
+        const vsum = state?.validation_summary || {};
+        const validated = state?.validated_findings || [];
+        const chains = state?.chains || [];
+        const fpRate = vsum.false_positive_rate_pct;
+        return (
+          <>
+            <div className="grid-stats">
+              <div className="stat"><div className="muted small">Assets</div><div className="mono">{state?.assets?.length || 0}</div></div>
+              <div className="stat"><div className="muted small">Technologies</div><div className="mono">{state?.technologies?.length || 0}</div></div>
+              <div className="stat"><div className="muted small">Raw findings</div><div className="mono">{state?.findings_count || 0}</div></div>
+              <div className="stat"><div className="muted small">Coverage done</div><div className="mono">{cov.done || 0}</div></div>
             </div>
-          ))}
-        </div>
-      )}
+
+            {state?.technologies?.length > 0 && (
+              <p className="small"><strong>Tech:</strong> <span className="mono">{state.technologies.join(', ')}</span></p>
+            )}
+
+            {validated.length > 0 && (
+              <div className="grid-stats">
+                <div className="stat"><div className="muted small">Confirmed</div><div className="mono sev-high">{vsum.confirmed || 0}</div></div>
+                <div className="stat"><div className="muted small">Likely</div><div className="mono">{vsum.likely || 0}</div></div>
+                <div className="stat"><div className="muted small">False positive</div><div className="mono">{vsum.false_positive || 0}</div></div>
+                <div className="stat"><div className="muted small">FP rate</div><div className="mono">{fpRate != null ? `${fpRate}%` : '-'}</div></div>
+              </div>
+            )}
+
+            {chains.length > 0 && (
+              <div className="stack-sm">
+                <div className="msg-h">Kill-chains ({chains.length})</div>
+                {chains.map((c) => (
+                  <div key={c.id} className="suggestion-card">
+                    <div className="row-between">
+                      <span className={`sev sev-${(c.severity || 'medium').toLowerCase()}`}>{c.severity}</span>
+                      <span className="muted small mono">{c.source || 'deterministic'}</span>
+                    </div>
+                    <div className="finding-title">{c.title}</div>
+                    {c.summary && <div className="finding-desc">{c.summary}</div>}
+                    <ol className="small chain-steps">
+                      {(c.steps || []).map((s, i) => (
+                        <li key={i}><strong>{s.action}</strong>{s.reason ? ` - ${s.reason}` : ''}</li>
+                      ))}
+                    </ol>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {validated.length > 0 ? (
+              <div className="stack-sm">
+                <div className="msg-h">Validated findings ({validated.length})</div>
+                {validated.slice(0, 60).map((f) => (
+                  <div key={f.id} className="finding">
+                    <div className="row-between">
+                      <span className={`sev sev-${(f.severity || 'info').toLowerCase()}`}>{f.severity}</span>
+                      <span className={`mono small vstatus-${f.status}`}>
+                        {f.status} ({Math.round((f.confidence || 0) * 100)}%)
+                      </span>
+                    </div>
+                    <div className="finding-title">{f.title}</div>
+                    <div className="mono small truncate" title={f.target}>{f.target}</div>
+                    <div className="muted small">{f.tool} · {f.method}</div>
+                    {f.poc && <pre className="body mono small">{f.poc}</pre>}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              state?.findings?.length > 0 && (
+                <div className="stack-sm">
+                  <div className="msg-h">Findings ({state.findings.length}) — not yet validated</div>
+                  {state.findings.slice(0, 50).map((f, i) => (
+                    <div key={i} className="finding">
+                      <div className="row-between">
+                        <span className={`sev sev-${(f.severity || 'info').toLowerCase()}`}>{f.severity}</span>
+                        <span className="muted small mono">{f.tool}</span>
+                      </div>
+                      <div className="finding-title">{f.title}</div>
+                      <div className="mono small truncate" title={f.target}>{f.target}</div>
+                    </div>
+                  ))}
+                </div>
+              )
+            )}
+          </>
+        );
+      })()}
     </div>
   );
 }
