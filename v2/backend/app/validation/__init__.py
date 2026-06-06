@@ -4,6 +4,7 @@ from app.validation.models import (
     ValidationResult,
     ValidationStatus,
 )
+from app.validation.chaining import build_chains
 from app.validation.run import validate_engagement
 from app.validation.storage import (
     ChainRepository,
@@ -17,6 +18,7 @@ __all__ = [
     "ValidatedFinding",
     "STATUS_CONFIDENCE",
     "validate_engagement",
+    "build_chains",
     "ValidatedFindingRepository",
     "ChainRepository",
     "new_vf_id",

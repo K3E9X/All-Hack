@@ -19,6 +19,7 @@ import app.orchestrator.state  # noqa: F401
 import app.orchestrator.runs  # noqa: F401
 import app.proxy.storage  # noqa: F401
 import app.scans.storage  # noqa: F401
+import app.validation.storage  # noqa: F401
 
 from app import db
 from app.api.audit import router as audit_router

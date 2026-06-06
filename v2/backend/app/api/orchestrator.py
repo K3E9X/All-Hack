@@ -11,12 +11,20 @@ from app.orchestrator.runs import Run, RunRepository, new_run_id
 from app.orchestrator.state import EngagementState
 from app.scans.storage import JobRepository
 from app.queue import get_arq_pool
+from app.validation import (
+    ChainRepository,
+    ValidatedFindingRepository,
+    build_chains,
+    validate_engagement,
+)
 
 router = APIRouter(prefix="/api/engagements", tags=["orchestrator"])
 
 _engagements = EngagementRepository()
 _runs = RunRepository()
 _jobs = JobRepository()
+_vf = ValidatedFindingRepository()
+_chains = ChainRepository()
 
 
 @router.post("/{engagement_id}/run")
@@ -88,6 +96,10 @@ async def engagement_state(engagement_id: str) -> dict:
             d["tool"] = j.tool
             findings.append(d)
 
+    validated = await _vf.list(engagement_id)
+    chains = await _chains.list(engagement_id)
+    validation_summary = await _vf.summary(engagement_id)
+
     return {
         "engagement": e.to_public(),
         "run": run.to_public() if run else None,
@@ -102,4 +114,36 @@ async def engagement_state(engagement_id: str) -> dict:
         "jobs": [j.to_public() for j in jobs],
         "findings": findings,
         "findings_count": len(findings),
+        "validated_findings": [v.to_public() for v in validated],
+        "validation_summary": validation_summary,
+        "chains": chains,
     }
+
+
+@router.post("/{engagement_id}/validate")
+async def run_validation(engagement_id: str) -> dict:
+    """Validate the engagement's findings on demand (e.g. after manual scans),
+    independent of a full autonomous run."""
+    e = await _engagements.get(engagement_id)
+    if e is None:
+        raise HTTPException(status_code=404, detail="engagement not found")
+    stats = await validate_engagement(engagement_id)
+    chains = await build_chains(engagement_id)
+    await audit("engagement.validated_manual", engagement_id=engagement_id, stats=stats)
+    return {"stats": stats, "chains": len(chains)}
+
+
+@router.get("/{engagement_id}/findings")
+async def validated_findings(engagement_id: str) -> dict:
+    items = await _vf.list(engagement_id)
+    return {
+        "summary": await _vf.summary(engagement_id),
+        "count": len(items),
+        "items": [v.to_public() for v in items],
+    }
+
+
+@router.get("/{engagement_id}/chains")
+async def chains(engagement_id: str) -> dict:
+    items = await _chains.list(engagement_id)
+    return {"count": len(items), "items": items}

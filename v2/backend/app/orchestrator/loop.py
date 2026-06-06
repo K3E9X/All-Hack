@@ -23,6 +23,7 @@ from app.orchestrator.runs import Run, RunRepository
 from app.orchestrator.state import EngagementState
 from app.scans.models import JobStatus
 from app.scans.storage import JobRepository
+from app.validation import build_chains, validate_engagement
 
 logger = logging.getLogger("allhack.orchestrator.loop")
 
@@ -114,6 +115,20 @@ async def run_engagement_loop(run_id: str) -> dict:
 
         else:
             logger.info("[%s] hit MAX_ITERATIONS", run.id)
+
+        # Validation phase: confirm findings with safe PoC, then build chains.
+        # Always run it (even on stop) so partial results are still validated.
+        run.phase = "validation"
+        await runs.update(run)
+        try:
+            stats = await validate_engagement(engagement.id)
+            await build_chains(engagement.id)
+            await audit(
+                "engagement.validated",
+                engagement_id=engagement.id, run_id=run.id, stats=stats,
+            )
+        except Exception:  # noqa: BLE001 - validation must not fail the run
+            logger.exception("[%s] validation phase error", run.id)
 
         if run.status != "stopped":
             run.status = "completed"

@@ -26,6 +26,7 @@ import app.orchestrator.state  # noqa: F401  - register schema
 import app.orchestrator.runs  # noqa: F401  - register schema
 import app.proxy.storage  # noqa: F401  - register schema
 import app.scans.storage  # noqa: F401  - register schema
+import app.validation.storage  # noqa: F401  - register schema
 
 from app.config import settings
 from app.orchestrator.loop import run_engagement_loop
