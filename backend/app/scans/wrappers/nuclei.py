@@ -57,6 +57,7 @@ class NucleiWrapper(BaseWrapper):
             severity = (info.get("severity") or "info").lower()
             template_id = obj.get("template-id") or obj.get("templateID") or ""
             matched_url = obj.get("matched-at") or obj.get("matched") or target
+            tags = info.get("tags")
 
             findings.append(
                 Finding(
@@ -67,14 +68,50 @@ class NucleiWrapper(BaseWrapper):
                     evidence=_evidence(obj),
                     metadata={
                         "template_id": template_id,
-                        "tags": info.get("tags"),
+                        "tags": tags,
                         "reference": info.get("reference"),
                         "classification": info.get("classification"),
                         "curl_command": obj.get("curl-command"),
+                        # Classify each finding from its template tags so SSRF /
+                        # SSTI / LFI / XXE / ... are reported as themselves rather
+                        # than lumped under the generic "multiple".
+                        "vuln_class": _classify(tags, template_id),
                     },
                 )
             )
         return ToolResult(findings=findings)
+
+
+# Template tag (substring) -> vuln_class. First match wins; order matters
+# (more specific before generic).
+_TAG_CLASS = [
+    (("sqli", "sql-injection", "error-based-sql", "blind-sql"), "sql_injection"),
+    (("xss", "rxss", "dom-xss"), "xss"),
+    (("ssrf",), "ssrf"),
+    (("ssti",), "ssti"),
+    (("xxe",), "xxe"),
+    (("lfi", "fileinclusion", "file-inclusion", "traversal", "path-traversal"), "lfi"),
+    (("rce", "cmdi", "command-injection", "oast-rce"), "command_injection"),
+    (("redirect", "open-redirect", "openredirect"), "open_redirect"),
+    (("cors",), "cors"),
+    (("default-login", "auth-bypass", "auth-bypas", "weak-cred"), "auth"),
+    (("exposure", "exposures", "disclosure", "backup", "config"), "exposed_resource"),
+    (("ssl", "tls"), "weak_tls"),
+    (("wordpress", "wp-plugin", "joomla", "drupal"), "cms_vulnerability"),
+]
+
+
+def _classify(tags, template_id: str) -> str:
+    bag = set()
+    if isinstance(tags, str):
+        bag = {t.strip().lower() for t in tags.split(",") if t.strip()}
+    elif isinstance(tags, (list, tuple)):
+        bag = {str(t).strip().lower() for t in tags}
+    tid = (template_id or "").lower()
+    for needles, vclass in _TAG_CLASS:
+        if bag.intersection(needles) or any(n in tid for n in needles):
+            return vclass
+    return "multiple"
 
 
 def _evidence(obj: dict) -> str:

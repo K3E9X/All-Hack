@@ -46,6 +46,43 @@ MAPPING: Dict[str, Dict[str, Any]] = {
         "remediation": "Context-aware output encoding, a strict CSP, and input "
                        "validation. Prefer framework auto-escaping.",
     },
+    "ssrf": {
+        "category": "injection",
+        "wstg": "WSTG-INPV-19", "attack": ["T1190"], "cwe": "CWE-918",
+        "remediation": "Validate and allow-list outbound URLs/hosts; block internal "
+                       "ranges and cloud metadata (169.254.169.254); don't follow "
+                       "redirects to private targets.",
+    },
+    "ssti": {
+        "category": "injection",
+        "wstg": "WSTG-INPV-18", "attack": ["T1190"], "cwe": "CWE-1336",
+        "remediation": "Never render user input as a template; use logic-less "
+                       "templates / strict sandboxing and escape all variables.",
+    },
+    "lfi": {
+        "category": "injection",
+        "wstg": "WSTG-ATHZ-01", "attack": ["T1190"], "cwe": "CWE-22",
+        "remediation": "Resolve and canonicalise paths against an allow-list; reject "
+                       "traversal sequences; never pass user input to file APIs.",
+    },
+    "xxe": {
+        "category": "injection",
+        "wstg": "WSTG-INPV-07", "attack": ["T1190"], "cwe": "CWE-611",
+        "remediation": "Disable external entities and DTD processing in the XML "
+                       "parser; prefer JSON or a hardened parser configuration.",
+    },
+    "open_redirect": {
+        "category": "injection",
+        "wstg": "WSTG-CLNT-04", "attack": ["T1190"], "cwe": "CWE-601",
+        "remediation": "Don't redirect to user-supplied URLs; use an allow-list or "
+                       "indirect (mapped) redirect targets.",
+    },
+    "cors": {
+        "category": "access_control",
+        "wstg": "WSTG-CLNT-07", "attack": ["T1190"], "cwe": "CWE-942",
+        "remediation": "Never reflect arbitrary Origins; use a strict allow-list and "
+                       "only set Allow-Credentials for trusted origins (never with *).",
+    },
     "misconfiguration": {
         "category": "config",
         "wstg": "WSTG-CONF-02", "attack": ["T1190"], "cwe": "CWE-16",

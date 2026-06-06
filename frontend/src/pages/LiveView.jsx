@@ -100,13 +100,14 @@ export default function LiveView() {
     try {
       const r = await api.engagements.analyzeTraffic(id);
       await loadState();
-      const lg = r.logic || {}, js = r.js_recon || {}, jw = r.jwt || {}, ac = r.access_control || {};
+      const lg = r.logic || {}, js = r.js_recon || {}, jw = r.jwt || {}, ac = r.access_control || {}, co = r.cors || {};
       alert(
         `Deep analysis complete:\n` +
         `· Logic: ${lg.idor || 0} IDOR, ${lg.csrf || 0} CSRF, ${lg.bfla || 0} BFLA/privesc\n` +
         `· JS mining: ${js.secrets || 0} secret(s), ${js.endpoints || 0} endpoint(s)\n` +
         `· JWT: ${jw.findings || 0} issue(s) on ${jw.jwt_tokens || 0} token(s)\n` +
-        `· Access control: ${ac.broken_access_control || 0} broken, ${ac.flagged || 0} to review`
+        `· Access control: ${ac.broken_access_control || 0} broken, ${ac.flagged || 0} to review\n` +
+        `· CORS: ${co.findings || 0} finding(s) on ${co.probed || 0} endpoint(s)`
       );
     } catch (e) { setErr(e.message); }
     finally { setAnalyzing(false); }
