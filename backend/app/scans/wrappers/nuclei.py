@@ -5,6 +5,7 @@ Runs with `-jsonl` so each finding is a single JSON object per line on stdout.
 from __future__ import annotations
 
 import json
+import os
 from typing import List, Sequence
 
 from app.scans.models import Finding
@@ -19,6 +20,10 @@ class NucleiWrapper(BaseWrapper):
     timeout_seconds = 30 * 60
 
     def build_command(self, target: str, options: Sequence[str]) -> List[str]:
+        # Out-of-band: nuclei confirms blind SSRF/XXE/RCE via interactsh. By
+        # default it uses ProjectDiscovery's free public servers (oast.*); set
+        # INTERACTSH_SERVER in .env to point at a self-hosted instance.
+        interactsh = os.environ.get("INTERACTSH_SERVER", "").strip()
         cmd = [
             self.binary,
             "-u", target,
@@ -32,6 +37,8 @@ class NucleiWrapper(BaseWrapper):
         # exposures scan also wants info-level).
         if "-severity" not in options and "-s" not in options:
             cmd += ["-severity", "low,medium,high,critical"]
+        if interactsh and "-interactsh-server" not in options:
+            cmd += ["-interactsh-server", interactsh]
         cmd.extend(options)
         return cmd
 

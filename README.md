@@ -71,6 +71,24 @@ You can also drive tools manually: browse the target through the MITM proxy
 (install its CA from the Proxy page), inspect captured requests, and launch
 individual scans from the Scans page.
 
+### Authenticated, traffic-driven testing
+
+For real coverage, run it authenticated:
+
+- **Authenticated scan** - paste the primary identity's headers (Cookie /
+  Authorization) in the engagement form. They're injected into every scanner
+  (nuclei/sqlmap/ffuf/dalfox/katana/...) so it tests *behind the login*.
+- **Real surface from the proxy** - browse the app through the MITM proxy
+  while logged in; the autonomous run seeds those captured (parameterized)
+  requests as scan targets, so sqlmap/dalfox/nuclei-dast hit the endpoints
+  you actually exercised.
+- **Grey-box IDOR/BOLA** - add a *second* identity's headers; the logic
+  analysis replays a captured request as the other user to prove broken
+  object-level authorization.
+- **Out-of-band (blind) confirmation** - nuclei confirms blind SSRF/XXE/RCE
+  via interactsh. By default it uses ProjectDiscovery's free public servers
+  (no infra); set `INTERACTSH_SERVER` in `.env` to self-host.
+
 ## How it works
 
 ```
