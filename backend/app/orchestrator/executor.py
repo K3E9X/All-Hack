@@ -44,6 +44,11 @@ class Executor:
         except (RuntimeError, KeyError) as exc:
             logger.warning("skip task %s: %s", task.key, exc)
             await self.state.mark_coverage(task.catalog_item_id, task.asset_value, "skipped")
+            await events.emit(
+                self.state.engagement_id, events.TASK_SKIPPED,
+                f"{task.tool} skipped on {task.asset_value}: {exc}",
+                level=events.LEVEL_VERBOSE, tool=task.tool, target=task.asset_value,
+            )
             return None
 
         await self.state.mark_coverage(
@@ -84,17 +89,23 @@ class Executor:
         meta = finding.metadata or {}
 
         # Fingerprints from probe/fingerprint tools.
+        techs: List[str] = []
         if tool == "whatweb":
-            plugin = meta.get("plugin")
-            if plugin:
-                await self.state.add_fingerprint(plugin, source="whatweb")
+            if meta.get("plugin"):
+                techs.append(str(meta["plugin"]))
         elif tool == "httpx":
-            for t in meta.get("tech") or []:
-                await self.state.add_fingerprint(str(t), source="httpx")
+            techs.extend(str(t) for t in (meta.get("tech") or []))
             if meta.get("server"):
-                await self.state.add_fingerprint(str(meta["server"]), source="httpx")
+                techs.append(str(meta["server"]))
         elif tool == "wpscan":
-            await self.state.add_fingerprint("wordpress", source="wpscan")
+            techs.append("wordpress")
+        for tech in techs:
+            await self.state.add_fingerprint(tech, source=tool)
+            await events.emit(
+                self.state.engagement_id, events.FINGERPRINT,
+                f"{tech} (via {tool})",
+                level=events.LEVEL_VERBOSE, technology=tech, tool=tool,
+            )
 
         # New endpoint assets from crawl / archive / content-discovery tools.
         new_asset = None  # (kind, value)

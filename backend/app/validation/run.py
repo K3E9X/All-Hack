@@ -11,6 +11,7 @@ import logging
 import time
 from typing import Dict
 
+from app import events
 from app.engagements import EngagementRepository
 from app.scans.storage import JobRepository
 from app.validation.models import ValidatedFinding, ValidationStatus
@@ -79,6 +80,12 @@ async def validate_engagement(engagement_id: str) -> Dict[str, int]:
                     created_at=time.time(),
                     metadata=f.metadata or {},
                 )
+            )
+            await events.emit(
+                engagement_id, events.VALIDATED,
+                f"{result.status.value} [{f.severity}] {f.title} ({result.method})",
+                level=events.LEVEL_VERBOSE,
+                status=result.status.value, severity=f.severity, tool=job.tool,
             )
 
     await vf_repo.replace_for_engagement(engagement_id, validated)

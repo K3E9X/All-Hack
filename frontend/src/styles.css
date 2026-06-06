@@ -539,6 +539,10 @@ body {
 .log-job_done .log-type { color: #6aa1ff; }
 .log-finding .log-type { color: #c9a400; }
 .log-asset_found .log-type { color: var(--muted); }
+.log-command .log-type { color: #7ed08b; }
+.log-fingerprint .log-type { color: #b07aff; }
+.log-task_skipped .log-type { color: var(--muted); }
+.log-validated .log-type { color: var(--ok); }
 
 .approval-card { border-color: #c9a400; }
 

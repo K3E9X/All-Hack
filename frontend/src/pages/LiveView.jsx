@@ -130,38 +130,38 @@ export default function LiveView() {
         </section>
       ))}
 
-      <div className="live-grid">
-        {/* High-level agent reasoning console (info events) */}
-        <section className="card">
-          <h3 className="msg-h">Agent console</h3>
-          <div className="console" ref={consoleRef}>
-            {infoEvents.length === 0 && <div className="muted small">No events yet.</div>}
-            {infoEvents.map((ev) => (
-              <div key={ev.id} className={`logline log-${ev.type}`}>
-                <span className="log-ts">{new Date(ev.ts * 1000).toLocaleTimeString()}</span>
-                <span className="log-type">[{ev.type}]</span>
-                <span className="log-msg">{ev.message}</span>
-              </div>
-            ))}
-          </div>
-        </section>
+      {/* Two consoles stacked full-width, same size. */}
+      {/* High-level agent reasoning console (info events) */}
+      <section className="card">
+        <h3 className="msg-h">Agent console</h3>
+        <div className="console" ref={consoleRef}>
+          {infoEvents.length === 0 && <div className="muted small">No events yet.</div>}
+          {infoEvents.map((ev) => (
+            <div key={ev.id} className={`logline log-${ev.type}`}>
+              <span className="log-ts">{new Date(ev.ts * 1000).toLocaleTimeString()}</span>
+              <span className="log-type">[{ev.type}]</span>
+              <span className="log-msg">{ev.message}</span>
+            </div>
+          ))}
+        </div>
+      </section>
 
-        {/* Verbose console: ONLY the fine-grained detail the agent console
-            does not show - per finished job, per finding, per discovered asset. */}
-        <section className="card">
-          <h3 className="msg-h">Verbose console</h3>
-          <div className="console" ref={verboseRef}>
-            {verboseEvents.length === 0 && <div className="muted small">No detail yet.</div>}
-            {verboseEvents.map((ev) => (
-              <div key={ev.id} className={`logline log-${ev.type}`}>
-                <span className="log-ts">{new Date(ev.ts * 1000).toLocaleTimeString()}</span>
-                <span className="log-type">[{ev.type}]</span>
-                <span className="log-msg">{ev.message}</span>
-              </div>
-            ))}
-          </div>
-        </section>
-      </div>
+      {/* Verbose console: ONLY the fine-grained detail the agent console
+          does not show - commands, per finished job, per finding, fingerprints,
+          discovered assets, per-finding validation. */}
+      <section className="card">
+        <h3 className="msg-h">Verbose console</h3>
+        <div className="console" ref={verboseRef}>
+          {verboseEvents.length === 0 && <div className="muted small">No detail yet.</div>}
+          {verboseEvents.map((ev) => (
+            <div key={ev.id} className={`logline log-${ev.type}`}>
+              <span className="log-ts">{new Date(ev.ts * 1000).toLocaleTimeString()}</span>
+              <span className="log-type">[{ev.type}]</span>
+              <span className="log-msg">{ev.message}</span>
+            </div>
+          ))}
+        </div>
+      </section>
 
       {/* Surface + cost stats */}
       <section className="card">

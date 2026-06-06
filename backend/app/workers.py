@@ -66,6 +66,15 @@ async def run_scan(ctx: Dict[str, Any], job_id: str) -> Dict[str, Any]:
     await repo.update(job)
     logger.info("[%s] %s %s", job.id, job.tool, cmd)
 
+    # Verbose: surface the exact command line to the live view.
+    if job.engagement_id:
+        from app import events
+        await events.emit(
+            job.engagement_id, events.COMMAND,
+            " ".join(cmd),
+            level=events.LEVEL_VERBOSE, tool=job.tool, job_id=job.id,
+        )
+
     stdout_buf = bytearray()
     stderr_buf = bytearray()
     proc: Optional[asyncio.subprocess.Process] = None
