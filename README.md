@@ -19,9 +19,26 @@ only adds judgement on top.
 
 ## Quick start
 
-Requirements: Docker with the Compose plugin (Docker Desktop / OrbStack on
-macOS, or `docker-ce` + `docker-compose-plugin` on Ubuntu/Debian). Multi-arch:
-`linux/amd64` and `linux/arm64` (Apple Silicon).
+Requirements: Docker with the Compose plugin. Supported hosts:
+
+- **Linux** (Ubuntu/Debian): `docker-ce` + `docker-compose-plugin`.
+- **macOS** (Intel or Apple Silicon): Docker Desktop or OrbStack.
+- **Windows**: via **WSL2** - see below.
+
+Images are multi-arch (`linux/amd64` and `linux/arm64`).
+
+### Windows (WSL2)
+
+The tool is Linux/Docker only, so on Windows run it inside WSL2:
+
+1. Install WSL2 with a distro: `wsl --install` (PowerShell, admin), reboot.
+2. Either install Docker Desktop and enable **Settings -> Resources -> WSL
+   integration** for your distro, or install `docker-ce` directly inside the
+   WSL distro.
+3. Open the WSL shell (Ubuntu), `git clone` the repo **inside** the WSL
+   filesystem (e.g. `~/allhack`, not `/mnt/c/...` - native FS is much faster),
+   then run `./install.sh` / `./start.sh` exactly as on Linux.
+4. Browse to http://localhost:3000 from Windows - WSL2 forwards localhost.
 
 ```
 ./install.sh          # checks Docker, seeds .env, runs `docker compose build`

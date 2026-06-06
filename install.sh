@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# install.sh - one-shot installer for Ubuntu, Debian, macOS (Apple Silicon or Intel).
+# install.sh - one-shot installer for Ubuntu, Debian, macOS (Apple Silicon or
+# Intel), and Windows via WSL2 (inside WSL the OS is detected as Linux).
 #
 # What it does:
 #   1. Verify Docker and Docker Compose are installed.
@@ -32,7 +33,13 @@ ARCH="$(uname -m)"
 log "Detected OS: ${OS} (${ARCH})"
 
 if [ "$OS" = "unknown" ]; then
-    fail "Unsupported OS. Supported: Ubuntu, Debian, macOS."
+    fail "Unsupported OS. Supported: Ubuntu, Debian, macOS, Windows via WSL2."
+fi
+
+# Friendly note when running inside WSL.
+if [ "$OS" = "linux" ] && grep -qiE "microsoft|wsl" /proc/version 2>/dev/null; then
+    log "Running under WSL2. Make sure Docker is reachable (Docker Desktop WSL"
+    log "integration, or docker-ce inside this distro)."
 fi
 
 # Docker check.
