@@ -69,9 +69,31 @@ services:
     cap_add:
       - NET_ADMIN
 
-  # The 'worker' service is added in a later Phase 1 commit once the arq
-  # worker code exists in app/workers/. For now scans still run in-process
-  # in the backend container.
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: allhack-worker
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      - DATA_DIR=/data
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-allhack}:${POSTGRES_PASSWORD:-allhack}@postgres:5432/${POSTGRES_DB:-allhack}
+      - REDIS_URL=redis://redis:6379/0
+    volumes:
+      # Same /data as the backend so the worker can read mitmproxy's CA dir
+      # if a wrapper ever needs to (none today, but keeps things flexible).
+      - ./data:/data
+    # Same image, different entrypoint: arq picks scan jobs off Redis and
+    # runs nuclei/sqlmap/ffuf/dalfox/nmap/etc.
+    entrypoint: []
+    command: ["arq", "app.workers.WorkerSettings"]
 
   frontend:
     build:

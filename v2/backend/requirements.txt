@@ -7,3 +7,4 @@ python-dotenv==1.0.1
 mitmproxy==11.0.2
 asyncpg==0.30.0
 psycopg[binary]==3.2.3
+arq==0.26.3
