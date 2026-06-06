@@ -27,9 +27,11 @@ class NucleiWrapper(BaseWrapper):
             "-disable-update-check",
             "-stats=false",
             "-no-color",
-            # Skip the noisiest info-level checks by default; users can override via options.
-            "-severity", "low,medium,high,critical",
         ]
+        # Default severity floor, unless the caller set its own (e.g. an
+        # exposures scan also wants info-level).
+        if "-severity" not in options and "-s" not in options:
+            cmd += ["-severity", "low,medium,high,critical"]
         cmd.extend(options)
         return cmd
 

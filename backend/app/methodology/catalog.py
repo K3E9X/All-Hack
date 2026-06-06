@@ -201,8 +201,47 @@ CATALOG: List[CatalogItem] = [
         severity_default="medium",
         applies_when={"tech_any": ["wordpress", "wp"]},
     ),
+    CatalogItem(
+        id="VULN-EXPOSURES",
+        wstg_id="WSTG-CONF-04",
+        attack_techniques=["T1592"],
+        vuln_class="exposed_resource",
+        phase=PHASE_VULN,
+        tool="nuclei",
+        description="Exposed files, configs, backups and secrets (.git/.env/...).",
+        severity_default="medium",
+        # info-level included on purpose: many exposure templates are info/low.
+        default_options=["-tags", "exposure,exposures,config,backup,disclosure",
+                         "-severity", "info,low,medium,high,critical"],
+        applies_when={"always": True},
+    ),
+    CatalogItem(
+        id="VULN-AUTH",
+        wstg_id="WSTG-ATHN-01",
+        attack_techniques=["T1110", "T1078"],
+        vuln_class="auth",
+        phase=PHASE_VULN,
+        tool="nuclei",
+        description="Default credentials and known authentication bypasses.",
+        severity_default="high",
+        default_options=["-tags", "default-login,auth-bypass,auth"],
+        applies_when={"always": True},
+    ),
 
     # ----- EXPLOITATION (parameter-driven, safe-ish active tests) -----
+    CatalogItem(
+        id="EXP-DAST",
+        wstg_id="WSTG-INPV-00",
+        attack_techniques=["T1190"],
+        vuln_class="multiple",
+        phase=PHASE_EXPLOIT,
+        tool="nuclei",
+        description="DAST fuzzing of parameters: SSRF, LFI, XXE, SSTI, "
+                    "open redirect, SQLi, XSS, command injection.",
+        severity_default="high",
+        default_options=["-dast"],
+        applies_when={"requires_params": True},
+    ),
     CatalogItem(
         id="EXP-SQLI",
         wstg_id="WSTG-INPV-05",

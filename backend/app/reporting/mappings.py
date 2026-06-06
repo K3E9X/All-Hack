@@ -49,6 +49,11 @@ MAPPING: Dict[str, Dict[str, Any]] = {
         "remediation": "Review each templated finding individually and apply the "
                        "vendor's guidance.",
     },
+    "auth": {
+        "wstg": "WSTG-ATHN-01", "attack": ["T1110", "T1078"], "cwe": "CWE-287",
+        "remediation": "Remove default/weak credentials, enforce strong auth and "
+                       "rate limiting, and fix authentication-bypass paths.",
+    },
     "recon": {"wstg": "WSTG-INFO-02", "attack": ["T1595"], "cwe": "CWE-200", "remediation": "Reduce exposed surface; restrict information disclosure."},
     "fingerprint": {"wstg": "WSTG-INFO-08", "attack": ["T1592"], "cwe": "CWE-200", "remediation": "Suppress version banners where practical."},
 }
