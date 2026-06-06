@@ -509,7 +509,8 @@ body {
 
 .live-grid {
   display: grid;
-  grid-template-columns: 1.4fr 1fr;
+  /* verbose console (2nd) gets the wider column */
+  grid-template-columns: 1fr 1.6fr;
   gap: 16px;
 }
 @media (max-width: 860px) {

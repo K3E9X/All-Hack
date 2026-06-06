@@ -81,6 +81,7 @@ export default function LiveView() {
   const validated = state?.validated_findings || [];
   const llm = state?.llm_usage || {};
   const infoEvents = eventsList.filter((ev) => ev.level !== 'verbose');
+  const verboseEvents = eventsList.filter((ev) => ev.level === 'verbose');
 
   return (
     <div className="stack">
@@ -145,13 +146,14 @@ export default function LiveView() {
           </div>
         </section>
 
-        {/* Verbose console: every event, including per-job / per-finding / per-asset */}
+        {/* Verbose console: ONLY the fine-grained detail the agent console
+            does not show - per finished job, per finding, per discovered asset. */}
         <section className="card">
           <h3 className="msg-h">Verbose console</h3>
           <div className="console" ref={verboseRef}>
-            {eventsList.length === 0 && <div className="muted small">No events yet.</div>}
-            {eventsList.map((ev) => (
-              <div key={ev.id} className={`logline log-${ev.type} ${ev.level === 'verbose' ? 'log-verbose' : ''}`}>
+            {verboseEvents.length === 0 && <div className="muted small">No detail yet.</div>}
+            {verboseEvents.map((ev) => (
+              <div key={ev.id} className={`logline log-${ev.type}`}>
                 <span className="log-ts">{new Date(ev.ts * 1000).toLocaleTimeString()}</span>
                 <span className="log-type">[{ev.type}]</span>
                 <span className="log-msg">{ev.message}</span>
