@@ -6,9 +6,12 @@ from typing import Dict, List
 from app.scans.wrappers.base import BaseWrapper
 from app.scans.wrappers.commix import CommixWrapper
 from app.scans.wrappers.dalfox import DalfoxWrapper
+from app.scans.wrappers.dnsx import DnsxWrapper
 from app.scans.wrappers.ffuf import FfufWrapper
+from app.scans.wrappers.gau import GauWrapper
 from app.scans.wrappers.httpx import HttpxWrapper
 from app.scans.wrappers.katana import KatanaWrapper
+from app.scans.wrappers.naabu import NaabuWrapper
 from app.scans.wrappers.nikto import NiktoWrapper
 from app.scans.wrappers.nmap import NmapWrapper
 from app.scans.wrappers.nuclei import NucleiWrapper
@@ -34,6 +37,9 @@ _WRAPPERS: Dict[str, BaseWrapper] = {
     "wafw00f": Wafw00fWrapper(),
     "whatweb": WhatwebWrapper(),
     "nikto": NiktoWrapper(),
+    "naabu": NaabuWrapper(),
+    "dnsx": DnsxWrapper(),
+    "gau": GauWrapper(),
 }
 
 

@@ -59,6 +59,9 @@ ARG DALFOX_VERSION=2.9.2
 ARG SUBFINDER_VERSION=2.6.7
 ARG HTTPX_VERSION=1.6.9
 ARG KATANA_VERSION=1.1.2
+ARG NAABU_VERSION=2.3.3
+ARG DNSX_VERSION=1.2.1
+ARG GAU_VERSION=2.2.4
 
 # Map Docker TARGETARCH to the suffix each project uses in its release archive.
 #   amd64 -> amd64
@@ -111,7 +114,29 @@ RUN set -eux; \
         "https://github.com/projectdiscovery/katana/releases/download/v${KATANA_VERSION}/katana_${KATANA_VERSION}_linux_${ARCH_SUFFIX}.zip"; \
     unzip -q katana.zip; \
     install -m 0755 katana /usr/local/bin/katana; \
-    rm -f katana katana.zip LICENSE.md README*.md
+    rm -f katana katana.zip LICENSE.md README*.md; \
+    \
+    # naabu (port scanner). We use connect-scan mode at runtime so no libpcap
+    # / NET_RAW capability is required.
+    curl -fsSL -o naabu.zip \
+        "https://github.com/projectdiscovery/naabu/releases/download/v${NAABU_VERSION}/naabu_${NAABU_VERSION}_linux_${ARCH_SUFFIX}.zip"; \
+    unzip -q naabu.zip; \
+    install -m 0755 naabu /usr/local/bin/naabu; \
+    rm -f naabu naabu.zip LICENSE.md README*.md; \
+    \
+    # dnsx (DNS toolkit)
+    curl -fsSL -o dnsx.zip \
+        "https://github.com/projectdiscovery/dnsx/releases/download/v${DNSX_VERSION}/dnsx_${DNSX_VERSION}_linux_${ARCH_SUFFIX}.zip"; \
+    unzip -q dnsx.zip; \
+    install -m 0755 dnsx /usr/local/bin/dnsx; \
+    rm -f dnsx dnsx.zip LICENSE.md README*.md; \
+    \
+    # gau (GetAllUrls - historical URLs from wayback/commoncrawl/otx)
+    curl -fsSL -o gau.tar.gz \
+        "https://github.com/lc/gau/releases/download/v${GAU_VERSION}/gau_${GAU_VERSION}_linux_${ARCH_SUFFIX}.tar.gz"; \
+    tar -xzf gau.tar.gz; \
+    install -m 0755 gau /usr/local/bin/gau; \
+    rm -f gau gau.tar.gz LICENSE README*.md
 
 # Pre-download nuclei templates so first scan is fast.
 RUN nuclei -update-templates -silent || true
