@@ -22,6 +22,7 @@ from app import db
 from app.api.audit import router as audit_router
 from app.api.engagements import router as engagements_router
 from app.api.llm import router as llm_router
+from app.api.methodology import router as methodology_router
 from app.api.proxy import router as proxy_router
 from app.api.scans import router as scans_router
 from app.config import settings
@@ -101,3 +102,4 @@ app.include_router(proxy_router)
 app.include_router(scans_router)
 app.include_router(llm_router)
 app.include_router(audit_router)
+app.include_router(methodology_router)

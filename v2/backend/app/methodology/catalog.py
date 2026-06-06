@@ -1,0 +1,275 @@
+"""Declarative test catalog: the methodology engine's source of truth.
+
+The planner reasons over this data, not over hardcoded steps. Each entry maps
+an OWASP WSTG test to the MITRE ATT&CK technique(s) it relates to, the tool
+that performs it, and an `applies_when` condition evaluated against the live
+engagement context (fingerprint, discovered assets, ...). The coverage matrix
+tracks which items have run against which assets.
+
+`applies_when` is intentionally a small structured dict (not a lambda) so it
+is serializable, inspectable in the UI, and safe to ship to the LLM planner:
+
+    {"always": true}                  - run on the base target
+    {"requires_params": true}         - only on URLs that have query params
+    {"tech_any": ["wordpress"]}       - only if a fingerprint matched one of these
+    {"is_host": true}                 - run against a host, not a URL (nmap/naabu/dns)
+"""
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional
+
+
+# PTES-aligned phases the planner walks in order.
+PHASE_RECON = "recon"
+PHASE_MAPPING = "mapping"
+PHASE_VULN = "vuln_analysis"
+PHASE_EXPLOIT = "exploitation"
+
+PHASE_ORDER = [PHASE_RECON, PHASE_MAPPING, PHASE_VULN, PHASE_EXPLOIT]
+
+
+@dataclass
+class CatalogItem:
+    id: str
+    wstg_id: str
+    attack_techniques: List[str]
+    vuln_class: str
+    phase: str
+    tool: str
+    description: str
+    severity_default: str = "info"
+    default_options: List[str] = field(default_factory=list)
+    applies_when: Dict[str, Any] = field(default_factory=lambda: {"always": True})
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "id": self.id,
+            "wstg_id": self.wstg_id,
+            "attack_techniques": self.attack_techniques,
+            "vuln_class": self.vuln_class,
+            "phase": self.phase,
+            "tool": self.tool,
+            "description": self.description,
+            "severity_default": self.severity_default,
+            "default_options": self.default_options,
+            "applies_when": self.applies_when,
+        }
+
+
+# ---------------------------------------------------------------------------
+# The catalog. Ordered roughly by phase; the planner re-orders within budget.
+# Every tool referenced here is a registered wrapper (app/scans/wrappers).
+# ---------------------------------------------------------------------------
+CATALOG: List[CatalogItem] = [
+    # ----- RECON -----
+    CatalogItem(
+        id="RECON-SUBDOMAINS",
+        wstg_id="WSTG-INFO-04",
+        attack_techniques=["T1590", "T1595"],
+        vuln_class="recon",
+        phase=PHASE_RECON,
+        tool="subfinder",
+        description="Enumerate subdomains of the target apex domain.",
+        applies_when={"is_host": True},
+    ),
+    CatalogItem(
+        id="RECON-DNS",
+        wstg_id="WSTG-INFO-04",
+        attack_techniques=["T1590"],
+        vuln_class="recon",
+        phase=PHASE_RECON,
+        tool="dnsx",
+        description="Resolve DNS records (A/AAAA/CNAME) for the host.",
+        applies_when={"is_host": True},
+    ),
+    CatalogItem(
+        id="RECON-PORTS",
+        wstg_id="WSTG-INFO-02",
+        attack_techniques=["T1595"],
+        vuln_class="recon",
+        phase=PHASE_RECON,
+        tool="naabu",
+        description="Scan top TCP ports to find exposed services.",
+        applies_when={"is_host": True},
+    ),
+    CatalogItem(
+        id="RECON-HTTP-PROBE",
+        wstg_id="WSTG-INFO-02",
+        attack_techniques=["T1595"],
+        vuln_class="recon",
+        phase=PHASE_RECON,
+        tool="httpx",
+        description="Probe HTTP(S), capture status, title and tech fingerprint.",
+        applies_when={"always": True},
+    ),
+    CatalogItem(
+        id="RECON-ARCHIVE-URLS",
+        wstg_id="WSTG-INFO-04",
+        attack_techniques=["T1595"],
+        vuln_class="recon",
+        phase=PHASE_RECON,
+        tool="gau",
+        description="Collect historical URLs (Wayback/Common Crawl/OTX).",
+        applies_when={"is_host": True},
+    ),
+
+    # ----- MAPPING / FINGERPRINT -----
+    CatalogItem(
+        id="MAP-FINGERPRINT",
+        wstg_id="WSTG-INFO-08",
+        attack_techniques=["T1592"],
+        vuln_class="fingerprint",
+        phase=PHASE_MAPPING,
+        tool="whatweb",
+        description="Fingerprint server, framework, CMS and language.",
+        applies_when={"always": True},
+    ),
+    CatalogItem(
+        id="MAP-WAF",
+        wstg_id="WSTG-INFO-00",
+        attack_techniques=["T1595"],
+        vuln_class="fingerprint",
+        phase=PHASE_MAPPING,
+        tool="wafw00f",
+        description="Detect a WAF so later phases can adapt payloads and rate.",
+        applies_when={"always": True},
+    ),
+    CatalogItem(
+        id="MAP-CRAWL",
+        wstg_id="WSTG-INFO-07",
+        attack_techniques=["T1595"],
+        vuln_class="recon",
+        phase=PHASE_MAPPING,
+        tool="katana",
+        description="Crawl the app to map endpoints, forms and parameters.",
+        applies_when={"always": True},
+    ),
+    CatalogItem(
+        id="MAP-CONTENT-DISCOVERY",
+        wstg_id="WSTG-CONF-04",
+        attack_techniques=["T1595"],
+        vuln_class="content_discovery",
+        phase=PHASE_MAPPING,
+        tool="ffuf",
+        description="Brute-force common paths/files (admin, backups, .git, .env).",
+        applies_when={"always": True},
+    ),
+
+    # ----- VULN ANALYSIS -----
+    CatalogItem(
+        id="VULN-NUCLEI",
+        wstg_id="WSTG-CONF-01",
+        attack_techniques=["T1190"],
+        vuln_class="multiple",
+        phase=PHASE_VULN,
+        tool="nuclei",
+        description="Template scan: CVEs, exposures, misconfig, default creds.",
+        severity_default="medium",
+        applies_when={"always": True},
+    ),
+    CatalogItem(
+        id="VULN-SERVER-MISCONFIG",
+        wstg_id="WSTG-CONF-02",
+        attack_techniques=["T1190"],
+        vuln_class="misconfiguration",
+        phase=PHASE_VULN,
+        tool="nikto",
+        description="Web-server misconfig, dangerous methods, backup/old files.",
+        severity_default="low",
+        applies_when={"always": True},
+    ),
+    CatalogItem(
+        id="VULN-TLS",
+        wstg_id="WSTG-CRYP-01",
+        attack_techniques=["T1190"],
+        vuln_class="weak_tls",
+        phase=PHASE_VULN,
+        tool="testssl",
+        description="TLS/SSL audit: ciphers, protocol versions, TLS CVEs.",
+        severity_default="medium",
+        applies_when={"is_https": True},
+    ),
+    CatalogItem(
+        id="VULN-WORDPRESS",
+        wstg_id="WSTG-CONF-01",
+        attack_techniques=["T1190"],
+        vuln_class="cms_vulnerability",
+        phase=PHASE_VULN,
+        tool="wpscan",
+        description="WordPress plugins/themes/users + known CVEs.",
+        severity_default="medium",
+        applies_when={"tech_any": ["wordpress", "wp"]},
+    ),
+
+    # ----- EXPLOITATION (parameter-driven, safe-ish active tests) -----
+    CatalogItem(
+        id="EXP-SQLI",
+        wstg_id="WSTG-INPV-05",
+        attack_techniques=["T1190"],
+        vuln_class="sql_injection",
+        phase=PHASE_EXPLOIT,
+        tool="sqlmap",
+        description="Test injectable parameters for SQL injection.",
+        severity_default="high",
+        default_options=["--batch", "--level=2", "--risk=2"],
+        applies_when={"requires_params": True},
+    ),
+    CatalogItem(
+        id="EXP-XSS",
+        wstg_id="WSTG-INPV-01",
+        attack_techniques=["T1190"],
+        vuln_class="xss",
+        phase=PHASE_EXPLOIT,
+        tool="dalfox",
+        description="Test reflected/DOM XSS on parameters.",
+        severity_default="medium",
+        applies_when={"requires_params": True},
+    ),
+    CatalogItem(
+        id="EXP-CMDI",
+        wstg_id="WSTG-INPV-12",
+        attack_techniques=["T1190"],
+        vuln_class="command_injection",
+        phase=PHASE_EXPLOIT,
+        tool="commix",
+        description="Test parameters for OS command injection.",
+        severity_default="critical",
+        applies_when={"requires_params": True},
+    ),
+]
+
+
+CATALOG_BY_ID: Dict[str, CatalogItem] = {item.id: item for item in CATALOG}
+
+
+def items_for_phase(phase: str) -> List[CatalogItem]:
+    return [i for i in CATALOG if i.phase == phase]
+
+
+def applies(item: CatalogItem, context: Dict[str, Any]) -> bool:
+    """Evaluate an item's applies_when against an asset/engagement context.
+
+    context keys:
+      is_host          - the target is a bare host (no path)
+      is_https         - target uses https
+      requires_params  - target URL has query parameters
+      tech             - list[str] of fingerprinted technologies (lowercased)
+    """
+    cond = item.applies_when or {"always": True}
+
+    if cond.get("always"):
+        return True
+    if cond.get("is_host") and not context.get("is_host"):
+        return False
+    if cond.get("is_https") and not context.get("is_https"):
+        return False
+    if cond.get("requires_params") and not context.get("requires_params"):
+        return False
+    tech_any = cond.get("tech_any")
+    if tech_any:
+        tech = [t.lower() for t in context.get("tech", [])]
+        if not any(any(want in have for have in tech) for want in tech_any):
+            return False
+    # If we reach here every present condition passed.
+    return True
