@@ -1,4 +1,4 @@
-"""Async runner that executes wrapper commands and updates the Job in SQLite.
+"""Async runner that executes wrapper commands and persists the Job to Postgres.
 
 Each job runs in its own asyncio task. stdout and stderr are streamed into
 memory (capped) so we can store them for inspection. When the process ends,
@@ -12,12 +12,10 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from pathlib import Path
 from typing import Dict, List, Optional
 
-from app.config import settings
 from app.scans.models import Finding, Job, JobStatus
-from app.scans.storage import JobRepository, init_jobs_schema, new_job_id
+from app.scans.storage import JobRepository, new_job_id
 from app.scans.wrappers import get_wrapper
 
 logger = logging.getLogger("allhack.scans.runner")
@@ -27,8 +25,8 @@ MAX_STREAM_BYTES = 1 * 1024 * 1024  # 1 MiB
 
 
 class Runner:
-    def __init__(self, db_path: Path) -> None:
-        self.repo = JobRepository(db_path)
+    def __init__(self) -> None:
+        self.repo = JobRepository()
         self._tasks: Dict[str, asyncio.Task] = {}
         self._processes: Dict[str, asyncio.subprocess.Process] = {}
 
@@ -181,6 +179,5 @@ _runner: Optional[Runner] = None
 def get_runner() -> Runner:
     global _runner
     if _runner is None:
-        init_jobs_schema(settings.sqlite_path)
-        _runner = Runner(settings.sqlite_path)
+        _runner = Runner()
     return _runner

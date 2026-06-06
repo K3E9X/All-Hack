@@ -1,29 +1,26 @@
-"""SQLite schema and data access for captured HTTP flows.
+"""Postgres data access for captured HTTP flows.
 
-We keep two paths into the database on purpose:
+Two paths into the database on purpose:
 
-  - `init_schema()`           - synchronous, run at startup and from the addon.
-  - async `FlowRepository`    - used by the FastAPI endpoints (aiosqlite).
-  - `insert_flow_sync()`      - called by the mitmproxy addon (stdlib sqlite3).
+  - async `FlowRepository` for FastAPI endpoints (asyncpg pool).
+  - sync `insert_flow_sync` for the mitmproxy addon (psycopg, sync) since
+    mitmdump runs in its own non-asyncio process.
 
-SQLite is opened in WAL mode so the addon process and the API process can
-read/write concurrently without blocking each other.
+Both share the same DATABASE_URL via app.config.
 """
 from __future__ import annotations
 
 import json
-import sqlite3
-from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from pathlib import Path
-from typing import Any, AsyncIterator, Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
-import aiosqlite
+from app import db
 
-SCHEMA = """
+
+SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS flows (
     id                     TEXT PRIMARY KEY,
-    timestamp              REAL NOT NULL,
+    "timestamp"            DOUBLE PRECISION NOT NULL,
     duration_ms            INTEGER,
     method                 TEXT NOT NULL,
     scheme                 TEXT,
@@ -32,83 +29,113 @@ CREATE TABLE IF NOT EXISTS flows (
     path                   TEXT NOT NULL,
     url                    TEXT NOT NULL,
     request_headers_json   TEXT,
-    request_body           BLOB,
+    request_body           BYTEA,
     request_content_type   TEXT,
     request_size           INTEGER,
     status_code            INTEGER,
     response_headers_json  TEXT,
-    response_body          BLOB,
+    response_body          BYTEA,
     response_content_type  TEXT,
     response_size          INTEGER,
     tag                    TEXT
 );
 
-CREATE INDEX IF NOT EXISTS idx_flows_timestamp ON flows(timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_flows_timestamp ON flows("timestamp" DESC);
 CREATE INDEX IF NOT EXISTS idx_flows_host      ON flows(host);
 CREATE INDEX IF NOT EXISTS idx_flows_status    ON flows(status_code);
 """
 
+db.register_schema(SCHEMA_SQL)
 
-def init_schema(db_path: Path) -> None:
-    """Create the schema and enable WAL. Safe to call from any process."""
-    db_path.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(str(db_path))
+
+# -----------------------------------------------------------------------------
+# Sync path (mitmproxy addon)
+# -----------------------------------------------------------------------------
+
+def insert_flow_sync(row: Dict[str, Any]) -> None:
+    """Insert a captured flow synchronously. Called from the mitmproxy addon."""
+    conn = db.sync_connect()
     try:
-        conn.execute("PRAGMA journal_mode=WAL;")
-        conn.execute("PRAGMA synchronous=NORMAL;")
-        conn.executescript(SCHEMA)
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO flows (
+                    id, "timestamp", duration_ms, method, scheme, host, port, path, url,
+                    request_headers_json, request_body, request_content_type, request_size,
+                    status_code,
+                    response_headers_json, response_body, response_content_type, response_size,
+                    tag
+                ) VALUES (
+                    %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                    %s, %s, %s, %s,
+                    %s,
+                    %s, %s, %s, %s,
+                    %s
+                )
+                ON CONFLICT (id) DO UPDATE SET
+                    "timestamp"            = EXCLUDED."timestamp",
+                    duration_ms            = EXCLUDED.duration_ms,
+                    method                 = EXCLUDED.method,
+                    scheme                 = EXCLUDED.scheme,
+                    host                   = EXCLUDED.host,
+                    port                   = EXCLUDED.port,
+                    path                   = EXCLUDED.path,
+                    url                    = EXCLUDED.url,
+                    request_headers_json   = EXCLUDED.request_headers_json,
+                    request_body           = EXCLUDED.request_body,
+                    request_content_type   = EXCLUDED.request_content_type,
+                    request_size           = EXCLUDED.request_size,
+                    status_code            = EXCLUDED.status_code,
+                    response_headers_json  = EXCLUDED.response_headers_json,
+                    response_body          = EXCLUDED.response_body,
+                    response_content_type  = EXCLUDED.response_content_type,
+                    response_size          = EXCLUDED.response_size,
+                    tag                    = EXCLUDED.tag
+                """,
+                (
+                    row["id"],
+                    row["timestamp"],
+                    row.get("duration_ms"),
+                    row["method"],
+                    row.get("scheme"),
+                    row["host"],
+                    row.get("port"),
+                    row["path"],
+                    row["url"],
+                    row.get("request_headers_json"),
+                    row.get("request_body"),
+                    row.get("request_content_type"),
+                    row.get("request_size"),
+                    row.get("status_code"),
+                    row.get("response_headers_json"),
+                    row.get("response_body"),
+                    row.get("response_content_type"),
+                    row.get("response_size"),
+                    row.get("tag"),
+                ),
+            )
         conn.commit()
     finally:
         conn.close()
 
 
-# ----- sync path (mitmproxy addon) -----
-
-def insert_flow_sync(db_path: Path, row: Dict[str, Any]) -> None:
-    """Insert a single captured flow. Called from the mitmproxy process."""
-    conn = sqlite3.connect(str(db_path), timeout=5.0)
+def init_schema_sync() -> None:
+    """Sync schema bootstrap, callable from the mitmproxy addon before any
+    insert when the API process has not yet started."""
+    conn = db.sync_connect()
     try:
-        conn.execute("PRAGMA journal_mode=WAL;")
-        conn.execute(
-            """
-            INSERT OR REPLACE INTO flows (
-                id, timestamp, duration_ms, method, scheme, host, port, path, url,
-                request_headers_json, request_body, request_content_type, request_size,
-                status_code,
-                response_headers_json, response_body, response_content_type, response_size,
-                tag
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                row["id"],
-                row["timestamp"],
-                row.get("duration_ms"),
-                row["method"],
-                row.get("scheme"),
-                row["host"],
-                row.get("port"),
-                row["path"],
-                row["url"],
-                row.get("request_headers_json"),
-                row.get("request_body"),
-                row.get("request_content_type"),
-                row.get("request_size"),
-                row.get("status_code"),
-                row.get("response_headers_json"),
-                row.get("response_body"),
-                row.get("response_content_type"),
-                row.get("response_size"),
-                row.get("tag"),
-            ),
-        )
+        with conn.cursor() as cur:
+            cur.execute(SCHEMA_SQL)
         conn.commit()
     finally:
         conn.close()
 
 
-# ----- async path (FastAPI endpoints) -----
+# -----------------------------------------------------------------------------
+# Async path (FastAPI endpoints)
+# -----------------------------------------------------------------------------
 
-MAX_BODY_PREVIEW = 256 * 1024  # bytes returned by /requests/{id}
+MAX_BODY_PREVIEW = 256 * 1024  # bytes returned by /flows/{id}
 
 
 @dataclass
@@ -130,22 +157,7 @@ class FlowSummary:
 
 
 class FlowRepository:
-    def __init__(self, db_path: Path) -> None:
-        self.db_path = db_path
-
-    @asynccontextmanager
-    async def _connect(self) -> AsyncIterator[aiosqlite.Connection]:
-        # aiosqlite.connect() is both awaitable and a context manager; using
-        # `async with await ...` would start its background thread twice and
-        # raise "threads can only be started once" on subsequent calls. Own
-        # the lifecycle here and close explicitly.
-        conn = await aiosqlite.connect(str(self.db_path))
-        try:
-            await conn.execute("PRAGMA journal_mode=WAL;")
-            conn.row_factory = aiosqlite.Row
-            yield conn
-        finally:
-            await conn.close()
+    """Read/write captured HTTP flows. Owns no connection; borrows from the pool."""
 
     async def list_flows(
         self,
@@ -160,56 +172,60 @@ class FlowRepository:
     ) -> List[FlowSummary]:
         where: List[str] = []
         params: List[Any] = []
+        i = 1
+
+        def ph() -> str:
+            nonlocal i
+            cur = i
+            i += 1
+            return f"${cur}"
 
         if host:
-            where.append("host = ?")
+            where.append(f"host = {ph()}")
             params.append(host)
         if method:
-            where.append("method = ?")
+            where.append(f"method = {ph()}")
             params.append(method.upper())
         if status_min is not None:
-            where.append("status_code >= ?")
+            where.append(f"status_code >= {ph()}")
             params.append(status_min)
         if status_max is not None:
-            where.append("status_code <= ?")
+            where.append(f"status_code <= {ph()}")
             params.append(status_max)
         if search:
-            where.append("url LIKE ?")
+            where.append(f"url ILIKE {ph()}")
             params.append(f"%{search}%")
 
         where_sql = f" WHERE {' AND '.join(where)}" if where else ""
+        limit_ph = ph()
+        offset_ph = ph()
         params.extend([limit, offset])
 
         sql = (
-            "SELECT id, timestamp, method, host, path, url, status_code, "
+            'SELECT id, "timestamp", method, host, path, url, status_code, '
             "response_size, duration_ms, request_content_type, response_content_type "
-            f"FROM flows{where_sql} ORDER BY timestamp DESC LIMIT ? OFFSET ?"
+            f'FROM flows{where_sql} ORDER BY "timestamp" DESC LIMIT {limit_ph} OFFSET {offset_ph}'
         )
 
-        async with self._connect() as conn:
-            cursor = await conn.execute(sql, params)
-            rows = await cursor.fetchall()
+        async with db.acquire() as conn:
+            rows = await conn.fetch(sql, *params)
 
         return [FlowSummary(**dict(row)) for row in rows]
 
     async def count_flows(self) -> int:
-        async with self._connect() as conn:
-            cursor = await conn.execute("SELECT COUNT(*) FROM flows")
-            (n,) = await cursor.fetchone()
-            return int(n)
+        async with db.acquire() as conn:
+            return int(await conn.fetchval("SELECT COUNT(*) FROM flows"))
 
     async def list_hosts(self) -> List[Dict[str, Any]]:
-        async with self._connect() as conn:
-            cursor = await conn.execute(
+        async with db.acquire() as conn:
+            rows = await conn.fetch(
                 "SELECT host, COUNT(*) AS count FROM flows GROUP BY host ORDER BY count DESC"
             )
-            rows = await cursor.fetchall()
-        return [{"host": row["host"], "count": row["count"]} for row in rows]
+        return [{"host": row["host"], "count": int(row["count"])} for row in rows]
 
     async def get_flow(self, flow_id: str) -> Optional[Dict[str, Any]]:
-        async with self._connect() as conn:
-            cursor = await conn.execute("SELECT * FROM flows WHERE id = ?", (flow_id,))
-            row = await cursor.fetchone()
+        async with db.acquire() as conn:
+            row = await conn.fetchrow("SELECT * FROM flows WHERE id = $1", flow_id)
         if row is None:
             return None
 
@@ -219,21 +235,28 @@ class FlowRepository:
         data["request_headers"] = _safe_json(data.pop("request_headers_json"))
         data["response_headers"] = _safe_json(data.pop("response_headers_json"))
 
-        # Decode body preview (text if it looks like text, else hex note)
-        data["request_body_preview"] = _body_preview(
-            data.pop("request_body"), data.get("request_content_type")
-        )
-        data["response_body_preview"] = _body_preview(
-            data.pop("response_body"), data.get("response_content_type")
-        )
+        # asyncpg returns BYTEA as bytes already (memoryview in some versions);
+        # normalize to bytes so the preview helper can slice it.
+        req_body = data.pop("request_body")
+        resp_body = data.pop("response_body")
+        if isinstance(req_body, memoryview):
+            req_body = bytes(req_body)
+        if isinstance(resp_body, memoryview):
+            resp_body = bytes(resp_body)
+
+        data["request_body_preview"] = _body_preview(req_body, data.get("request_content_type"))
+        data["response_body_preview"] = _body_preview(resp_body, data.get("response_content_type"))
 
         return data
 
     async def delete_all(self) -> int:
-        async with self._connect() as conn:
-            cursor = await conn.execute("DELETE FROM flows")
-            await conn.commit()
-            return cursor.rowcount or 0
+        async with db.acquire() as conn:
+            result = await conn.execute("DELETE FROM flows")
+        # result is "DELETE <count>"
+        try:
+            return int(result.split()[-1])
+        except (IndexError, ValueError):
+            return 0
 
 
 def _safe_json(raw: Optional[str]) -> List[List[str]]:
@@ -278,7 +301,6 @@ def _body_preview(body: Optional[bytes], content_type: Optional[str]) -> Dict[st
         except Exception:
             pass
 
-    # Fallback: hex for the first few KB.
     hex_cap = 8 * 1024
     return {
         "present": True,

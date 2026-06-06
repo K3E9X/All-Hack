@@ -1,7 +1,8 @@
-"""FastAPI entrypoint for v2.
+"""FastAPI entrypoint for All-Hack.
 
-Phase 0: health, config, LLM ping.
-Phase 1: MITM proxy capture + flow inspection (see app/api/proxy.py).
+Storage is Postgres (asyncpg pool, shared by the API and the arq worker).
+The mitmproxy addon writes flows synchronously via psycopg using the same
+DATABASE_URL.
 """
 from __future__ import annotations
 
@@ -10,21 +11,24 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
+# Importing the storage modules registers their CREATE TABLE statements with
+# app.db; init_db() then runs them all in lifespan startup.
+import app.proxy.storage  # noqa: F401
+import app.scans.storage  # noqa: F401
+
+from app import db
 from app.api.llm import router as llm_router
 from app.api.proxy import router as proxy_router
 from app.api.scans import router as scans_router
 from app.config import settings
 from app.llm import LLMError, get_llm
-from app.proxy import init_schema
-from app.scans import init_jobs_schema
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):  # noqa: ARG001
-    # Make sure the shared SQLite DB exists before the addon or the API touches it.
-    init_schema(settings.sqlite_path)
-    init_jobs_schema(settings.sqlite_path)
+    await db.init_db()
     yield
+    await db.close_pool()
 
 
 app = FastAPI(title="allhack v2", version="2.0.0", lifespan=lifespan)

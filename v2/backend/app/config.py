@@ -23,6 +23,10 @@ class Settings(BaseSettings):
 
     # Storage
     data_dir: Path = Path("/data")
+    # Postgres + Redis are mandatory from Phase 1 onward. Defaults match the
+    # docker-compose service names so a `docker compose up` works out of the box.
+    database_url: str = "postgresql://allhack:allhack@postgres:5432/allhack"
+    redis_url: str = "redis://redis:6379/0"
 
     # MITM
     mitm_port: int = 8080
@@ -37,10 +41,6 @@ class Settings(BaseSettings):
     @property
     def openrouter_fallback_list(self) -> List[str]:
         return [m.strip() for m in self.openrouter_fallback_models.split(",") if m.strip()]
-
-    @property
-    def sqlite_path(self) -> Path:
-        return self.data_dir / "allhack.db"
 
 
 settings = Settings()

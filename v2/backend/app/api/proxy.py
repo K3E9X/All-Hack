@@ -12,7 +12,7 @@ from app.proxy import FlowRepository
 
 router = APIRouter(prefix="/api/proxy", tags=["proxy"])
 
-_repo = FlowRepository(settings.sqlite_path)
+_repo = FlowRepository()
 
 # mitmproxy writes its CA to ~/.mitmproxy by default. We pass --set confdir=/data/mitm
 # in entrypoint.sh so the cert ends up in a predictable location users can grab.
@@ -28,7 +28,7 @@ async def status() -> dict:
         "listen_port": settings.mitm_port,
         "flows_captured": total,
         "ca_available": ca_path.exists(),
-        "db_path": str(settings.sqlite_path),
+        "storage": "postgres",
     }
 
 

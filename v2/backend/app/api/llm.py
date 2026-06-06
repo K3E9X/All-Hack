@@ -18,8 +18,8 @@ from app.scans.storage import JobRepository
 
 router = APIRouter(prefix="/api/llm", tags=["llm"])
 
-_flows = FlowRepository(settings.sqlite_path)
-_jobs = JobRepository(settings.sqlite_path)
+_flows = FlowRepository()
+_jobs = JobRepository()
 
 
 def _require_llm() -> None:

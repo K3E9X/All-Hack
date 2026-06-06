@@ -9,11 +9,10 @@ from pydantic import BaseModel
 from app.scans import get_runner
 from app.scans.storage import JobRepository
 from app.scans.wrappers import available_wrappers, get_wrapper
-from app.config import settings
 
 router = APIRouter(prefix="/api/scans", tags=["scans"])
 
-_repo = JobRepository(settings.sqlite_path)
+_repo = JobRepository()
 
 
 class ScanRequest(BaseModel):
