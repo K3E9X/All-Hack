@@ -7,9 +7,12 @@ confirmed with a **safe** proof-of-exploit, findings are linked into
 kill-chains, you watch it live, and you ship a client report.
 
 It orchestrates mature CLI tools (nuclei, sqlmap, ffuf, dalfox, nmap, ...) -
-it does not reinvent scanners - and uses an LLM (via OpenRouter, free models
-work) to plan, reorder and explain. The whole loop also runs **with no LLM**:
-the methodology engine is deterministic; the model only adds judgement on top.
+it does not reinvent scanners - and uses an LLM to plan, reorder and explain.
+Models are per-role and swappable: by default **Z.ai (GLM)** for the
+planner/executor/validator, with **Moonshot (Kimi)** as a drop-in alternative
+and **OpenRouter** as an optional free fallback. The whole loop also runs
+**with no LLM** at all: the methodology engine is deterministic; the model
+only adds judgement on top.
 
 > For authorized testing only. Use it on systems you own or have written
 > permission to test.
@@ -21,10 +24,13 @@ macOS, or `docker-ce` + `docker-compose-plugin` on Ubuntu/Debian). Multi-arch:
 `linux/amd64` and `linux/arm64` (Apple Silicon).
 
 ```
-./install.sh          # checks Docker, seeds .env, builds the images
-# (optional) edit .env -> OPENROUTER_API_KEY  — the loop runs without it
-./start.sh            # up | stop | restart | --logs
+./install.sh          # checks Docker, seeds .env, runs `docker compose build`
+# edit .env -> set your Z.ai (GLM) or Kimi API key(s); optional, loop runs without
+./start.sh            # docker compose up -d   (also: stop | restart | --logs)
 ```
+
+`install.sh` is just a guarded wrapper around `docker compose build`; `start.sh`
+around `docker compose up`. You can run those directly if you prefer.
 
 | Service    | URL                          |
 | ---------- | ---------------------------- |
@@ -104,15 +110,14 @@ present. WordPress CVE correlation needs `WPSCAN_API_TOKEN` (free, optional).
 
 | Variable                       | Purpose                                            |
 | ------------------------------ | -------------------------------------------------- |
-| `OPENROUTER_API_KEY`           | Enables LLM features (planner reorder, explanations). Optional. |
-| `OPENROUTER_MODEL`             | Default `qwen/qwen3-coder:free`.                   |
-| `OPENROUTER_FALLBACK_MODELS`   | Tried on 429/5xx from the primary.                |
-| `PLANNER/EXECUTOR/VALIDATOR_*` | Optional per-role provider (Z.ai GLM, Moonshot Kimi). Fall back to OpenRouter. |
+| `PLANNER/EXECUTOR/VALIDATOR_BASE_URL` `_API_KEY` `_MODEL` | Per-role LLM. Default `.env` points all three at **Z.ai GLM** (`glm-4.6`); set the key to activate. Swap to **Kimi** (`https://api.moonshot.cn/v1`, `kimi-k2-0905-preview`) per role. |
+| `OPENROUTER_API_KEY` / `_MODEL` / `_FALLBACK_MODELS` | **Optional** free fallback aggregator, used only for roles whose own key is blank. |
 | `POSTGRES_*`                   | Database credentials (defaults work out of the box). |
 | `WPSCAN_API_TOKEN`             | Optional WordPress CVE lookups.                    |
 
-If a role has no key it reuses the OpenRouter config, so the stack works with a
-single key (or none).
+Set a Z.ai (or Kimi) key on each role for the real thing; leave keys blank and
+it falls back to OpenRouter's free models, so the stack works with a single key
+or none.
 
 ## Layout
 
