@@ -1,0 +1,149 @@
+"""Postgres persistence for engagements."""
+from __future__ import annotations
+
+from typing import List, Optional
+
+from app import db
+from app.engagements.models import (
+    Engagement,
+    EngagementStatus,
+    VerificationMethod,
+    scope_from_json,
+    scope_to_json,
+)
+
+SCHEMA_SQL = """
+CREATE TABLE IF NOT EXISTS engagements (
+    id                   TEXT PRIMARY KEY,
+    target_url           TEXT NOT NULL,
+    target_host          TEXT NOT NULL,
+    scope_hosts_json     TEXT NOT NULL,
+    status               TEXT NOT NULL,
+    verification_token   TEXT NOT NULL,
+    verification_method  TEXT,
+    title                TEXT,
+    notes                TEXT,
+    created_at           DOUBLE PRECISION NOT NULL,
+    verified_at          DOUBLE PRECISION,
+    closed_at            DOUBLE PRECISION,
+    attested_at          DOUBLE PRECISION,
+    budget_requests      INTEGER,
+    budget_seconds       INTEGER
+);
+
+CREATE INDEX IF NOT EXISTS idx_engagements_created ON engagements(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_engagements_status  ON engagements(status);
+CREATE INDEX IF NOT EXISTS idx_engagements_host    ON engagements(target_host);
+"""
+
+db.register_schema(SCHEMA_SQL)
+
+
+class EngagementRepository:
+    async def create(self, e: Engagement) -> None:
+        async with db.acquire() as conn:
+            await conn.execute(
+                """
+                INSERT INTO engagements (
+                    id, target_url, target_host, scope_hosts_json, status,
+                    verification_token, verification_method, title, notes,
+                    created_at, verified_at, closed_at, attested_at,
+                    budget_requests, budget_seconds
+                ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+                """,
+                e.id,
+                e.target_url,
+                e.target_host,
+                scope_to_json(e.scope_hosts),
+                e.status.value,
+                e.verification_token,
+                e.verification_method.value if e.verification_method else None,
+                e.title,
+                e.notes,
+                e.created_at,
+                e.verified_at,
+                e.closed_at,
+                e.attested_at,
+                e.budget_requests,
+                e.budget_seconds,
+            )
+
+    async def update(self, e: Engagement) -> None:
+        async with db.acquire() as conn:
+            await conn.execute(
+                """
+                UPDATE engagements SET
+                    target_url = $1,
+                    target_host = $2,
+                    scope_hosts_json = $3,
+                    status = $4,
+                    verification_token = $5,
+                    verification_method = $6,
+                    title = $7,
+                    notes = $8,
+                    verified_at = $9,
+                    closed_at = $10,
+                    attested_at = $11,
+                    budget_requests = $12,
+                    budget_seconds = $13
+                WHERE id = $14
+                """,
+                e.target_url,
+                e.target_host,
+                scope_to_json(e.scope_hosts),
+                e.status.value,
+                e.verification_token,
+                e.verification_method.value if e.verification_method else None,
+                e.title,
+                e.notes,
+                e.verified_at,
+                e.closed_at,
+                e.attested_at,
+                e.budget_requests,
+                e.budget_seconds,
+                e.id,
+            )
+
+    async def get(self, engagement_id: str) -> Optional[Engagement]:
+        async with db.acquire() as conn:
+            row = await conn.fetchrow(
+                "SELECT * FROM engagements WHERE id = $1", engagement_id
+            )
+        return _row_to_engagement(row) if row else None
+
+    async def list(self, *, limit: int = 100, offset: int = 0) -> List[Engagement]:
+        async with db.acquire() as conn:
+            rows = await conn.fetch(
+                "SELECT * FROM engagements ORDER BY created_at DESC LIMIT $1 OFFSET $2",
+                limit,
+                offset,
+            )
+        return [_row_to_engagement(r) for r in rows]
+
+    async def count(self) -> int:
+        async with db.acquire() as conn:
+            return int(await conn.fetchval("SELECT COUNT(*) FROM engagements"))
+
+
+def _row_to_engagement(row) -> Engagement:
+    return Engagement(
+        id=row["id"],
+        target_url=row["target_url"],
+        target_host=row["target_host"],
+        scope_hosts=scope_from_json(row["scope_hosts_json"]),
+        status=EngagementStatus(row["status"]),
+        verification_token=row["verification_token"],
+        verification_method=(
+            VerificationMethod(row["verification_method"])
+            if row["verification_method"]
+            else None
+        ),
+        title=row["title"] or "",
+        notes=row["notes"] or "",
+        created_at=row["created_at"],
+        verified_at=row["verified_at"],
+        closed_at=row["closed_at"],
+        attested_at=row["attested_at"],
+        budget_requests=row["budget_requests"],
+        budget_seconds=row["budget_seconds"],
+    )
