@@ -1,129 +1,61 @@
-#!/bin/bash
+#!/usr/bin/env bash
+# start.sh - start the stack in the background and print access info.
+#
+# Usage:
+#   ./start.sh            # start detached
+#   ./start.sh --logs     # start detached and follow logs
+#   ./start.sh stop       # stop and remove containers
+#   ./start.sh restart    # restart cleanly
 
-# All-Hack Start Script
-# Usage: ./start.sh [dev|prod]
-# Compatible: macOS, Debian, Ubuntu, Fedora
+set -euo pipefail
 
-# Get script directory (cross-platform)
-get_script_dir() {
-    local source="${BASH_SOURCE[0]}"
-    while [ -h "$source" ]; do
-        local dir="$(cd -P "$(dirname "$source")" && pwd)"
-        source="$(readlink "$source" 2>/dev/null || greadlink "$source" 2>/dev/null || echo "$source")"
-        [[ $source != /* ]] && source="$dir/$source"
-    done
-    echo "$(cd -P "$(dirname "$source")" && pwd)"
-}
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
 
-ROOT_DIR="$(get_script_dir)"
-cd "$ROOT_DIR"
+log()  { printf '[start] %s\n' "$*"; }
+fail() { printf '[start] ERROR: %s\n' "$*" >&2; exit 1; }
 
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m'
-
-log() { echo -e "${GREEN}[+]${NC} $1"; }
-warn() { echo -e "${YELLOW}[!]${NC} $1"; }
-error() { echo -e "${RED}[x]${NC} $1"; exit 1; }
-info() { echo -e "${BLUE}[i]${NC} $1"; }
-
-# Parse arguments
-MODE="${1:-prod}"
-
-# PID file for tracking
-PID_FILE="$ROOT_DIR/.allhack.pid"
-LOG_DIR="$ROOT_DIR/logs"
-mkdir -p "$LOG_DIR"
-
-# Check if already running
-if [ -f "$PID_FILE" ]; then
-    OLD_PID=$(cat "$PID_FILE" 2>/dev/null | head -1)
-    if [ -n "$OLD_PID" ] && kill -0 "$OLD_PID" 2>/dev/null; then
-        warn "All-Hack already running (PID: $OLD_PID)"
-        warn "Run ./stop.sh first"
-        exit 1
-    else
-        rm -f "$PID_FILE"
-    fi
-fi
-
-cleanup() {
-    log "Shutting down..."
-    [ -n "$BACKEND_PID" ] && kill $BACKEND_PID 2>/dev/null
-    [ -n "$FRONTEND_PID" ] && kill $FRONTEND_PID 2>/dev/null
-    rm -f "$PID_FILE"
-    exit 0
-}
-trap cleanup SIGINT SIGTERM
-
-# Check prerequisites
-if [ ! -d "backend/venv" ]; then
-    error "Backend not installed. Run ./install.sh first"
-fi
-
-if [ ! -d "frontend/node_modules" ]; then
-    error "Frontend not installed. Run ./install.sh first"
-fi
-
-# Start backend
-log "Starting backend..."
-cd "$ROOT_DIR/backend"
-
-# Activate venv (cross-platform: Linux/macOS vs Windows Git Bash)
-if [ -f "venv/bin/activate" ]; then
-    source venv/bin/activate
-elif [ -f "venv/Scripts/activate" ]; then
-    source venv/Scripts/activate
-fi
-
-uvicorn app.main:app --host 0.0.0.0 --port 8001 > "$LOG_DIR/backend.log" 2>&1 &
-BACKEND_PID=$!
-echo "$BACKEND_PID" > "$PID_FILE"
-
-cd "$ROOT_DIR"
-
-# Wait for backend
-sleep 2
-if ! kill -0 $BACKEND_PID 2>/dev/null; then
-    error "Backend failed to start. Check $LOG_DIR/backend.log"
-fi
-
-log "Backend running on http://localhost:8001"
-
-if [ "$MODE" == "dev" ]; then
-    # Development mode: run frontend dev server
-    log "Starting frontend dev server..."
-    cd "$ROOT_DIR/frontend"
-    npm run dev > "$LOG_DIR/frontend.log" 2>&1 &
-    FRONTEND_PID=$!
-    echo "$FRONTEND_PID" >> "$PID_FILE"
-    cd "$ROOT_DIR"
-
-    sleep 3
-    if ! kill -0 $FRONTEND_PID 2>/dev/null; then
-        warn "Frontend dev server failed. Check $LOG_DIR/frontend.log"
-    else
-        log "Frontend running on http://localhost:5173"
-    fi
-
-    echo ""
-    info "Development mode"
-    info "  Frontend: http://localhost:5173"
-    info "  Backend:  http://localhost:8001"
-    info "  API Docs: http://localhost:8001/docs"
+if docker compose version >/dev/null 2>&1; then
+    COMPOSE_CMD="docker compose"
+elif command -v docker-compose >/dev/null 2>&1; then
+    COMPOSE_CMD="docker-compose"
 else
-    # Production mode: serve frontend from backend
-    echo ""
-    info "Production mode"
-    info "  URL:      http://localhost:8001"
-    info "  API Docs: http://localhost:8001/docs"
+    fail "Docker Compose not found. Run ./install.sh first."
 fi
 
-echo ""
-info "Logs: $LOG_DIR/"
-log "Press Ctrl+C to stop"
+if [ ! -f .env ]; then
+    fail ".env not found. Run ./install.sh first."
+fi
 
-# Wait for processes
-wait
+case "${1:-up}" in
+    stop)
+        log "Stopping stack..."
+        $COMPOSE_CMD down
+        exit 0
+        ;;
+    restart)
+        log "Restarting stack..."
+        $COMPOSE_CMD down
+        $COMPOSE_CMD up -d
+        ;;
+    up|--logs|"")
+        log "Starting stack..."
+        $COMPOSE_CMD up -d
+        ;;
+    *)
+        fail "Unknown command: ${1}. Use: up | stop | restart | --logs"
+        ;;
+esac
+
+printf '\n'
+log "Stack is up."
+log "  UI:         http://localhost:3000"
+log "  API:        http://localhost:8000"
+log "  API docs:   http://localhost:8000/docs"
+log "  MITM proxy: http://localhost:8080  (set this as your browser HTTP/HTTPS proxy)"
+printf '\n'
+
+if [ "${1:-}" = "--logs" ]; then
+    log "Following logs (Ctrl+C to detach, stack keeps running)..."
+    $COMPOSE_CMD logs -f
+fi
