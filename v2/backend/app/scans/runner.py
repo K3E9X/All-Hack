@@ -14,7 +14,7 @@ from typing import List, Optional
 from app.scans.models import Job, JobStatus
 from app.scans.storage import JobRepository, new_job_id
 from app.scans.wrappers import get_wrapper
-from app.workers import get_arq_pool
+from app.queue import get_arq_pool
 
 logger = logging.getLogger("allhack.scans.runner")
 

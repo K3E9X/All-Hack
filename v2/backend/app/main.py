@@ -16,6 +16,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import app.audit  # noqa: F401
 import app.engagements.storage  # noqa: F401
 import app.orchestrator.state  # noqa: F401
+import app.orchestrator.runs  # noqa: F401
 import app.proxy.storage  # noqa: F401
 import app.scans.storage  # noqa: F401
 
@@ -24,6 +25,7 @@ from app.api.audit import router as audit_router
 from app.api.engagements import router as engagements_router
 from app.api.llm import router as llm_router
 from app.api.methodology import router as methodology_router
+from app.api.orchestrator import router as orchestrator_router
 from app.api.proxy import router as proxy_router
 from app.api.scans import router as scans_router
 from app.config import settings
@@ -99,6 +101,7 @@ async def llm_ping(role: str = "planner") -> dict:
 
 
 app.include_router(engagements_router)
+app.include_router(orchestrator_router)
 app.include_router(proxy_router)
 app.include_router(scans_router)
 app.include_router(llm_router)

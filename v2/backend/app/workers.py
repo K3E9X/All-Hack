@@ -16,16 +16,19 @@ import time
 from typing import Any, Dict, List, Optional
 
 from arq import cron  # noqa: F401  (kept for future scheduled tasks)
-from arq.connections import RedisSettings, create_pool
 
 from app import db
+from app.queue import close_arq_pool, get_arq_pool  # noqa: F401
+from app.queue import redis_settings as _redis_settings
 import app.audit  # noqa: F401  - register schema
 import app.engagements.storage  # noqa: F401  - register schema
 import app.orchestrator.state  # noqa: F401  - register schema
+import app.orchestrator.runs  # noqa: F401  - register schema
 import app.proxy.storage  # noqa: F401  - register schema
 import app.scans.storage  # noqa: F401  - register schema
 
 from app.config import settings
+from app.orchestrator.loop import run_engagement_loop
 from app.scans.models import Finding, Job, JobStatus
 from app.scans.storage import JobRepository
 from app.scans.wrappers import get_wrapper
@@ -34,28 +37,6 @@ logger = logging.getLogger("allhack.worker")
 
 # Same caps as the in-process Runner had.
 MAX_STREAM_BYTES = 1 * 1024 * 1024  # 1 MiB
-
-# Module-level pool used by the API to enqueue jobs. Built lazily.
-_arq_pool = None
-
-
-def _redis_settings() -> RedisSettings:
-    return RedisSettings.from_dsn(settings.redis_url)
-
-
-async def get_arq_pool():
-    """Return the shared arq pool, creating it on first use."""
-    global _arq_pool
-    if _arq_pool is None:
-        _arq_pool = await create_pool(_redis_settings())
-    return _arq_pool
-
-
-async def close_arq_pool() -> None:
-    global _arq_pool
-    if _arq_pool is not None:
-        await _arq_pool.close()
-        _arq_pool = None
 
 
 # -----------------------------------------------------------------------------
@@ -175,6 +156,15 @@ async def run_scan(ctx: Dict[str, Any], job_id: str) -> Dict[str, Any]:
     return {"job_id": job_id, "status": job.status.value, "findings": len(findings)}
 
 
+async def run_engagement(ctx: Dict[str, Any], run_id: str) -> Dict[str, Any]:
+    """arq task: drive the autonomous plan->execute->ingest loop for a run.
+
+    Long-lived. The scan sub-jobs it launches run concurrently on this same
+    worker (max_jobs > 1), so the loop can submit a batch and await it.
+    """
+    return await run_engagement_loop(run_id)
+
+
 async def _pump_streams(
     proc: asyncio.subprocess.Process,
     stdout_buf: bytearray,
@@ -210,12 +200,15 @@ async def shutdown(ctx: Dict[str, Any]) -> None:
 
 class WorkerSettings:
     """Used by: arq app.workers.WorkerSettings"""
-    functions = [run_scan]
+    functions = [run_scan, run_engagement]
     redis_settings = _redis_settings()
     on_startup = startup
     on_shutdown = shutdown
-    # Run a few scan jobs concurrently; tune later if needed.
-    max_jobs = 4
+    # Must be > 1: the long-lived run_engagement task occupies one slot while
+    # the scan sub-jobs it launches need other slots to actually execute.
+    max_jobs = 8
     # arq retries failed jobs by default; we never want that for pentest
     # commands (a flaky network would re-run sqlmap five times). Disable.
     max_tries = 1
+    # The orchestrator loop can run for a long time; raise the per-task ceiling.
+    job_timeout = 3 * 60 * 60
