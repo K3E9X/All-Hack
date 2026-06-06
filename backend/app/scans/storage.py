@@ -124,6 +124,18 @@ class JobRepository:
         async with db.acquire() as conn:
             return int(await conn.fetchval("SELECT COUNT(*) FROM jobs"))
 
+    async def delete_by_tool(self, engagement_id: str, tool: str) -> int:
+        """Remove an engagement's jobs for a given tool (used to make the
+        synthetic 'logic' analysis idempotent across re-runs)."""
+        async with db.acquire() as conn:
+            result = await conn.execute(
+                "DELETE FROM jobs WHERE engagement_id=$1 AND tool=$2", engagement_id, tool
+            )
+        try:
+            return int(result.split()[-1])
+        except (IndexError, ValueError):
+            return 0
+
     async def delete(self, job_id: str) -> bool:
         async with db.acquire() as conn:
             result = await conn.execute("DELETE FROM jobs WHERE id = $1", job_id)

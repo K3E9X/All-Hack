@@ -34,6 +34,7 @@ export const api = {
     stop: (id) => request(`/api/engagements/${id}/stop`, { method: 'POST' }),
     state: (id) => request(`/api/engagements/${id}/state`),
     validate: (id) => request(`/api/engagements/${id}/validate`, { method: 'POST' }),
+    analyzeTraffic: (id) => request(`/api/engagements/${id}/analyze-traffic`, { method: 'POST' }),
     events: (id, afterId = 0) => request(`/api/engagements/${id}/events?after_id=${afterId}`),
     approvals: (id) => request(`/api/engagements/${id}/approvals`),
     decideApproval: (id, approvalId, decision) =>

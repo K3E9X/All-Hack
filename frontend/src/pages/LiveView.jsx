@@ -72,6 +72,16 @@ export default function LiveView() {
   async function stop() {
     try { await api.engagements.stop(id); await loadState(); } catch (e) { setErr(e.message); }
   }
+  const [analyzing, setAnalyzing] = useState(false);
+  async function analyzeTraffic() {
+    setAnalyzing(true);
+    try {
+      const r = await api.engagements.analyzeTraffic(id);
+      await loadState();
+      alert(`Analyzed ${r.flows_analyzed} captured flows: ${r.idor} IDOR, ${r.csrf} CSRF candidate(s).`);
+    } catch (e) { setErr(e.message); }
+    finally { setAnalyzing(false); }
+  }
 
   const e = state?.engagement;
   const r = state?.run;
@@ -91,6 +101,9 @@ export default function LiveView() {
           <Link className="btn ghost" to="/engagements">Back</Link>
           {!active && <button className="btn" onClick={run}>Run</button>}
           {active && <button className="btn ghost danger" onClick={stop}>Stop</button>}
+          <button className="btn ghost" onClick={analyzeTraffic} disabled={analyzing}>
+            {analyzing ? 'Analyzing...' : 'Analyze traffic (IDOR/CSRF)'}
+          </button>
           <a className="btn ghost" href={`/api/engagements/${id}/report.md`} target="_blank" rel="noreferrer">Report .md</a>
           <a className="btn ghost" href={`/api/engagements/${id}/report.html`} target="_blank" rel="noreferrer">Report (print)</a>
         </div>

@@ -54,6 +54,16 @@ MAPPING: Dict[str, Dict[str, Any]] = {
         "remediation": "Remove default/weak credentials, enforce strong auth and "
                        "rate limiting, and fix authentication-bypass paths.",
     },
+    "idor": {
+        "wstg": "WSTG-ATHZ-04", "attack": ["T1190"], "cwe": "CWE-639",
+        "remediation": "Enforce object-level authorization server-side: check the "
+                       "current user owns/may access every referenced object id.",
+    },
+    "csrf": {
+        "wstg": "WSTG-SESS-05", "attack": ["T1190"], "cwe": "CWE-352",
+        "remediation": "Require an anti-CSRF token (or SameSite=strict cookies + "
+                       "origin checks) on all state-changing requests.",
+    },
     "recon": {"wstg": "WSTG-INFO-02", "attack": ["T1595"], "cwe": "CWE-200", "remediation": "Reduce exposed surface; restrict information disclosure."},
     "fingerprint": {"wstg": "WSTG-INFO-08", "attack": ["T1592"], "cwe": "CWE-200", "remediation": "Suppress version banners where practical."},
 }

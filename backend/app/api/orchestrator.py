@@ -134,10 +134,27 @@ async def run_validation(engagement_id: str) -> dict:
     e = await _engagements.get(engagement_id)
     if e is None:
         raise HTTPException(status_code=404, detail="engagement not found")
+    from app.analysis import analyze_logic
+    await analyze_logic(engagement_id)
     stats = await validate_engagement(engagement_id)
     chains = await build_chains(engagement_id)
     await audit("engagement.validated_manual", engagement_id=engagement_id, stats=stats)
     return {"stats": stats, "chains": len(chains)}
+
+
+@router.post("/{engagement_id}/analyze-traffic")
+async def analyze_traffic(engagement_id: str) -> dict:
+    """Run IDOR/CSRF logic analysis over proxy-captured authenticated traffic,
+    then re-validate and rebuild chains so the new findings show up."""
+    e = await _engagements.get(engagement_id)
+    if e is None:
+        raise HTTPException(status_code=404, detail="engagement not found")
+    from app.analysis import analyze_logic
+    result = await analyze_logic(engagement_id)
+    await validate_engagement(engagement_id)
+    await build_chains(engagement_id)
+    await audit("engagement.analyzed_traffic", engagement_id=engagement_id, result=result)
+    return result
 
 
 @router.get("/{engagement_id}/findings")

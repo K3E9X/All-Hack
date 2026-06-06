@@ -56,6 +56,21 @@ class FindingValidator:
         self.safe = safe_poc
 
     async def validate(self, finding: Finding, tool: str, vuln_class: str) -> ValidationResult:
+        # 0. logic analysis (IDOR/CSRF) already decided its own status from the
+        # captured traffic + safe re-fetch; trust the precomputed verdict.
+        if tool == "logic":
+            md = finding.metadata or {}
+            status_str = str(md.get("status", "likely"))
+            conf = float(md.get("confidence", 0.55))
+            try:
+                status = ValidationStatus(status_str)
+            except ValueError:
+                status = ValidationStatus.LIKELY
+            return ValidationResult(
+                status=status, confidence=conf, method="logic-analysis",
+                poc=finding.evidence or "", detail="From captured authenticated traffic.",
+            )
+
         # 1. tool already proved it
         if tool in _TOOL_CONFIRMED:
             poc = finding.evidence or (finding.metadata or {}).get("payload") or ""
