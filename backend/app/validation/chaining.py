@@ -125,6 +125,24 @@ def _deterministic_chains(findings: List[ValidatedFinding]) -> List[Dict[str, An
             steps=steps,
         ))
 
+    # Pattern: RCE -> local privilege escalation -> root.
+    if cmdi:
+        privesc = has("privilege_escalation")
+        if privesc:
+            chains.append(_chain(
+                title="RCE to root via local privilege escalation",
+                severity="critical",
+                summary="Command execution plus a local privesc vector (passwordless "
+                        "sudo / SUID GTFOBins binary) yields full root control.",
+                steps=[
+                    {"finding_id": cmdi[0].id, "action": "Gain code execution",
+                     "reason": cmdi[0].title},
+                    {"finding_id": privesc[0].id, "action": "Escalate to root locally",
+                     "reason": privesc[0].title},
+                    {"action": "Full host control", "reason": "Root on the host"},
+                ],
+            ))
+
     # Pattern: leaked secret -> server/account compromise (secret -> RCE/access).
     secret = has("secret_exposure")
     if secret:

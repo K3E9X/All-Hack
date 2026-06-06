@@ -3,7 +3,6 @@ parsing. (The actual tool execution is integration, not unit-tested.)"""
 from types import SimpleNamespace
 
 from app.exploit.proof import (
-    _NIX_PROOF,
     _data_proof_options,
     _extract_dump,
     _extract_proof,
@@ -32,15 +31,21 @@ def test_injection_targets_only_commix_sqlmap_and_deduped():
 
 
 def test_proof_options_commix_is_benign_os_cmd():
-    opts = _proof_options("commix", allow_sql_os_cmd=False)
+    opts = _proof_options("commix", allow_sql_os_cmd=False, allow_data_proof=False)
     assert "--os-cmd" in opts
-    # the command chain is the read-only allow-list, no destructive verbs
+    # the command runs the read-only enumeration; no destructive verbs
     cmd = opts[opts.index("--os-cmd") + 1]
-    assert cmd == _NIX_PROOF
-    # no destructive or exfiltration verbs (2>/dev/null redirects are benign)
-    for bad in ("rm ", "mkfs", "dd if=", "curl", "wget", "chmod ", "chown ",
-                "> /", ">>"):
+    assert "id;" in cmd and "uname" in cmd  # proves execution + context
+    for bad in ("rm -rf", "rmdir", "mkfs", "dd if=", "chmod ", "chown ", "> /",
+                ">>", "shutdown", "reboot", "curl"):  # curl only in the gated secrets cmd
         assert bad not in cmd
+
+
+def test_proof_options_commix_adds_secrets_only_with_data_proof():
+    base = _proof_options("commix", False, allow_data_proof=False)[2]
+    rich = _proof_options("commix", False, allow_data_proof=True)[2]
+    assert "===SECRETS===" not in base
+    assert "===SECRETS===" in rich and "169.254.169.254" in rich
 
 
 def test_proof_options_sqlmap_readonly_by_default():

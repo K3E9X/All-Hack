@@ -113,8 +113,12 @@ a tool *confirms* an injection the agent demonstrates real impact by running a
 **benign, read-only** command through it:
 
 - **RCE / command injection** - re-runs commix with `--os-cmd` executing a
-  read-only chain (`id; whoami; hostname; uname -a; cat /etc/passwd; ...`) and
-  captures the output as the proof.
+  read-only post-exploitation enumeration in one shot (privilege context,
+  host/container detection, listening services & routes, scheduled tasks, SUID
+  binaries, users). The output proves execution and maps the blast radius. It
+  also **detects (never exploits) local privilege-escalation vectors** -
+  passwordless `sudo` and GTFOBins-known SUID binaries - which feed an
+  RCE → root kill-chain.
 - **SQLi** - re-runs sqlmap in read-only context mode (`--current-user`,
   `--is-dba`, `--banner`, ...); OS command execution through the DB is a
   separate sub-opt-in.

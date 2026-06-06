@@ -37,6 +37,11 @@ def test_jwt_with_privesc_is_critical_ato():
     assert ato and ato[0]["severity"] == "critical"
 
 
+def test_rce_plus_privesc_chains_to_root():
+    chains = _deterministic_chains([vf("command_injection"), vf("privilege_escalation")])
+    assert "RCE to root via local privilege escalation" in _titles(chains)
+
+
 def test_ssrf_chains_to_cloud_creds():
     chains = _deterministic_chains([vf("ssrf")])
     assert "SSRF to cloud credential theft" in _titles(chains)
