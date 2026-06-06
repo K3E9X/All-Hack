@@ -317,6 +317,25 @@ body {
   color: var(--muted);
 }
 
+.job-detail {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--border);
+}
+
+.cov-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.cov-chip {
+  border: 1px solid var(--border);
+  padding: 2px 8px;
+  font-size: 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
 .headers-table {
   width: 100%;
   border-collapse: collapse;
