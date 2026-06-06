@@ -44,8 +44,15 @@ foundation for the agent system that comes next:
   - **UI**: a new Engagements tab to create, see the challenge, and
     verify; the Scans tab now requires picking an authorized engagement.
 
+**Phase 3 (this commit family)** broadens the tool arsenal from 10 to 17
+wrappers so every major web vuln-class has at least one tool: command
+injection (`commix`), web-server misconfig (`nikto`), WAF detection
+(`wafw00f`), tech fingerprint (`whatweb`), plus recon expansion (`naabu`,
+`dnsx`, `gau`). Each wrapper is tagged with a category surfaced by
+`/api/scans/tools`.
+
 Next phases (specced, not yet built): test catalog (OWASP WSTG x MITRE
-ATT&CK), the planner/executor/validator agent loop, safe-PoC validation,
+ATT&CK) + the planner/executor/validator agent loop, safe-PoC validation,
 kill-chain analysis, and the live operator UI.
 
 ### Authorization workflow
@@ -254,17 +261,23 @@ Notes:
 
 ## Bundled tools (inside the backend image)
 
-- `nuclei` (ProjectDiscovery)
-- `subfinder` (ProjectDiscovery) - passive subdomain enumeration
-- `httpx` (ProjectDiscovery) - HTTP probe + tech fingerprint
-- `katana` (ProjectDiscovery) - crawler / spider
-- `ffuf` - directory / parameter fuzzing
-- `dalfox` - XSS scanner
-- `nmap` - ports + service fingerprint
-- `sqlmap` - SQL injection
-- `testssl.sh` - TLS / SSL audit
-- `wpscan` - WordPress scanner (set `WPSCAN_API_TOKEN` in `.env` for CVE correlation)
-- `mitmproxy` (Python library, used by the backend)
+Recon: `nmap`, `naabu` (ports), `subfinder` (subdomains), `dnsx` (DNS),
+`httpx` (probe), `katana` (crawler), `gau` (historical URLs).
+Fingerprint: `whatweb`, `httpx`, `wafw00f` (WAF detection).
+Content discovery: `ffuf`.
+Vuln / CMS / server: `nuclei`, `nikto`, `wpscan`.
+Injection: `sqlmap` (SQLi), `commix` (command injection).
+XSS: `dalfox`.
+TLS: `testssl.sh`.
+Internal: `mitmproxy` (capture, used by the backend).
+
+17 tools total; `GET /api/scans/tools` reports each one's `category` and
+whether its binary is present in the running container.
+
+Deferred to later phases (need agent-supplied context): `trufflehog` /
+`gitleaks` (secrets - after a `.git`/source is found), `jwt_tool`
+(needs an extracted token), `SSTImap` (SSTI), `interactsh` (out-of-band
+SSRF/XXE confirmation, wired into the validation layer).
 
 You do not need to install any of these on your host.
 
