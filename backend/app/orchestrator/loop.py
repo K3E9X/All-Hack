@@ -173,10 +173,19 @@ async def run_engagement_loop(run_id: str) -> dict:
                           run_id=run.id, phase="validation")
         try:
             # Traffic-driven analysis (logic/IDOR/CSRF/BFLA, JS secrets+endpoints,
-            # JWT, access-control) over anything captured via the proxy. Runs
-            # before validation so its findings get validated + reported too.
+            # JWT, access-control, CORS, params, GraphQL) over captured traffic.
             from app.analysis import run_analysis
             await run_analysis(engagement.id)
+            # Proof-of-impact: prove confirmed injections (RCE/SQLi) with a
+            # benign read-only command. Double opt-in: requires
+            # allow_active_exploit (the exploitation phase already passed its
+            # approval checkpoint, which is the other gate).
+            if engagement.allow_active_exploit:
+                try:
+                    from app.exploit import prove_impact
+                    await prove_impact(engagement.id)
+                except Exception:  # noqa: BLE001 - never fail the run on proof
+                    logger.exception("[%s] proof-of-impact error", run.id)
             stats = await validate_engagement(engagement.id)
             chains = await build_chains(engagement.id)
             await audit(

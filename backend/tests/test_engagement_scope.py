@@ -38,6 +38,21 @@ def test_primary_host_always_in_scope():
     assert e.host_in_scope("example.com")
 
 
+def test_active_exploit_flags_default_off():
+    e = Engagement.create("https://example.com", attested=True)
+    assert e.allow_active_exploit is False
+    assert e.allow_sql_os_cmd is False
+
+
+def test_active_exploit_flags_opt_in():
+    e = Engagement.create("https://example.com", attested=True,
+                          allow_active_exploit=True, allow_sql_os_cmd=True)
+    assert e.allow_active_exploit is True
+    assert e.allow_sql_os_cmd is True
+    # exposed as flags in the public view
+    assert e.to_public()["allow_active_exploit"] is True
+
+
 def test_public_view_hides_credentials():
     e = Engagement.create("https://example.com", attested=True,
                           primary_auth=[{"name": "Cookie", "value": "secret"}],

@@ -60,6 +60,12 @@ class CreateEngagementRequest(BaseModel):
     secondary_auth_headers: Optional[str] = None
     # The operator must attest they are authorized to test this target.
     attest_authorized: bool = False
+    # Active exploitation: prove confirmed injections (RCE/SQLi) by running a
+    # benign read-only command. Off by default; double-gated with the
+    # exploitation approval.
+    allow_active_exploit: bool = False
+    # Sub-flag: also allow OS command execution through SQLi (sqlmap --os-cmd).
+    allow_sql_os_cmd: bool = False
 
 
 @router.post("", status_code=201)
@@ -82,6 +88,8 @@ async def create_engagement(req: CreateEngagementRequest) -> dict:
         budget_seconds=req.budget_seconds,
         attested=req.attest_authorized,
         require_exploit_approval=req.require_exploit_approval,
+        allow_active_exploit=req.allow_active_exploit,
+        allow_sql_os_cmd=req.allow_sql_os_cmd,
         secondary_auth=_parse_headers_blob(req.secondary_auth_headers),
         primary_auth=_parse_headers_blob(req.auth_headers),
     )

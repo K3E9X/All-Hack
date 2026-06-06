@@ -106,6 +106,24 @@ Findings are partitioned into homogeneous categories (recon, enumeration,
 access control, injection, auth & secrets, server & config) in both the live
 view and the report.
 
+### Proof of impact (opt-in)
+
+Detection isn't proof. With **"Prove impact"** enabled on the engagement, after
+a tool *confirms* an injection the agent demonstrates real impact by running a
+**benign, read-only** command through it:
+
+- **RCE / command injection** - re-runs commix with `--os-cmd` executing a
+  read-only chain (`id; whoami; hostname; uname -a; cat /etc/passwd; ...`) and
+  captures the output as the proof.
+- **SQLi** - re-runs sqlmap in read-only context mode (`--current-user`,
+  `--is-dba`, `--banner`, ...); OS command execution through the DB is a
+  separate sub-opt-in.
+
+It is **double-gated** (the opt-in flag *and* the exploitation approval
+checkpoint), in-scope only, and strictly non-destructive: no writes, deletes,
+persistence, exfiltration or lateral movement. The exact command and its raw
+output are visible in the Jobs tab.
+
 ## How it works
 
 ```

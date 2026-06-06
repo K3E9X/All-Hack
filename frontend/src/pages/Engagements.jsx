@@ -7,7 +7,7 @@ const POLL_MS = 5000;
 export default function Engagements() {
   const [items, setItems] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
-  const [form, setForm] = useState({ target_url: '', scope_hosts: '', attest: false, require_approval: false, auth: '', secondary_auth: '' });
+  const [form, setForm] = useState({ target_url: '', scope_hosts: '', attest: false, require_approval: false, auth: '', secondary_auth: '', allow_active_exploit: false, allow_sql_os_cmd: false });
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState(null);
 
@@ -42,10 +42,12 @@ export default function Engagements() {
         scope_hosts: scope.length ? scope : undefined,
         attest_authorized: true,
         require_exploit_approval: form.require_approval,
+        allow_active_exploit: form.allow_active_exploit,
+        allow_sql_os_cmd: form.allow_active_exploit && form.allow_sql_os_cmd,
         auth_headers: form.auth || undefined,
         secondary_auth_headers: form.secondary_auth || undefined,
       });
-      setForm({ target_url: '', scope_hosts: '', attest: false, require_approval: false, auth: '', secondary_auth: '' });
+      setForm({ target_url: '', scope_hosts: '', attest: false, require_approval: false, auth: '', secondary_auth: '', allow_active_exploit: false, allow_sql_os_cmd: false });
       setSelectedId(res.engagement.id);
       load();
     } catch (err) {
@@ -122,6 +124,29 @@ export default function Engagements() {
               Require my approval before the exploitation phase.
             </span>
           </label>
+          <label className="checkbox-row">
+            <input
+              type="checkbox"
+              checked={form.allow_active_exploit}
+              onChange={(e) => setForm((f) => ({ ...f, allow_active_exploit: e.target.checked }))}
+            />
+            <span className="small">
+              Prove impact: run a benign read-only command through confirmed
+              injections (RCE/SQLi) to demonstrate access. Never destructive.
+            </span>
+          </label>
+          {form.allow_active_exploit && (
+            <label className="checkbox-row" style={{ marginLeft: 24 }}>
+              <input
+                type="checkbox"
+                checked={form.allow_sql_os_cmd}
+                onChange={(e) => setForm((f) => ({ ...f, allow_sql_os_cmd: e.target.checked }))}
+              />
+              <span className="small">
+                Also attempt OS command execution through SQLi (sqlmap --os-cmd).
+              </span>
+            </label>
+          )}
           <label className="checkbox-row">
             <input
               type="checkbox"
