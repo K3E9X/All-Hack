@@ -67,10 +67,17 @@ class Engagement:
     # used to prove IDOR/BOLA by replaying a captured request as another user.
     # List of {"name": ..., "value": ...}. Never returned to the client.
     secondary_auth: List[Dict[str, str]] = field(default_factory=list)
+    # Authenticated scanning: HTTP headers of the PRIMARY identity, injected
+    # into every active scanner so it tests behind the login. Never returned.
+    primary_auth: List[Dict[str, str]] = field(default_factory=list)
 
     @property
     def grey_box(self) -> bool:
         return bool(self.secondary_auth)
+
+    @property
+    def authenticated(self) -> bool:
+        return bool(self.primary_auth)
 
     # ----- factory -----
     @classmethod
@@ -86,6 +93,7 @@ class Engagement:
         attested: bool = False,
         require_exploit_approval: bool = False,
         secondary_auth: Optional[List[Dict[str, str]]] = None,
+        primary_auth: Optional[List[Dict[str, str]]] = None,
     ) -> "Engagement":
         host = _host_of(target_url)
         scope = scope_hosts or [host]
@@ -115,6 +123,7 @@ class Engagement:
             attested_at=now if attested else None,
             require_exploit_approval=require_exploit_approval,
             secondary_auth=list(secondary_auth or []),
+            primary_auth=list(primary_auth or []),
         )
 
     # ----- scope check -----
@@ -143,9 +152,11 @@ class Engagement:
         # never leak it once authorized.
         if self.status != EngagementStatus.PENDING_AUTHORIZATION:
             d["verification_token"] = None
-        # Never leak the secondary identity's credentials; expose only a flag.
+        # Never leak credentials; expose only flags.
         d.pop("secondary_auth", None)
+        d.pop("primary_auth", None)
         d["grey_box"] = self.grey_box
+        d["authenticated"] = self.authenticated
         return d
 
     def challenge(self) -> Dict[str, Any]:

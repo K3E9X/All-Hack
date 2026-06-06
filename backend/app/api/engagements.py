@@ -50,6 +50,10 @@ class CreateEngagementRequest(BaseModel):
     budget_seconds: Optional[int] = None
     # Pause before the exploitation phase and wait for human approval.
     require_exploit_approval: bool = False
+    # Authenticated scanning: headers of the PRIMARY identity ("Name: value"
+    # per line, e.g. Cookie / Authorization). Injected into every scanner so
+    # it tests behind the login.
+    auth_headers: Optional[str] = None
     # Grey-box: headers of a SECOND identity, as a blob ("Name: value" per line,
     # e.g. a Cookie or Authorization header). Enables true IDOR/BOLA proof by
     # replaying a captured request as another user.
@@ -79,6 +83,7 @@ async def create_engagement(req: CreateEngagementRequest) -> dict:
         attested=req.attest_authorized,
         require_exploit_approval=req.require_exploit_approval,
         secondary_auth=_parse_headers_blob(req.secondary_auth_headers),
+        primary_auth=_parse_headers_blob(req.auth_headers),
     )
     await _repo.create(e)
     await audit(

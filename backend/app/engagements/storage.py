@@ -31,11 +31,13 @@ CREATE TABLE IF NOT EXISTS engagements (
     budget_requests      INTEGER,
     budget_seconds       INTEGER,
     require_exploit_approval BOOLEAN NOT NULL DEFAULT FALSE,
-    secondary_auth_json  TEXT
+    secondary_auth_json  TEXT,
+    primary_auth_json    TEXT
 );
 
 ALTER TABLE engagements ADD COLUMN IF NOT EXISTS require_exploit_approval BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE engagements ADD COLUMN IF NOT EXISTS secondary_auth_json TEXT;
+ALTER TABLE engagements ADD COLUMN IF NOT EXISTS primary_auth_json TEXT;
 
 CREATE INDEX IF NOT EXISTS idx_engagements_created ON engagements(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_engagements_status  ON engagements(status);
@@ -55,8 +57,8 @@ class EngagementRepository:
                     verification_token, verification_method, title, notes,
                     created_at, verified_at, closed_at, attested_at,
                     budget_requests, budget_seconds, require_exploit_approval,
-                    secondary_auth_json
-                ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
+                    secondary_auth_json, primary_auth_json
+                ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
                 """,
                 e.id,
                 e.target_url,
@@ -75,6 +77,7 @@ class EngagementRepository:
                 e.budget_seconds,
                 e.require_exploit_approval,
                 json.dumps(e.secondary_auth or []),
+                json.dumps(e.primary_auth or []),
             )
 
     async def update(self, e: Engagement) -> None:
@@ -160,12 +163,13 @@ def _row_to_engagement(row) -> Engagement:
         require_exploit_approval=(
             row["require_exploit_approval"] if "require_exploit_approval" in row else False
         ),
-        secondary_auth=_load_secondary_auth(row),
+        secondary_auth=_load_auth(row, "secondary_auth_json"),
+        primary_auth=_load_auth(row, "primary_auth_json"),
     )
 
 
-def _load_secondary_auth(row) -> list:
-    raw = row["secondary_auth_json"] if "secondary_auth_json" in row else None
+def _load_auth(row, column: str) -> list:
+    raw = row[column] if column in row else None
     if not raw:
         return []
     try:

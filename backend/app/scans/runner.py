@@ -37,6 +37,19 @@ class Runner:
             raise RuntimeError(f"tool '{tool}' is not installed in this container")
 
         options = list(options or [])
+
+        # Authenticated scanning: inject the engagement's primary-identity
+        # headers as tool-specific flags so the scanner tests behind the login.
+        if engagement_id:
+            try:
+                from app.engagements.storage import EngagementRepository
+                from app.scans.auth import auth_args
+
+                eng = await EngagementRepository().get(engagement_id)
+                if eng and eng.primary_auth:
+                    options = auth_args(tool, eng.primary_auth) + options
+            except Exception:  # noqa: BLE001 - never block a scan on auth wiring
+                logger.exception("auth injection failed for %s", tool)
         job = Job(
             id=new_job_id(),
             tool=tool,

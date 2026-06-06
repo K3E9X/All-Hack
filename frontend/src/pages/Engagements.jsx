@@ -7,7 +7,7 @@ const POLL_MS = 5000;
 export default function Engagements() {
   const [items, setItems] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
-  const [form, setForm] = useState({ target_url: '', scope_hosts: '', attest: false, require_approval: false, secondary_auth: '' });
+  const [form, setForm] = useState({ target_url: '', scope_hosts: '', attest: false, require_approval: false, auth: '', secondary_auth: '' });
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState(null);
 
@@ -42,9 +42,10 @@ export default function Engagements() {
         scope_hosts: scope.length ? scope : undefined,
         attest_authorized: true,
         require_exploit_approval: form.require_approval,
+        auth_headers: form.auth || undefined,
         secondary_auth_headers: form.secondary_auth || undefined,
       });
-      setForm({ target_url: '', scope_hosts: '', attest: false, require_approval: false, secondary_auth: '' });
+      setForm({ target_url: '', scope_hosts: '', attest: false, require_approval: false, auth: '', secondary_auth: '' });
       setSelectedId(res.engagement.id);
       load();
     } catch (err) {
@@ -82,6 +83,20 @@ export default function Engagements() {
               placeholder="api.example.com, .example.com"
               value={form.scope_hosts}
               onChange={(e) => setForm((f) => ({ ...f, scope_hosts: e.target.value }))}
+            />
+          </label>
+          <label className="grow">
+            <span className="muted small">
+              Authenticated scan (optional): the PRIMARY identity's headers,
+              one per line (e.g. <code>Cookie: session=...</code> or
+              <code>Authorization: Bearer ...</code>). Injected into every
+              scanner so they test behind the login.
+            </span>
+            <textarea
+              rows={2}
+              placeholder="Cookie: session=AAAAA..."
+              value={form.auth}
+              onChange={(e) => setForm((f) => ({ ...f, auth: e.target.value }))}
             />
           </label>
           <label className="grow">
