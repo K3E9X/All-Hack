@@ -97,6 +97,7 @@ async def submit_scan(req: ScanRequest) -> dict:
             target=req.target,
             options=req.options,
             flow_id=req.flow_id,
+            engagement_id=engagement.id,
         )
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc

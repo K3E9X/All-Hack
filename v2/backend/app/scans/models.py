@@ -50,6 +50,9 @@ class Job:
     findings: List[Finding] = field(default_factory=list)
     flow_id: Optional[str] = None
     error: Optional[str] = None
+    engagement_id: Optional[str] = None
+    # Set when the autonomous orchestrator launched the job (catalog item id).
+    catalog_item_id: Optional[str] = None
 
     def to_public(self) -> Dict[str, Any]:
         return {
@@ -69,6 +72,8 @@ class Job:
             ),
             "findings_count": len(self.findings),
             "flow_id": self.flow_id,
+            "engagement_id": self.engagement_id,
+            "catalog_item_id": self.catalog_item_id,
             "error": self.error,
         }
 

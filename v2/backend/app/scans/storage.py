@@ -10,24 +10,31 @@ from app.scans.models import Finding, Job, JobStatus, findings_from_json, findin
 
 SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS jobs (
-    id             TEXT PRIMARY KEY,
-    tool           TEXT NOT NULL,
-    target         TEXT NOT NULL,
-    args_json      TEXT NOT NULL,
-    status         TEXT NOT NULL,
-    created_at     DOUBLE PRECISION NOT NULL,
-    started_at     DOUBLE PRECISION,
-    finished_at    DOUBLE PRECISION,
-    exit_code      INTEGER,
-    stdout         BYTEA,
-    stderr         BYTEA,
-    findings_json  TEXT,
-    flow_id        TEXT,
-    error          TEXT
+    id              TEXT PRIMARY KEY,
+    tool            TEXT NOT NULL,
+    target          TEXT NOT NULL,
+    args_json       TEXT NOT NULL,
+    status          TEXT NOT NULL,
+    created_at      DOUBLE PRECISION NOT NULL,
+    started_at      DOUBLE PRECISION,
+    finished_at     DOUBLE PRECISION,
+    exit_code       INTEGER,
+    stdout          BYTEA,
+    stderr          BYTEA,
+    findings_json   TEXT,
+    flow_id         TEXT,
+    error           TEXT,
+    engagement_id   TEXT,
+    catalog_item_id TEXT
 );
 
-CREATE INDEX IF NOT EXISTS idx_jobs_created ON jobs(created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_jobs_status  ON jobs(status);
+-- For databases created before these columns existed.
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS engagement_id   TEXT;
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS catalog_item_id TEXT;
+
+CREATE INDEX IF NOT EXISTS idx_jobs_created    ON jobs(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_jobs_status     ON jobs(status);
+CREATE INDEX IF NOT EXISTS idx_jobs_engagement ON jobs(engagement_id);
 """
 
 db.register_schema(SCHEMA_SQL)
@@ -42,8 +49,9 @@ class JobRepository:
                 """
                 INSERT INTO jobs (
                     id, tool, target, args_json, status, created_at, started_at,
-                    finished_at, exit_code, stdout, stderr, findings_json, flow_id, error
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+                    finished_at, exit_code, stdout, stderr, findings_json, flow_id, error,
+                    engagement_id, catalog_item_id
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
                 """,
                 job.id,
                 job.tool,
@@ -59,6 +67,8 @@ class JobRepository:
                 findings_to_json(job.findings),
                 job.flow_id,
                 job.error,
+                job.engagement_id,
+                job.catalog_item_id,
             )
 
     async def update(self, job: Job) -> None:
@@ -101,6 +111,15 @@ class JobRepository:
             )
         return [_row_to_job(row) for row in rows]
 
+    async def list_by_engagement(self, engagement_id: str, *, limit: int = 1000) -> List[Job]:
+        async with db.acquire() as conn:
+            rows = await conn.fetch(
+                "SELECT * FROM jobs WHERE engagement_id = $1 ORDER BY created_at DESC LIMIT $2",
+                engagement_id,
+                limit,
+            )
+        return [_row_to_job(row) for row in rows]
+
     async def count(self) -> int:
         async with db.acquire() as conn:
             return int(await conn.fetchval("SELECT COUNT(*) FROM jobs"))
@@ -140,6 +159,8 @@ def _row_to_job(row) -> Job:
         findings=findings_from_json(row["findings_json"]),
         flow_id=row["flow_id"],
         error=row["error"],
+        engagement_id=row["engagement_id"] if "engagement_id" in row else None,
+        catalog_item_id=row["catalog_item_id"] if "catalog_item_id" in row else None,
     )
 
 

@@ -29,6 +29,8 @@ class Runner:
         target: str,
         options: Optional[List[str]] = None,
         flow_id: Optional[str] = None,
+        engagement_id: Optional[str] = None,
+        catalog_item_id: Optional[str] = None,
     ) -> Job:
         wrapper = get_wrapper(tool)  # raises KeyError for unknown tools
         if not wrapper.is_available():
@@ -43,6 +45,8 @@ class Runner:
             status=JobStatus.QUEUED,
             created_at=time.time(),
             flow_id=flow_id,
+            engagement_id=engagement_id,
+            catalog_item_id=catalog_item_id,
         )
         await self.repo.create(job)
 

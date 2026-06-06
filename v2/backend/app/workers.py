@@ -21,6 +21,7 @@ from arq.connections import RedisSettings, create_pool
 from app import db
 import app.audit  # noqa: F401  - register schema
 import app.engagements.storage  # noqa: F401  - register schema
+import app.orchestrator.state  # noqa: F401  - register schema
 import app.proxy.storage  # noqa: F401  - register schema
 import app.scans.storage  # noqa: F401  - register schema
 

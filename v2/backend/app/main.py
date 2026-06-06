@@ -15,6 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 # app.db; init_db() then runs them all in lifespan startup.
 import app.audit  # noqa: F401
 import app.engagements.storage  # noqa: F401
+import app.orchestrator.state  # noqa: F401
 import app.proxy.storage  # noqa: F401
 import app.scans.storage  # noqa: F401
 
