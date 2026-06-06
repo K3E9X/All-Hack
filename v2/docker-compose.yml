@@ -1,29 +1,77 @@
-# docker-compose for v2.
-# Two services only: backend (FastAPI + pentest tools + MITM proxy) and frontend (nginx).
-# Data persists in ./data (SQLite).
+# docker-compose for All-Hack v2 (AutoPentester foundation).
+#
+# Services:
+#   * postgres   - primary store (engagements, jobs, findings, proxy flows)
+#   * redis      - arq worker queue + transient state
+#   * backend    - FastAPI + mitmproxy addon + arq worker (single image, two roles)
+#   * frontend   - React build served by nginx
+#
+# All persistent state lives in volumes; nothing important is in container fs.
 
 services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: allhack-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-allhack}
+      POSTGRES_USER: ${POSTGRES_USER:-allhack}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-allhack}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-allhack} -d ${POSTGRES_DB:-allhack}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    # Not exposed to the host by default; backend reaches it on the internal
+    # network. Uncomment to inspect with psql from the host.
+    # ports:
+    #   - "5432:5432"
+
+  redis:
+    image: redis:7-alpine
+    container_name: allhack-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
     container_name: allhack-backend
     restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     env_file:
       - .env
     environment:
       - DATA_DIR=/data
       - MITM_PORT=8080
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-allhack}:${POSTGRES_PASSWORD:-allhack}@postgres:5432/${POSTGRES_DB:-allhack}
+      - REDIS_URL=redis://redis:6379/0
     ports:
-      # API
       - "8000:8000"
-      # MITM proxy (configure your browser to use this)
       - "8080:8080"
     volumes:
+      # Bind mount: mitmproxy CA cert lives here, users download it from /api/proxy/ca.pem.
       - ./data:/data
-    # Give mitmproxy permission to bind high ports and inspect TLS.
     cap_add:
       - NET_ADMIN
+
+  # The 'worker' service is added in a later Phase 1 commit once the arq
+  # worker code exists in app/workers/. For now scans still run in-process
+  # in the backend container.
 
   frontend:
     build:
@@ -35,3 +83,7 @@ services:
       - backend
     ports:
       - "3000:80"
+
+volumes:
+  postgres-data:
+  redis-data:
