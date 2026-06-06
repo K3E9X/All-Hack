@@ -37,7 +37,20 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         bsdmainutils \
         procps \
         dnsutils \
+        nikto \
+        whatweb \
     && rm -rf /var/lib/apt/lists/*
+
+# wafw00f (pip) - WAF fingerprinting.
+RUN pip install --no-cache-dir wafw00f==2.3.1
+
+# commix (git checkout) - command injection. The repo ships commix.py with a
+# python3 shebang; symlink it onto PATH as 'commix'.
+RUN set -eux; \
+    git clone --depth 1 https://github.com/commixproject/commix.git /opt/commix; \
+    ln -sf /opt/commix/commix.py /usr/local/bin/commix; \
+    chmod +x /opt/commix/commix.py; \
+    commix --version >/dev/null 2>&1 || true
 
 # Pinned versions (updated manually). Matches the official release naming.
 ARG NUCLEI_VERSION=3.3.5

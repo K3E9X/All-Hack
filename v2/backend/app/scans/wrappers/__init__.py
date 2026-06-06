@@ -4,15 +4,19 @@ from __future__ import annotations
 from typing import Dict, List
 
 from app.scans.wrappers.base import BaseWrapper
+from app.scans.wrappers.commix import CommixWrapper
 from app.scans.wrappers.dalfox import DalfoxWrapper
 from app.scans.wrappers.ffuf import FfufWrapper
 from app.scans.wrappers.httpx import HttpxWrapper
 from app.scans.wrappers.katana import KatanaWrapper
+from app.scans.wrappers.nikto import NiktoWrapper
 from app.scans.wrappers.nmap import NmapWrapper
 from app.scans.wrappers.nuclei import NucleiWrapper
 from app.scans.wrappers.sqlmap import SqlmapWrapper
 from app.scans.wrappers.subfinder import SubfinderWrapper
 from app.scans.wrappers.testssl import TestsslWrapper
+from app.scans.wrappers.wafw00f import Wafw00fWrapper
+from app.scans.wrappers.whatweb import WhatwebWrapper
 from app.scans.wrappers.wpscan import WpscanWrapper
 
 _WRAPPERS: Dict[str, BaseWrapper] = {
@@ -26,6 +30,10 @@ _WRAPPERS: Dict[str, BaseWrapper] = {
     "katana": KatanaWrapper(),
     "testssl": TestsslWrapper(),
     "wpscan": WpscanWrapper(),
+    "commix": CommixWrapper(),
+    "wafw00f": Wafw00fWrapper(),
+    "whatweb": WhatwebWrapper(),
+    "nikto": NiktoWrapper(),
 }
 
 
