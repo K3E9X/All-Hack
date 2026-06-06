@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { api } from '../lib/api.js';
+import Console from '../components/Console.jsx';
 
 const PHASES = ['recon', 'mapping', 'vuln_analysis', 'exploitation', 'validation'];
 
@@ -21,10 +22,10 @@ export default function LiveView() {
   const [eventsList, setEventsList] = useState([]);
   const [approvals, setApprovals] = useState([]);
   const [err, setErr] = useState(null);
+  const [notice, setNotice] = useState(null);
+  const [connected, setConnected] = useState(false);
   const wsRef = useRef(null);
   const lastIdRef = useRef(0);
-  const consoleRef = useRef(null);
-  const verboseRef = useRef(null);
   const [activeCat, setActiveCat] = useState('all');
   const [analyzing, setAnalyzing] = useState(false);
 
@@ -58,22 +59,19 @@ export default function LiveView() {
       const proto = location.protocol === 'https:' ? 'wss' : 'ws';
       const ws = new WebSocket(`${proto}://${location.host}/ws/engagements/${id}/stream?after=${lastIdRef.current}`);
       wsRef.current = ws;
+      ws.onopen = () => setConnected(true);
       ws.onmessage = (msg) => {
         try {
           const ev = JSON.parse(msg.data);
           lastIdRef.current = Math.max(lastIdRef.current, ev.id || 0);
-          setEventsList((prev) => [...prev.slice(-400), ev]);
+          setEventsList((prev) => [...prev.slice(-600), ev]);
         } catch { /* ignore */ }
       };
-      ws.onerror = () => { /* fall back to polling state */ };
+      ws.onclose = () => setConnected(false);
+      ws.onerror = () => { setConnected(false); /* fall back to polling state */ };
     })();
     return () => { closed = true; if (wsRef.current) wsRef.current.close(); };
   }, [id]);
-
-  useEffect(() => {
-    consoleRef.current?.scrollTo(0, consoleRef.current.scrollHeight);
-    verboseRef.current?.scrollTo(0, verboseRef.current.scrollHeight);
-  }, [eventsList]);
 
   async function decide(approvalId, decision) {
     try { await api.engagements.decideApproval(id, approvalId, decision); await loadState(); }
@@ -87,16 +85,17 @@ export default function LiveView() {
   }
   async function analyzeTraffic() {
     setAnalyzing(true);
+    setNotice(null);
     try {
       const r = await api.engagements.analyzeTraffic(id);
       await loadState();
       const lg = r.logic || {}, js = r.js_recon || {}, jw = r.jwt || {}, ac = r.access_control || {};
-      alert(
-        `Deep analysis complete:\n` +
-        `· Logic: ${lg.idor || 0} IDOR, ${lg.csrf || 0} CSRF, ${lg.bfla || 0} BFLA/privesc\n` +
-        `· JS mining: ${js.secrets || 0} secret(s), ${js.endpoints || 0} endpoint(s)\n` +
-        `· JWT: ${jw.findings || 0} issue(s) on ${jw.jwt_tokens || 0} token(s)\n` +
-        `· Access control: ${ac.broken_access_control || 0} broken, ${ac.flagged || 0} to review`
+      setNotice(
+        `Deep analysis complete — ` +
+        `Logic: ${lg.idor || 0} IDOR / ${lg.csrf || 0} CSRF / ${lg.bfla || 0} BFLA · ` +
+        `JS: ${js.secrets || 0} secret(s) / ${js.endpoints || 0} endpoint(s) · ` +
+        `JWT: ${jw.findings || 0} issue(s) · ` +
+        `Access control: ${ac.broken_access_control || 0} broken / ${ac.flagged || 0} to review`
       );
     } catch (e) { setErr(e.message); }
     finally { setAnalyzing(false); }
@@ -124,30 +123,43 @@ export default function LiveView() {
   const shownFindings =
     activeCat === 'all' ? validated : (byCategory[activeCat] || []);
 
+  const phaseIdx = PHASES.indexOf(r?.phase);
+
   return (
-    <div className="stack">
-      <div className="row-between">
-        <h2>Live view {e ? `· ${e.target_host}` : ''}</h2>
+    <div className="liveview stack">
+      {/* Command bar (light, not a boxed card) */}
+      <div className="cmdbar">
+        <div className="cmdbar-title">
+          <span className={`dot ${active ? 'dot-live' : ''}`} />
+          <h2>Live view{e ? ` · ${e.target_host}` : ''}</h2>
+          <span className={`run-pill run-${r?.status || 'none'}`}>{r?.status || 'not started'}</span>
+        </div>
         <div className="btn-row">
           <Link className="btn ghost" to="/engagements">Back</Link>
           {!active && <button className="btn" onClick={run}>Run</button>}
           {active && <button className="btn ghost danger" onClick={stop}>Stop</button>}
           <button className="btn ghost" onClick={analyzeTraffic} disabled={analyzing}>
-            {analyzing ? 'Analyzing...' : 'Deep analysis (logic / JS / JWT)'}
+            {analyzing ? 'Analyzing…' : 'Deep analysis'}
           </button>
           <a className="btn ghost" href={`/api/engagements/${id}/report.md`} target="_blank" rel="noreferrer">Report .md</a>
-          <a className="btn ghost" href={`/api/engagements/${id}/report.html`} target="_blank" rel="noreferrer">Report (print)</a>
+          <a className="btn ghost" href={`/api/engagements/${id}/report.html`} target="_blank" rel="noreferrer">Report</a>
         </div>
       </div>
-      {err && <p className="result error small">{err}</p>}
 
-      {/* Phase timeline */}
-      <section className="card">
+      {err && <p className="result error small">{err}</p>}
+      {notice && (
+        <div className="notice">
+          <span className="small">{notice}</span>
+          <button className="console-btn" onClick={() => setNotice(null)}>dismiss</button>
+        </div>
+      )}
+
+      {/* Status band: phase progress + vitals on a single strip */}
+      <div className="statusband">
         <div className="phase-timeline">
           {PHASES.map((p) => {
             const isCurrent = r?.phase === p;
-            const idx = PHASES.indexOf(r?.phase);
-            const done = idx > PHASES.indexOf(p);
+            const done = phaseIdx > PHASES.indexOf(p);
             return (
               <div key={p} className={`phase ${isCurrent ? 'phase-current' : ''} ${done ? 'phase-done' : ''}`}>
                 {p}
@@ -155,13 +167,21 @@ export default function LiveView() {
             );
           })}
         </div>
-        <div className="muted small">
-          Run: <span className={`run-${r?.status || 'none'}`}>{r?.status || 'not started'}</span>
-          {r ? ` · iteration ${r.iterations} · ${r.jobs_launched} jobs` : ''}
+        <div className="vitals">
+          <div className="vital"><span className="vital-k">iter</span><span className="vital-v mono">{r?.iterations ?? 0}</span></div>
+          <div className="vital"><span className="vital-k">jobs</span><span className="vital-v mono">{r?.jobs_launched ?? 0}</span></div>
+          <div className="vital"><span className="vital-k">assets</span><span className="vital-v mono">{state?.assets?.length || 0}</span></div>
+          <div className="vital"><span className="vital-k">confirmed</span><span className="vital-v mono sev-high">{vsum.confirmed || 0}</span></div>
+          <div className="vital"><span className="vital-k">FP rate</span><span className="vital-v mono">{vsum.false_positive_rate_pct != null ? `${vsum.false_positive_rate_pct}%` : '—'}</span></div>
+          <div className="vital"><span className="vital-k">LLM calls</span><span className="vital-v mono">{llm.calls || 0}</span></div>
+          <div className="vital"><span className="vital-k">API cost</span><span className="vital-v mono">${(llm.cost_usd || 0).toFixed(4)}</span></div>
         </div>
-      </section>
+        {state?.technologies?.length > 0 && (
+          <div className="muted small tech-line"><strong>tech</strong> · <span className="mono">{state.technologies.join(', ')}</span></div>
+        )}
+      </div>
 
-      {/* Pending approvals */}
+      {/* Pending approvals (prominent, only when present) */}
       {approvals.map((a) => (
         <section key={a.id} className="card approval-card">
           <h3 className="msg-h">Approval required</h3>
@@ -174,55 +194,57 @@ export default function LiveView() {
         </section>
       ))}
 
-      {/* Two consoles stacked full-width, same size. */}
-      {/* High-level agent reasoning console (info events) */}
-      <section className="card">
-        <h3 className="msg-h">Agent console</h3>
-        <div className="console" ref={consoleRef}>
-          {infoEvents.length === 0 && <div className="muted small">No events yet.</div>}
-          {infoEvents.map((ev) => (
-            <div key={ev.id} className={`logline log-${ev.type}`}>
-              <span className="log-ts">{new Date(ev.ts * 1000).toLocaleTimeString()}</span>
-              <span className="log-type">[{ev.type}]</span>
-              <span className="log-msg">{ev.message}</span>
-            </div>
-          ))}
-        </div>
-      </section>
+      {/* Activity: the two consoles, equal, side by side (stack on narrow) */}
+      <div className="live-grid">
+        <Console
+          title="Agent"
+          events={infoEvents}
+          live={connected && active}
+          emptyText="No events yet. Press Run to start the engagement."
+        />
+        <Console
+          title="Verbose"
+          events={verboseEvents}
+          live={connected && active}
+          emptyText="No detail yet. Commands, jobs, findings and validation show here."
+        />
+      </div>
 
-      {/* Verbose console: ONLY the fine-grained detail the agent console
-          does not show - commands, per finished job, per finding, fingerprints,
-          discovered assets, per-finding validation. */}
-      <section className="card">
-        <h3 className="msg-h">Verbose console</h3>
-        <div className="console" ref={verboseRef}>
-          {verboseEvents.length === 0 && <div className="muted small">No detail yet.</div>}
-          {verboseEvents.map((ev) => (
-            <div key={ev.id} className={`logline log-${ev.type}`}>
-              <span className="log-ts">{new Date(ev.ts * 1000).toLocaleTimeString()}</span>
-              <span className="log-type">[{ev.type}]</span>
-              <span className="log-msg">{ev.message}</span>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* Surface + cost stats */}
-      <section className="card">
-        <h3 className="msg-h">Surface &amp; cost</h3>
-        <div className="grid-stats">
-          <div className="stat"><div className="muted small">Assets</div><div className="mono">{state?.assets?.length || 0}</div></div>
-          <div className="stat"><div className="muted small">Tech</div><div className="mono">{state?.technologies?.length || 0}</div></div>
-          <div className="stat"><div className="muted small">Confirmed</div><div className="mono sev-high">{vsum.confirmed || 0}</div></div>
-          <div className="stat"><div className="muted small">FP rate</div><div className="mono">{vsum.false_positive_rate_pct != null ? `${vsum.false_positive_rate_pct}%` : '-'}</div></div>
-          <div className="stat"><div className="muted small">LLM calls</div><div className="mono">{llm.calls || 0}</div></div>
-          <div className="stat"><div className="muted small">Tokens</div><div className="mono">{(llm.total_tokens || 0).toLocaleString()}</div></div>
-          <div className="stat"><div className="muted small">API cost</div><div className="mono">${(llm.cost_usd || 0).toFixed(4)}</div></div>
-        </div>
-        {state?.technologies?.length > 0 && (
-          <p className="small"><strong>Tech:</strong> <span className="mono">{state.technologies.join(', ')}</span></p>
-        )}
-      </section>
+      {/* Findings, partitioned by test category (homogeneous tabs) */}
+      {validated.length > 0 && (
+        <section className="card">
+          <h3 className="msg-h">Findings by category ({validated.length})</h3>
+          <div className="tabs">
+            <button className={activeCat === 'all' ? 'active' : ''} onClick={() => setActiveCat('all')}>
+              All <span className="tab-count">{validated.length}</span>
+            </button>
+            {activeCats.map((c) => (
+              <button
+                key={c.key}
+                className={activeCat === c.key ? 'active' : ''}
+                onClick={() => setActiveCat(c.key)}
+              >
+                {c.label} <span className="tab-count">{byCategory[c.key].length}</span>
+              </button>
+            ))}
+          </div>
+          <div className="findings-grid">
+            {shownFindings.slice(0, 120).map((f) => (
+              <div key={f.id} className="finding">
+                <div className="row-between">
+                  <span className={`sev sev-${(f.severity || 'info').toLowerCase()}`}>{f.severity}</span>
+                  <span className={`mono small vstatus-${f.status}`}>{f.status} ({Math.round((f.confidence || 0) * 100)}%)</span>
+                </div>
+                <div className="finding-title">{f.title}</div>
+                <div className="mono small truncate" title={f.target}>{f.target}</div>
+                <div className="muted small">{f.tool} · {f.vuln_class}{f.method ? ` · ${f.method}` : ''}</div>
+                {f.poc && <pre className="body mono small">{f.poc}</pre>}
+              </div>
+            ))}
+            {shownFindings.length === 0 && <div className="muted small">No findings in this category.</div>}
+          </div>
+        </section>
+      )}
 
       {/* Kill-chains */}
       {chains.length > 0 && (
@@ -244,45 +266,6 @@ export default function LiveView() {
                 </ol>
               </div>
             ))}
-          </div>
-        </section>
-      )}
-
-      {/* Validated findings, partitioned by test category (homogeneous tabs) */}
-      {validated.length > 0 && (
-        <section className="card">
-          <h3 className="msg-h">Findings by category ({validated.length})</h3>
-          <div className="tabs">
-            <button
-              className={activeCat === 'all' ? 'active' : ''}
-              onClick={() => setActiveCat('all')}
-            >
-              All <span className="tab-count">{validated.length}</span>
-            </button>
-            {activeCats.map((c) => (
-              <button
-                key={c.key}
-                className={activeCat === c.key ? 'active' : ''}
-                onClick={() => setActiveCat(c.key)}
-              >
-                {c.label} <span className="tab-count">{byCategory[c.key].length}</span>
-              </button>
-            ))}
-          </div>
-          <div className="stack-sm">
-            {shownFindings.slice(0, 120).map((f) => (
-              <div key={f.id} className="finding">
-                <div className="row-between">
-                  <span className={`sev sev-${(f.severity || 'info').toLowerCase()}`}>{f.severity}</span>
-                  <span className={`mono small vstatus-${f.status}`}>{f.status} ({Math.round((f.confidence || 0) * 100)}%)</span>
-                </div>
-                <div className="finding-title">{f.title}</div>
-                <div className="mono small truncate" title={f.target}>{f.target}</div>
-                <div className="muted small">{f.tool} · {f.vuln_class}{f.method ? ` · ${f.method}` : ''}</div>
-                {f.poc && <pre className="body mono small">{f.poc}</pre>}
-              </div>
-            ))}
-            {shownFindings.length === 0 && <div className="muted small">No findings in this category.</div>}
           </div>
         </section>
       )}
