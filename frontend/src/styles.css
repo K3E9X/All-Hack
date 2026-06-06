@@ -328,7 +328,10 @@ body {
 }
 
 .body {
+  /* Malleable: drag the bottom-right corner to resize the PoC / proof block. */
   max-height: 400px;
+  min-height: 40px;
+  resize: vertical;
   overflow: auto;
   background: var(--bg);
   border: 1px solid var(--border);
@@ -518,8 +521,12 @@ body {
 }
 
 .console {
+  /* Malleable: drag the bottom-right corner to resize / shrink. */
   height: 360px;
-  overflow-y: auto;
+  min-height: 80px;
+  max-height: 80vh;
+  resize: vertical;
+  overflow: auto;
   background: var(--bg);
   border: 1px solid var(--border);
   padding: 8px;

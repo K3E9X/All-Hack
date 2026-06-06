@@ -64,6 +64,12 @@ MAPPING: Dict[str, Dict[str, Any]] = {
         "remediation": "Require an anti-CSRF token (or SameSite=strict cookies + "
                        "origin checks) on all state-changing requests.",
     },
+    "privilege_escalation": {
+        "wstg": "WSTG-ATHZ-02", "attack": ["T1068", "T1078.003"], "cwe": "CWE-285",
+        "remediation": "Enforce function-level authorization server-side: check the "
+                       "caller's role/permissions on every privileged endpoint and "
+                       "action; deny by default. Don't rely on hiding admin UI.",
+    },
     "recon": {"wstg": "WSTG-INFO-02", "attack": ["T1595"], "cwe": "CWE-200", "remediation": "Reduce exposed surface; restrict information disclosure."},
     "fingerprint": {"wstg": "WSTG-INFO-08", "attack": ["T1592"], "cwe": "CWE-200", "remediation": "Suppress version banners where practical."},
 }

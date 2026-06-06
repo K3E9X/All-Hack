@@ -1,4 +1,4 @@
-"""Application-logic analysis over captured proxy traffic (IDOR + CSRF).
+"""Application-logic analysis over captured proxy traffic (IDOR + CSRF + BFLA).
 
 These classes can't be found by scanners pointed at a URL: they need real
 authenticated requests. So we analyze the flows the operator captured through
@@ -10,6 +10,11 @@ the MITM proxy (while logged in) and look for:
     is a strong access-control signal; a 401/403/404 means it's protected.
   * CSRF - cookie-authenticated state-changing requests (POST/PUT/PATCH/
     DELETE) with no anti-CSRF token and no bearer auth.
+  * BFLA / privilege escalation - privileged-looking endpoints (/admin, ...)
+    reached by the primary identity, replayed safely as anonymous and as a
+    low-privilege second identity. If a low-priv user (or anyone) can reach a
+    privileged function, that's broken function-level authorization. Writes
+    are never executed automatically (safe mode) - they're flagged for review.
 
 Results are stored as a synthetic scan job (tool="logic") so they flow through
 the normal validation / report / kill-chain pipeline unchanged. An optional
@@ -41,6 +46,14 @@ _CSRF_BODY_KEYS = (
 )
 _STATIC_EXT = (".js", ".css", ".png", ".jpg", ".jpeg", ".gif", ".svg",
                ".woff", ".woff2", ".ttf", ".ico", ".map", ".webp")
+
+# Path fragments that suggest a privileged / administrative function.
+_PRIV_PATTERNS = (
+    "/admin", "/administrator", "/manage", "/management", "/internal",
+    "/superuser", "/backoffice", "/staff", "/moderator", "/console",
+    "/api/admin", "/users/roles", "/role", "/privileges", "/settings/users",
+    "/system", "/config/users", "/audit",
+)
 
 MAX_FLOWS = 1000
 MAX_IDOR_CONFIRM = 25
@@ -123,6 +136,43 @@ async def analyze_logic(
                       "method": f.method},
         ))
 
+    # ---- BFLA / privilege escalation ----
+    # Privileged-looking endpoints reached as identity A; replay as the
+    # low-privilege identity B. If B can use them => broken function-level
+    # authorization / privesc.
+    bfla_count = 0
+    for f in in_scope:
+        if not _is_privileged(f.url):
+            continue
+        method = (f.method or "GET").upper()
+        if method == "GET" and f.status_code == 200 and bfla_count < MAX_IDOR_CONFIRM:
+            bfla_count += 1
+            verdict = await _confirm_bfla(safe, f, second_headers)
+            if verdict is None:
+                continue  # restricted for B / not reachable -> no privesc
+            status, confidence, poc = verdict
+            findings.append(Finding(
+                severity="high",
+                title=f"Privilege escalation (BFLA) on {urlparse(f.url).path}",
+                description="A low-privilege identity can reach a privileged function.",
+                target=f.url,
+                evidence=poc,
+                metadata={"vuln_class": "privilege_escalation", "status": status,
+                          "confidence": confidence, "method": method},
+            ))
+        elif method in _STATE_CHANGING:
+            # Can't safely execute an admin write as B; flag for manual review.
+            findings.append(Finding(
+                severity="medium",
+                title=f"Privileged action to review: {method} {urlparse(f.url).path}",
+                description="State-changing privileged endpoint; verify a low-privilege "
+                            "user cannot invoke it (not executed automatically - safe mode).",
+                target=f.url,
+                evidence=f"{method} {f.url} observed as a privileged action.",
+                metadata={"vuln_class": "privilege_escalation", "status": "unconfirmed",
+                          "confidence": 0.4, "method": method},
+            ))
+
     if use_llm:
         await _llm_refine(findings)
 
@@ -130,16 +180,17 @@ async def analyze_logic(
 
     idor_n = sum(1 for x in findings if x.metadata.get("vuln_class") == "idor")
     csrf_n = sum(1 for x in findings if x.metadata.get("vuln_class") == "csrf")
+    bfla_n = sum(1 for x in findings if x.metadata.get("vuln_class") == "privilege_escalation")
     await events.emit(
         engagement_id, events.VALIDATED,
-        f"Logic analysis: {idor_n} IDOR, {csrf_n} CSRF candidate(s) "
-        f"from {len(in_scope)} captured flows",
+        f"Logic analysis: {idor_n} IDOR, {csrf_n} CSRF, {bfla_n} BFLA/privesc "
+        f"candidate(s) from {len(in_scope)} captured flows",
         level=events.LEVEL_VERBOSE,
     )
-    logger.info("[%s] logic analysis: idor=%d csrf=%d (flows=%d)",
-                engagement_id, idor_n, csrf_n, len(in_scope))
+    logger.info("[%s] logic analysis: idor=%d csrf=%d bfla=%d (flows=%d)",
+                engagement_id, idor_n, csrf_n, bfla_n, len(in_scope))
     return {"flows_analyzed": len(in_scope), "idor": idor_n, "csrf": csrf_n,
-            "total": len(findings)}
+            "bfla": bfla_n, "total": len(findings)}
 
 
 # --------------------------------------------------------------------------- #
@@ -242,6 +293,49 @@ async def _confirm_bola_greybox(
         )
         return ("confirmed", 0.95, poc)
     return ("likely", 0.5, f"Second identity got HTTP {resp.status_code} on {url}")
+
+
+# --------------------------------------------------------------------------- #
+# BFLA / privilege escalation
+# --------------------------------------------------------------------------- #
+
+def _is_privileged(url: str) -> bool:
+    path = urlparse(url).path.lower()
+    return any(p in path for p in _PRIV_PATTERNS)
+
+
+async def _confirm_bfla(
+    safe: SafePoC, flow, second_headers: Dict[str, str]
+) -> Optional[Tuple[str, float, str]]:
+    """Replay a privileged GET endpoint (reached as A) without privileges.
+    Anonymous 200 => unauthenticated admin access (critical). Low-priv B 200
+    => privilege escalation. 401/403/404 => properly restricted (None)."""
+    url = flow.url
+    try:
+        anon = await safe.fetch(url, method="GET", headers={})
+    except ScopeError:
+        return None
+    if anon is not None and anon.status_code == 200 and len(anon.text) > 0:
+        return ("confirmed", 0.9,
+                f"Privileged endpoint {url} is reachable WITHOUT authentication "
+                f"(HTTP 200, {len(anon.text)} bytes) - broken access control.")
+
+    if not second_headers:
+        # No low-priv identity to test with; flag as a candidate.
+        return ("likely", 0.45,
+                f"Privileged endpoint {url} reached by the primary identity; "
+                f"provide a low-privilege identity (grey-box) to confirm privesc.")
+
+    resp = await safe.fetch(url, method="GET", headers=second_headers)
+    if resp is None:
+        return ("likely", 0.45, f"Low-privilege identity could not reach {url}")
+    if resp.status_code in (401, 403, 404):
+        return None  # correctly restricted
+    if resp.status_code == 200 and len(resp.text) > 0:
+        return ("confirmed", 0.9,
+                f"BFLA/privilege escalation: the low-privilege identity received "
+                f"HTTP 200 ({len(resp.text)} bytes) on privileged endpoint {url}.")
+    return ("likely", 0.5, f"Low-privilege identity got HTTP {resp.status_code} on {url}")
 
 
 # --------------------------------------------------------------------------- #
