@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { api } from '../lib/api.js';
 
 const POLL_MS = 5000;
@@ -6,7 +7,7 @@ const POLL_MS = 5000;
 export default function Engagements() {
   const [items, setItems] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
-  const [form, setForm] = useState({ target_url: '', scope_hosts: '', attest: false });
+  const [form, setForm] = useState({ target_url: '', scope_hosts: '', attest: false, require_approval: false });
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState(null);
 
@@ -40,8 +41,9 @@ export default function Engagements() {
         target_url: form.target_url,
         scope_hosts: scope.length ? scope : undefined,
         attest_authorized: true,
+        require_exploit_approval: form.require_approval,
       });
-      setForm({ target_url: '', scope_hosts: '', attest: false });
+      setForm({ target_url: '', scope_hosts: '', attest: false, require_approval: false });
       setSelectedId(res.engagement.id);
       load();
     } catch (err) {
@@ -84,6 +86,16 @@ export default function Engagements() {
           <label className="checkbox-row">
             <input
               type="checkbox"
+              checked={form.require_approval}
+              onChange={(e) => setForm((f) => ({ ...f, require_approval: e.target.checked }))}
+            />
+            <span className="small">
+              Require my approval before the exploitation phase.
+            </span>
+          </label>
+          <label className="checkbox-row">
+            <input
+              type="checkbox"
               checked={form.attest}
               onChange={(e) => setForm((f) => ({ ...f, attest: e.target.checked }))}
             />
@@ -116,6 +128,7 @@ export default function Engagements() {
                   <th>Target</th>
                   <th>Status</th>
                   <th>Scope</th>
+                  <th></th>
                 </tr>
               </thead>
               <tbody>
@@ -129,6 +142,11 @@ export default function Engagements() {
                     <td className="truncate" title={e.target_url}>{e.target_url}</td>
                     <td className={`eng-${e.status}`}>{e.status}</td>
                     <td className="truncate">{(e.scope_hosts || []).join(', ')}</td>
+                    <td onClick={(ev) => ev.stopPropagation()}>
+                      {e.status === 'authorized' && (
+                        <Link className="text-link" to={`/engagements/${e.id}/live`}>live view</Link>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>

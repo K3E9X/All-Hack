@@ -474,6 +474,69 @@ body {
 }
 .chain-steps li { margin-bottom: 3px; }
 
+/* ---- Live view ---- */
+
+.text-link {
+  color: var(--accent, #4ea1ff);
+  text-decoration: none;
+}
+.text-link:hover { text-decoration: underline; }
+
+.phase-timeline {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.phase {
+  flex: 1;
+  min-width: 90px;
+  text-align: center;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--muted);
+}
+.phase-done { color: var(--fg); border-color: var(--fg); }
+.phase-current {
+  color: var(--bg);
+  background: var(--fg);
+  border-color: var(--fg);
+  font-weight: 600;
+}
+
+.live-grid {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 16px;
+}
+@media (max-width: 860px) {
+  .live-grid { grid-template-columns: 1fr; }
+}
+
+.console {
+  height: 360px;
+  overflow-y: auto;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  padding: 8px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+}
+.logline { display: flex; gap: 8px; padding: 1px 0; }
+.log-ts { color: var(--muted); flex-shrink: 0; }
+.log-type { flex-shrink: 0; }
+.log-msg { word-break: break-word; }
+.log-phase_changed .log-type { color: #4ea1ff; }
+.log-validated .log-type,
+.log-chain_built .log-type { color: var(--ok); }
+.log-approval_required .log-type { color: #c9a400; }
+.log-error .log-type { color: var(--error); }
+
+.approval-card { border-color: #c9a400; }
+
 /* ---- LLM suggestions / explain / report ---- */
 
 .stack-sm > * + * { margin-top: 10px; }

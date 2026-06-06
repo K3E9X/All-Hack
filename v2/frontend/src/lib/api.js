@@ -33,6 +33,15 @@ export const api = {
     run: (id) => request(`/api/engagements/${id}/run`, { method: 'POST' }),
     stop: (id) => request(`/api/engagements/${id}/stop`, { method: 'POST' }),
     state: (id) => request(`/api/engagements/${id}/state`),
+    validate: (id) => request(`/api/engagements/${id}/validate`, { method: 'POST' }),
+    events: (id, afterId = 0) => request(`/api/engagements/${id}/events?after_id=${afterId}`),
+    approvals: (id) => request(`/api/engagements/${id}/approvals`),
+    decideApproval: (id, approvalId, decision) =>
+      request(`/api/engagements/${id}/approvals/${approvalId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ decision }),
+      }),
   },
 
   methodology: {
