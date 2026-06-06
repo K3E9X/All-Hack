@@ -10,6 +10,8 @@
 #   - katana     (ProjectDiscovery, Go binary)
 #   - testssl.sh (git clone - bash + openssl)
 #   - wpscan     (gem install - ruby)
+#   - nikto      (git clone - perl)
+#   - whatweb    (git clone - ruby)
 #   - nmap       (apt)
 #   - sqlmap     (apt)
 #   - mitmproxy  (pip)
@@ -39,9 +41,24 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         bsdmainutils \
         procps \
         dnsutils \
-        nikto \
-        whatweb \
+        perl \
+        libnet-ssleay-perl \
+        libio-socket-ssl-perl \
     && rm -rf /var/lib/apt/lists/*
+
+# nikto (Perl) and whatweb (Ruby) are not in the slim apt repos, so install
+# them from source. Non-fatal: if a clone fails the wrapper simply reports the
+# tool as unavailable and the orchestrator skips it - the build never breaks.
+RUN set -eux; \
+    git clone --depth 1 https://github.com/sullo/nikto.git /opt/nikto || true; \
+    if [ -f /opt/nikto/program/nikto.pl ]; then \
+        printf '#!/bin/sh\nexec perl /opt/nikto/program/nikto.pl "$@"\n' > /usr/local/bin/nikto; \
+        chmod +x /usr/local/bin/nikto; \
+    fi; \
+    git clone --depth 1 https://github.com/urbanadventurer/WhatWeb.git /opt/whatweb || true; \
+    if [ -f /opt/whatweb/whatweb ]; then \
+        ln -sf /opt/whatweb/whatweb /usr/local/bin/whatweb; \
+    fi
 
 # wafw00f (pip) - WAF fingerprinting.
 RUN pip install --no-cache-dir wafw00f==2.3.1
