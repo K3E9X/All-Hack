@@ -180,6 +180,13 @@ MAPPING: Dict[str, Dict[str, Any]] = {
         "remediation": "Bind only an explicit allow-list of fields from request "
                        "bodies; never trust client-supplied role/privilege fields.",
     },
+    "graphql": {
+        "category": "config",
+        "wstg": "WSTG-APIT-01", "attack": ["T1190"], "cwe": "CWE-200",
+        "remediation": "Disable GraphQL introspection in production; enforce "
+                       "authorization per field/operation and add query depth/cost "
+                       "limits.",
+    },
     "param_discovery": {
         "category": "enumeration",
         "wstg": "WSTG-INFO-07", "attack": ["T1595"], "cwe": "CWE-200",

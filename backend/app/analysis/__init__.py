@@ -22,12 +22,13 @@ from app.analysis.jwt_analysis import analyze_jwt
 from app.analysis.access_control import analyze_access_control
 from app.analysis.cors import analyze_cors
 from app.analysis.param_discovery import analyze_params
+from app.analysis.graphql import analyze_graphql
 
 logger = logging.getLogger("allhack.analysis")
 
 __all__ = ["analyze_logic", "analyze_js", "analyze_jwt",
            "analyze_access_control", "analyze_cors", "analyze_params",
-           "run_analysis"]
+           "analyze_graphql", "run_analysis"]
 
 
 async def run_analysis(engagement_id: str) -> Dict[str, Dict]:
@@ -41,6 +42,7 @@ async def run_analysis(engagement_id: str) -> Dict[str, Dict]:
         ("jwt", analyze_jwt),
         ("access_control", analyze_access_control),
         ("cors", analyze_cors),
+        ("graphql", analyze_graphql),
     ):
         try:
             out[name] = await fn(engagement_id)

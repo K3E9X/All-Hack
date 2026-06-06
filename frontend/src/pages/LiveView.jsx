@@ -100,7 +100,7 @@ export default function LiveView() {
     try {
       const r = await api.engagements.analyzeTraffic(id);
       await loadState();
-      const lg = r.logic || {}, js = r.js_recon || {}, jw = r.jwt || {}, ac = r.access_control || {}, co = r.cors || {}, pa = r.params || {};
+      const lg = r.logic || {}, js = r.js_recon || {}, jw = r.jwt || {}, ac = r.access_control || {}, co = r.cors || {}, pa = r.params || {}, gq = r.graphql || {};
       alert(
         `Deep analysis complete:\n` +
         `· Logic: ${lg.idor || 0} IDOR, ${lg.csrf || 0} CSRF, ${lg.bfla || 0} BFLA/privesc\n` +
@@ -108,7 +108,8 @@ export default function LiveView() {
         `· Params: ${pa.harvested || 0} harvested, ${pa.reflected_endpoints || 0} reflected, ${pa.seeded || 0} seeded\n` +
         `· JWT: ${jw.findings || 0} issue(s) on ${jw.jwt_tokens || 0} token(s)\n` +
         `· Access control: ${ac.broken_access_control || 0} broken, ${ac.flagged || 0} to review\n` +
-        `· CORS: ${co.findings || 0} finding(s) on ${co.probed || 0} endpoint(s)`
+        `· CORS: ${co.findings || 0} finding(s) on ${co.probed || 0} endpoint(s)\n` +
+        `· GraphQL: ${gq.detected || 0} endpoint(s), ${gq.introspection || 0} introspectable`
       );
     } catch (e) { setErr(e.message); }
     finally { setAnalyzing(false); }
