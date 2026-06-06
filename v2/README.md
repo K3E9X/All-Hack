@@ -11,25 +11,29 @@ everything for you". Just a solid bench for manual + assisted pentesting.
 
 ## Status
 
-Phase 0: repo scaffolding, Docker stack, OpenRouter client wired up.
+Earlier phases (Phase 0-3) built the bench: docker stack, MITM proxy
+capture, CLI wrappers (10 tools: nuclei, sqlmap, ffuf, dalfox, nmap,
+subfinder, httpx, katana, testssl.sh, wpscan), and a single-LLM copilot
+(suggest attacks / explain findings / markdown report).
 
-Phase 1: MITM proxy capture with mitmproxy, flows persisted to SQLite,
-list + inspector UI with filters (host, method, URL).
+**Phase 1 of the AutoPentester rewrite (this commit family)** lays the
+foundation for the agent system that comes next:
 
-Phase 2: CLI tool wrappers for `nuclei`, `sqlmap`, `ffuf`, `dalfox`, `nmap`.
-Each job is launched async, stdout/stderr are stored in SQLite, output is
-parsed into normalized `Finding` objects.
+  - Storage moves SQLite -> **Postgres** (asyncpg pool, shared between
+    the API, the worker, and the mitmproxy addon via psycopg sync).
+  - A **Redis-backed worker queue** (arq) runs scans in an isolated
+    container. The backend never spawns subprocesses anymore; it only
+    enqueues. Cancel still works via `arq.abort_job`.
+  - The LLM client becomes a **per-role router** (planner / executor /
+    validator). Each role picks its own OpenAI-compatible provider
+    (Z.ai GLM, Moonshot Kimi, OpenRouter, OpenAI, ...). Roles with no
+    key fall back to OpenRouter so existing Phase 0-3 flows keep
+    working with zero config changes.
 
-Phase 3 (this commit): LLM copilot powered by OpenRouter.
-  - Per-flow attack suggestions: the model looks at a captured request
-    and proposes concrete scans to run (tool + target + options) as
-    structured JSON; one click launches any suggestion as a real job.
-  - Per-job explanation: plain-language write-up of scan findings with
-    exploitation paths and remediation hints.
-  - Markdown pentest report: compiles selected jobs and captured hosts
-    into a client-ready document, downloadable as `.md`.
-
-Later: PDF export, HTML rendering of the report preview, template customization.
+Next phases (specced, not yet built): authorization gate (DNS TXT /
+.well-known verification), test catalog (OWASP WSTG x MITRE ATT&CK),
+the planner/executor/validator agent loop, kill-chain analysis, and
+the live operator UI.
 
 ## Requirements
 
@@ -64,22 +68,55 @@ Then edit `.env` and set `OPENROUTER_API_KEY`.
 
 Services after `./start.sh`:
 
-| Service      | URL                          | Notes                                  |
-| ------------ | ---------------------------- | -------------------------------------- |
-| UI           | http://localhost:3000        | Minimal single-page app.               |
-| API          | http://localhost:8000        | FastAPI.                               |
-| API docs     | http://localhost:8000/docs   | Auto-generated OpenAPI.                |
-| MITM proxy   | http://localhost:8080        | Configure your browser to use this.    |
+| Container         | Port (host)          | Role                                       |
+| ----------------- | -------------------- | ------------------------------------------ |
+| frontend          | 3000                 | Minimal SPA, nginx-served.                 |
+| backend (API)     | 8000                 | FastAPI; only enqueues scans, never spawns.|
+| backend (MITM)    | 8080                 | mitmdump + addon writing to Postgres.      |
+| worker            | -                    | arq, pops scan jobs from Redis and runs them.|
+| postgres          | - (internal only)    | Single source of truth.                    |
+| redis             | - (internal only)    | arq queue + transient state.               |
 
 ## Configuration (`.env`)
 
 | Variable               | Default                                      | Purpose                                     |
 | ---------------------- | -------------------------------------------- | ------------------------------------------- |
+| `POSTGRES_DB / USER / PASSWORD` | `allhack / allhack / allhack`       | Postgres bootstrap for the compose stack.   |
 | `OPENROUTER_API_KEY`   | (empty)                                      | Required to use any LLM feature.            |
 | `OPENROUTER_MODEL`     | `qwen/qwen3-coder:free`                      | Any OpenRouter model slug.                  |
 | `OPENROUTER_FALLBACK_MODELS` | `meta-llama/llama-3.3-70b-instruct:free,openai/gpt-oss-120b:free,qwen/qwen3-next-80b-a3b-instruct:free` | Comma-separated chain tried on 429/5xx from the primary. |
+| `PLANNER_BASE_URL / API_KEY / MODEL`   | (empty -> OpenRouter fallback) | OpenAI-compatible endpoint for the planner role. |
+| `EXECUTOR_BASE_URL / API_KEY / MODEL`  | (empty -> OpenRouter fallback) | OpenAI-compatible endpoint for the executor role. |
+| `VALIDATOR_BASE_URL / API_KEY / MODEL` | (empty -> OpenRouter fallback) | OpenAI-compatible endpoint for the validator role. |
 | `OPENROUTER_APP_NAME`  | `allhack`                                    | Sent as `X-Title` header.                   |
 | `CORS_ORIGINS`         | `http://localhost:3000,http://127.0.0.1:3000`| For direct-API access during dev.           |
+| `WPSCAN_API_TOKEN`     | (empty)                                      | Optional, enables CVE lookups in wpscan.    |
+
+### Per-role LLM router (Phase 1-D)
+
+Each role is independent and configured via three vars: `{ROLE}_BASE_URL`,
+`{ROLE}_API_KEY`, `{ROLE}_MODEL`. Leaving them blank makes the role fall
+back to the OpenRouter client (so installs without per-role config still
+work). Examples:
+
+```
+# Strong reasoner for planning (Z.ai GLM)
+PLANNER_BASE_URL=https://api.z.ai/api/paas/v4
+PLANNER_API_KEY=zai-...
+PLANNER_MODEL=glm-5.1
+
+# Cheap and fast for executing tool calls (Z.ai GLM)
+EXECUTOR_BASE_URL=https://api.z.ai/api/paas/v4
+EXECUTOR_API_KEY=zai-...
+EXECUTOR_MODEL=glm-4.6
+
+# Accurate validator (Moonshot Kimi)
+VALIDATOR_BASE_URL=https://api.moonshot.cn/v1
+VALIDATOR_API_KEY=sk-...
+VALIDATOR_MODEL=kimi-k2.6
+```
+
+Verify a role is reachable with `POST /api/llm/ping?role=planner`.
 
 ## Using the MITM proxy (Phase 1)
 
