@@ -431,6 +431,38 @@ body {
 .eng-closed                { color: var(--muted); }
 .eng-revoked               { color: var(--error); }
 
+.run-queued    { color: var(--muted); }
+.run-running   { color: #c9a400; }
+.run-completed { color: var(--ok); }
+.run-failed    { color: var(--error); }
+.run-stopped   { color: var(--muted); }
+
+.autonomous-wrap {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--border);
+}
+
+.grid-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+
+.grid-stats .stat {
+  border: 1px solid var(--border);
+  padding: 8px 10px;
+  background: var(--bg);
+}
+
+.grid-stats .stat .mono {
+  font-size: 20px;
+}
+
+@media (max-width: 720px) {
+  .grid-stats { grid-template-columns: repeat(2, 1fr); }
+}
+
 /* ---- LLM suggestions / explain / report ---- */
 
 .stack-sm > * + * { margin-top: 10px; }

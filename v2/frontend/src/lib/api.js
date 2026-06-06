@@ -30,6 +30,13 @@ export const api = {
     }),
     verify: (id) => request(`/api/engagements/${id}/verify`, { method: 'POST' }),
     close: (id) => request(`/api/engagements/${id}/close`, { method: 'POST' }),
+    run: (id) => request(`/api/engagements/${id}/run`, { method: 'POST' }),
+    stop: (id) => request(`/api/engagements/${id}/stop`, { method: 'POST' }),
+    state: (id) => request(`/api/engagements/${id}/state`),
+  },
+
+  methodology: {
+    catalog: () => request('/api/methodology/catalog'),
   },
 
   proxy: {

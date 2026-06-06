@@ -238,6 +238,100 @@ function EngagementInspector({ engagementId, onChange }) {
           </div>
         </div>
       )}
+
+      {e.status === 'authorized' && <AutonomousPanel engagementId={engagementId} />}
     </section>
+  );
+}
+
+function AutonomousPanel({ engagementId }) {
+  const [state, setState] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(null);
+
+  const load = useCallback(async () => {
+    try {
+      setState(await api.engagements.state(engagementId));
+      setErr(null);
+    } catch (e) {
+      setErr(e.message);
+    }
+  }, [engagementId]);
+
+  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    const t = setInterval(load, 3000);
+    return () => clearInterval(t);
+  }, [load]);
+
+  const run = state?.run;
+  const active = run && (run.status === 'queued' || run.status === 'running');
+
+  async function start() {
+    setBusy(true); setErr(null);
+    try { await api.engagements.run(engagementId); await load(); }
+    catch (e) { setErr(e.message); }
+    finally { setBusy(false); }
+  }
+  async function stop() {
+    setBusy(true); setErr(null);
+    try { await api.engagements.stop(engagementId); await load(); }
+    catch (e) { setErr(e.message); }
+    finally { setBusy(false); }
+  }
+
+  const cov = state?.coverage_summary || {};
+
+  return (
+    <div className="autonomous-wrap stack-sm">
+      <div className="row-between">
+        <h3 className="msg-h">Autonomous test</h3>
+        <div className="btn-row">
+          {!active && <button className="btn" onClick={start} disabled={busy}>Run autonomous test</button>}
+          {active && <button className="btn ghost danger" onClick={stop} disabled={busy}>Stop</button>}
+        </div>
+      </div>
+
+      {err && <p className="result error small">{err}</p>}
+
+      {run ? (
+        <dl className="kv">
+          <dt>Run status</dt><dd className={`mono run-${run.status}`}>{run.status}</dd>
+          <dt>Phase</dt><dd className="mono">{run.phase || '-'}</dd>
+          <dt>Iterations</dt><dd className="mono">{run.iterations}</dd>
+          <dt>Jobs launched</dt><dd className="mono">{run.jobs_launched}</dd>
+          {run.error && (<><dt>Error</dt><dd className="mono error">{run.error}</dd></>)}
+        </dl>
+      ) : (
+        <p className="muted small">No run yet. Launch one to start autonomous coverage.</p>
+      )}
+
+      <div className="grid-stats">
+        <div className="stat"><div className="muted small">Assets</div><div className="mono">{state?.assets?.length || 0}</div></div>
+        <div className="stat"><div className="muted small">Technologies</div><div className="mono">{state?.technologies?.length || 0}</div></div>
+        <div className="stat"><div className="muted small">Findings</div><div className="mono">{state?.findings_count || 0}</div></div>
+        <div className="stat"><div className="muted small">Coverage done</div><div className="mono">{cov.done || 0}</div></div>
+      </div>
+
+      {state?.technologies?.length > 0 && (
+        <p className="small"><strong>Tech:</strong> <span className="mono">{state.technologies.join(', ')}</span></p>
+      )}
+
+      {state?.findings?.length > 0 && (
+        <div className="stack-sm">
+          <div className="msg-h">Findings ({state.findings.length})</div>
+          {state.findings.slice(0, 50).map((f, i) => (
+            <div key={i} className="finding">
+              <div className="row-between">
+                <span className={`sev sev-${(f.severity || 'info').toLowerCase()}`}>{f.severity}</span>
+                <span className="muted small mono">{f.tool}</span>
+              </div>
+              <div className="finding-title">{f.title}</div>
+              <div className="mono small truncate" title={f.target}>{f.target}</div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
