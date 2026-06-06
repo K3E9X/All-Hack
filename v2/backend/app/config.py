@@ -10,7 +10,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
-    # OpenRouter
+    # OpenRouter (default + fallback for any role left blank below).
     openrouter_api_key: str = ""
     openrouter_model: str = "qwen/qwen3-coder:free"
     openrouter_fallback_models: str = (
@@ -20,6 +20,23 @@ class Settings(BaseSettings):
     )
     openrouter_app_name: str = "allhack"
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
+
+    # Per-role LLM router (Planner / Executor / Validator). Each role is an
+    # OpenAI-compatible Chat Completions endpoint - works with OpenRouter,
+    # Z.ai (GLM), Moonshot (Kimi), DeepSeek, OpenAI, etc. If a role's API
+    # key is empty, it falls back to OpenRouter so the existing Phase 0-3
+    # flows keep working without any new config.
+    planner_base_url: str = ""
+    planner_api_key: str = ""
+    planner_model: str = ""
+
+    executor_base_url: str = ""
+    executor_api_key: str = ""
+    executor_model: str = ""
+
+    validator_base_url: str = ""
+    validator_api_key: str = ""
+    validator_model: str = ""
 
     # Storage
     data_dir: Path = Path("/data")

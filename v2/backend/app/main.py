@@ -21,7 +21,7 @@ from app.api.llm import router as llm_router
 from app.api.proxy import router as proxy_router
 from app.api.scans import router as scans_router
 from app.config import settings
-from app.llm import LLMError, get_llm
+from app.llm import LLMError, get_llm, get_router, iter_roles
 
 
 @asynccontextmanager
@@ -54,14 +54,24 @@ async def config() -> dict:
         "llm_configured": llm.configured,
         "llm_model": llm.model,
         "llm_fallback_models": llm.fallback_models,
+        "llm_roles": get_router().status(),
         "mitm_port": settings.mitm_port,
         "data_dir": str(settings.data_dir),
     }
 
 
 @app.post("/api/llm/ping")
-async def llm_ping() -> dict:
-    llm = get_llm()
+async def llm_ping(role: str = "planner") -> dict:
+    """Sanity-check the LLM client for a given role.
+
+    `role` is one of: planner, executor, validator. Defaults to planner.
+    Unknown roles fall back to the legacy single-client behaviour (the
+    OpenRouter default) so the Phase 0-3 UI keeps working unmodified.
+    """
+    if role in iter_roles():
+        llm = get_router().get(role)
+    else:
+        llm = get_llm()
     try:
         reply = await llm.chat(
             [
@@ -74,6 +84,7 @@ async def llm_ping() -> dict:
     except LLMError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     return {
+        "role": role,
         "primary_model": llm.model,
         "model_used": llm.last_used_model or llm.model,
         "fallback_used": (llm.last_used_model or llm.model) != llm.model,
