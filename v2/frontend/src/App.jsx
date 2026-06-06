@@ -7,6 +7,7 @@ export default function App() {
         <div className="brand">allhack</div>
         <nav className="nav">
           <NavLink to="/" end>Home</NavLink>
+          <NavLink to="/engagements">Engagements</NavLink>
           <NavLink to="/proxy">Proxy</NavLink>
           <NavLink to="/scans">Scans</NavLink>
           <NavLink to="/reports">Reports</NavLink>

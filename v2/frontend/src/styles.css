@@ -417,6 +417,20 @@ body {
 .sev-low      { color: #0b84ff; }
 .sev-info     { color: var(--muted); }
 
+/* ---- Engagements ---- */
+
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-direction: row !important;
+}
+
+.eng-pending_authorization { color: #c9a400; }
+.eng-authorized            { color: var(--ok); }
+.eng-closed                { color: var(--muted); }
+.eng-revoked               { color: var(--error); }
+
 /* ---- LLM suggestions / explain / report ---- */
 
 .stack-sm > * + * { margin-top: 10px; }

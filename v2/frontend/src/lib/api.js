@@ -20,6 +20,18 @@ export const api = {
   config: () => request('/api/config'),
   llmPing: () => request('/api/llm/ping', { method: 'POST' }),
 
+  engagements: {
+    list: () => request('/api/engagements'),
+    get: (id) => request(`/api/engagements/${id}`),
+    create: (payload) => request('/api/engagements', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }),
+    verify: (id) => request(`/api/engagements/${id}/verify`, { method: 'POST' }),
+    close: (id) => request(`/api/engagements/${id}/close`, { method: 'POST' }),
+  },
+
   proxy: {
     status: () => request('/api/proxy/status'),
     hosts: () => request('/api/proxy/hosts'),
@@ -60,5 +72,14 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     }),
+  },
+
+  audit: {
+    list: (params = {}) => {
+      const qs = new URLSearchParams(
+        Object.entries(params).filter(([, v]) => v !== undefined && v !== '' && v !== null)
+      ).toString();
+      return request(`/api/audit${qs ? `?${qs}` : ''}`);
+    },
   },
 };

@@ -9,6 +9,7 @@ export default function Scans() {
   const [tools, setTools] = useState([]);
   const [jobs, setJobs] = useState([]);
   const [total, setTotal] = useState(0);
+  const [engagements, setEngagements] = useState([]);
   const [selectedId, setSelectedId] = useState(() => searchParams.get('job'));
 
   // Keep selection in sync if the URL changes (e.g. navigating from Proxy).
@@ -16,17 +17,27 @@ export default function Scans() {
     const fromUrl = searchParams.get('job');
     if (fromUrl) setSelectedId(fromUrl);
   }, [searchParams]);
-  const [form, setForm] = useState({ tool: '', target: '', options: '' });
+  const [form, setForm] = useState({ engagement_id: '', tool: '', target: '', options: '' });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
 
   const loadAll = useCallback(async () => {
     try {
-      const [t, j] = await Promise.all([api.scans.tools(), api.scans.list({ limit: 100 })]);
+      const [t, j, eng] = await Promise.all([
+        api.scans.tools(),
+        api.scans.list({ limit: 100 }),
+        api.engagements.list(),
+      ]);
       setTools(t);
       setJobs(j.items);
       setTotal(j.total);
-      setForm((f) => (f.tool ? f : { ...f, tool: t.find((x) => x.available)?.name || '' }));
+      const authorized = (eng.items || []).filter((e) => e.status === 'authorized');
+      setEngagements(authorized);
+      setForm((f) => ({
+        ...f,
+        tool: f.tool || t.find((x) => x.available)?.name || '',
+        engagement_id: f.engagement_id || authorized[0]?.id || '',
+      }));
     } catch (err) {
       setError(err.message);
     }
@@ -42,6 +53,10 @@ export default function Scans() {
   async function onSubmit(e) {
     e.preventDefault();
     setError(null);
+    if (!form.engagement_id) {
+      setError('Select an authorized engagement. Create and verify one on the Engagements page first.');
+      return;
+    }
     if (!form.tool || !form.target) {
       setError('Tool and target are required.');
       return;
@@ -53,6 +68,7 @@ export default function Scans() {
         .map((s) => s.trim())
         .filter(Boolean);
       const job = await api.scans.submit({
+        engagement_id: form.engagement_id,
         tool: form.tool,
         target: form.target,
         options: opts,
@@ -71,7 +87,25 @@ export default function Scans() {
     <div className="stack">
       <section className="card">
         <h2>Launch a scan</h2>
+        {engagements.length === 0 && (
+          <p className="result error small">
+            No authorized engagement. Go to Engagements, create one and verify
+            target ownership before you can scan.
+          </p>
+        )}
         <form onSubmit={onSubmit} className="scan-form">
+          <label>
+            <span className="muted small">Engagement</span>
+            <select
+              value={form.engagement_id}
+              onChange={(e) => setForm((f) => ({ ...f, engagement_id: e.target.value }))}
+            >
+              <option value="">- select -</option>
+              {engagements.map((e) => (
+                <option key={e.id} value={e.id}>{e.target_host} ({e.id})</option>
+              ))}
+            </select>
+          </label>
           <label>
             <span className="muted small">Tool</span>
             <select
