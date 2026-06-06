@@ -180,6 +180,12 @@ MAPPING: Dict[str, Dict[str, Any]] = {
         "remediation": "Bind only an explicit allow-list of fields from request "
                        "bodies; never trust client-supplied role/privilege fields.",
     },
+    "param_discovery": {
+        "category": "enumeration",
+        "wstg": "WSTG-INFO-07", "attack": ["T1595"], "cwe": "CWE-200",
+        "remediation": "Reflected/undocumented parameters widen attack surface; "
+                       "remove unused params and validate/encode all that remain.",
+    },
     "endpoint_discovery": {
         "category": "recon",
         "wstg": "WSTG-INFO-07", "attack": ["T1595"], "cwe": "CWE-200",

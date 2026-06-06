@@ -21,11 +21,13 @@ from app.analysis.js_recon import analyze_js
 from app.analysis.jwt_analysis import analyze_jwt
 from app.analysis.access_control import analyze_access_control
 from app.analysis.cors import analyze_cors
+from app.analysis.param_discovery import analyze_params
 
 logger = logging.getLogger("allhack.analysis")
 
 __all__ = ["analyze_logic", "analyze_js", "analyze_jwt",
-           "analyze_access_control", "analyze_cors", "run_analysis"]
+           "analyze_access_control", "analyze_cors", "analyze_params",
+           "run_analysis"]
 
 
 async def run_analysis(engagement_id: str) -> Dict[str, Dict]:
@@ -34,6 +36,7 @@ async def run_analysis(engagement_id: str) -> Dict[str, Dict]:
     out: Dict[str, Dict] = {}
     for name, fn in (
         ("js_recon", analyze_js),            # first: may seed new endpoints
+        ("params", analyze_params),          # also seeds parameterised endpoints
         ("logic", analyze_logic),
         ("jwt", analyze_jwt),
         ("access_control", analyze_access_control),
