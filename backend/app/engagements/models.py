@@ -63,6 +63,14 @@ class Engagement:
     attested_at: Optional[float] = None
     # Pause before the exploitation phase and wait for human approval.
     require_exploit_approval: bool = False
+    # Grey-box: HTTP headers of a SECOND identity (e.g. Cookie / Authorization),
+    # used to prove IDOR/BOLA by replaying a captured request as another user.
+    # List of {"name": ..., "value": ...}. Never returned to the client.
+    secondary_auth: List[Dict[str, str]] = field(default_factory=list)
+
+    @property
+    def grey_box(self) -> bool:
+        return bool(self.secondary_auth)
 
     # ----- factory -----
     @classmethod
@@ -77,6 +85,7 @@ class Engagement:
         budget_seconds: Optional[int] = None,
         attested: bool = False,
         require_exploit_approval: bool = False,
+        secondary_auth: Optional[List[Dict[str, str]]] = None,
     ) -> "Engagement":
         host = _host_of(target_url)
         scope = scope_hosts or [host]
@@ -105,6 +114,7 @@ class Engagement:
             budget_seconds=budget_seconds,
             attested_at=now if attested else None,
             require_exploit_approval=require_exploit_approval,
+            secondary_auth=list(secondary_auth or []),
         )
 
     # ----- scope check -----
@@ -133,6 +143,9 @@ class Engagement:
         # never leak it once authorized.
         if self.status != EngagementStatus.PENDING_AUTHORIZATION:
             d["verification_token"] = None
+        # Never leak the secondary identity's credentials; expose only a flag.
+        d.pop("secondary_auth", None)
+        d["grey_box"] = self.grey_box
         return d
 
     def challenge(self) -> Dict[str, Any]:

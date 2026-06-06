@@ -7,7 +7,7 @@ const POLL_MS = 5000;
 export default function Engagements() {
   const [items, setItems] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
-  const [form, setForm] = useState({ target_url: '', scope_hosts: '', attest: false, require_approval: false });
+  const [form, setForm] = useState({ target_url: '', scope_hosts: '', attest: false, require_approval: false, secondary_auth: '' });
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState(null);
 
@@ -42,8 +42,9 @@ export default function Engagements() {
         scope_hosts: scope.length ? scope : undefined,
         attest_authorized: true,
         require_exploit_approval: form.require_approval,
+        secondary_auth_headers: form.secondary_auth || undefined,
       });
-      setForm({ target_url: '', scope_hosts: '', attest: false, require_approval: false });
+      setForm({ target_url: '', scope_hosts: '', attest: false, require_approval: false, secondary_auth: '' });
       setSelectedId(res.engagement.id);
       load();
     } catch (err) {
@@ -81,6 +82,19 @@ export default function Engagements() {
               placeholder="api.example.com, .example.com"
               value={form.scope_hosts}
               onChange={(e) => setForm((f) => ({ ...f, scope_hosts: e.target.value }))}
+            />
+          </label>
+          <label className="grow">
+            <span className="muted small">
+              Grey-box (optional): a SECOND identity's headers, one per line
+              (e.g. <code>Cookie: session=...</code> or <code>Authorization: Bearer ...</code>).
+              Enables true IDOR/BOLA proof by replaying a captured request as another user.
+            </span>
+            <textarea
+              rows={2}
+              placeholder="Cookie: session=BBBBB..."
+              value={form.secondary_auth}
+              onChange={(e) => setForm((f) => ({ ...f, secondary_auth: e.target.value }))}
             />
           </label>
           <label className="checkbox-row">

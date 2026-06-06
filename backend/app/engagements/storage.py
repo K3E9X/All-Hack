@@ -1,6 +1,7 @@
 """Postgres persistence for engagements."""
 from __future__ import annotations
 
+import json
 from typing import List, Optional
 
 from app import db
@@ -29,10 +30,12 @@ CREATE TABLE IF NOT EXISTS engagements (
     attested_at          DOUBLE PRECISION,
     budget_requests      INTEGER,
     budget_seconds       INTEGER,
-    require_exploit_approval BOOLEAN NOT NULL DEFAULT FALSE
+    require_exploit_approval BOOLEAN NOT NULL DEFAULT FALSE,
+    secondary_auth_json  TEXT
 );
 
 ALTER TABLE engagements ADD COLUMN IF NOT EXISTS require_exploit_approval BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE engagements ADD COLUMN IF NOT EXISTS secondary_auth_json TEXT;
 
 CREATE INDEX IF NOT EXISTS idx_engagements_created ON engagements(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_engagements_status  ON engagements(status);
@@ -51,8 +54,9 @@ class EngagementRepository:
                     id, target_url, target_host, scope_hosts_json, status,
                     verification_token, verification_method, title, notes,
                     created_at, verified_at, closed_at, attested_at,
-                    budget_requests, budget_seconds, require_exploit_approval
-                ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
+                    budget_requests, budget_seconds, require_exploit_approval,
+                    secondary_auth_json
+                ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
                 """,
                 e.id,
                 e.target_url,
@@ -70,6 +74,7 @@ class EngagementRepository:
                 e.budget_requests,
                 e.budget_seconds,
                 e.require_exploit_approval,
+                json.dumps(e.secondary_auth or []),
             )
 
     async def update(self, e: Engagement) -> None:
@@ -155,4 +160,16 @@ def _row_to_engagement(row) -> Engagement:
         require_exploit_approval=(
             row["require_exploit_approval"] if "require_exploit_approval" in row else False
         ),
+        secondary_auth=_load_secondary_auth(row),
     )
+
+
+def _load_secondary_auth(row) -> list:
+    raw = row["secondary_auth_json"] if "secondary_auth_json" in row else None
+    if not raw:
+        return []
+    try:
+        v = json.loads(raw)
+        return [x for x in v if isinstance(x, dict)] if isinstance(v, list) else []
+    except json.JSONDecodeError:
+        return []

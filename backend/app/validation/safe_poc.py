@@ -54,13 +54,15 @@ class SafePoC:
         if not host or not self._in_scope(host):
             raise ScopeError(f"host '{host}' is out of engagement scope")
 
-    async def fetch(self, url: str, *, method: str = "GET") -> Optional[SafeResponse]:
+    async def fetch(
+        self, url: str, *, method: str = "GET", headers: Optional[dict] = None
+    ) -> Optional[SafeResponse]:
         self._check(method, url)
         try:
             async with httpx.AsyncClient(
                 timeout=TIMEOUT, follow_redirects=False, verify=False
             ) as client:
-                resp = await client.request(method, url)
+                resp = await client.request(method, url, headers=headers or None)
                 body = b""
                 if method.upper() == "GET":
                     # Read at most MAX_BODY_BYTES.

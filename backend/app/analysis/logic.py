@@ -58,9 +58,12 @@ async def analyze_logic(
     in_scope = [f for f in summaries if eng.host_in_scope(_host(f.url))]
 
     safe = SafePoC(in_scope=eng.host_in_scope)
+    # Grey-box: a second identity's headers, used to prove cross-user access.
+    second_headers = {h["name"]: h["value"] for h in (eng.secondary_auth or [])
+                      if h.get("name") and h.get("value")}
     findings: List[Finding] = []
 
-    # ---- IDOR (from summaries; safe re-fetch to confirm) ----
+    # ---- IDOR ----
     confirmed_count = 0
     for f in in_scope:
         if (f.method or "").upper() != "GET":
@@ -80,9 +83,14 @@ async def analyze_logic(
         )
         if active_idor and confirmed_count < MAX_IDOR_CONFIRM:
             confirmed_count += 1
-            verdict = await _confirm_idor(safe, f, modified_url, original)
+            if second_headers:
+                # Grey-box: replay the SAME request as identity B (rigorous).
+                verdict = await _confirm_bola_greybox(safe, f, second_headers)
+            else:
+                # Black-box: probe a neighbouring id (weaker signal).
+                verdict = await _confirm_idor(safe, f, modified_url, original)
             if verdict is None:
-                # Protected (401/403/404) -> not an IDOR; skip.
+                # Protected / public -> not an IDOR; skip.
                 continue
             status, confidence, poc = verdict
 
@@ -200,6 +208,40 @@ async def _confirm_idor(
         return ("likely", conf, poc)
     # Other codes (5xx, redirects): inconclusive but worth noting.
     return ("likely", 0.5, f"Neighbour id returned HTTP {resp.status_code}: {modified_url}")
+
+
+async def _confirm_bola_greybox(
+    safe: SafePoC, flow, second_headers: Dict[str, str]
+) -> Optional[Tuple[str, float, str]]:
+    """Grey-box BOLA proof: replay the SAME authenticated request as a second
+    identity. If identity B can read identity A's object (and it isn't simply
+    public), that's a confirmed broken-object-level-authorization."""
+    url = flow.url
+    # 1. Rule out a public resource: fetch with no credentials at all.
+    try:
+        anon = await safe.fetch(url, method="GET", headers={})
+    except ScopeError:
+        return ("likely", 0.5, f"Re-test skipped (out of scope): {url}")
+    if anon is not None and anon.status_code == 200 and len(anon.text) > 0:
+        # Anyone can read it -> it's public, not an authz flaw.
+        return None
+
+    # 2. Replay as identity B.
+    resp = await safe.fetch(url, method="GET", headers=second_headers)
+    if resp is None:
+        return ("likely", 0.5, f"Second identity could not reach {url}")
+    if resp.status_code in (401, 403, 404):
+        # B is correctly denied -> object-level authorization works.
+        return None
+    if resp.status_code == 200 and len(resp.text) > 0:
+        poc = (
+            f"BOLA confirmed: the object at {url} was requested by identity A, "
+            f"and a second identity (B) received HTTP 200 ({len(resp.text)} bytes) "
+            f"for the same object - cross-user access without authorization. "
+            f"(Anonymous access was not 200, so the resource is not public.)"
+        )
+        return ("confirmed", 0.95, poc)
+    return ("likely", 0.5, f"Second identity got HTTP {resp.status_code} on {url}")
 
 
 # --------------------------------------------------------------------------- #

@@ -6,6 +6,23 @@ unless an AUTHORIZED engagement covers it (enforced in app/api/scans.py).
 from __future__ import annotations
 
 import time
+from typing import Dict
+
+
+def _parse_headers_blob(blob):
+    """Parse 'Name: value' lines into [{'name','value'}]. Returns [] if empty."""
+    if not blob:
+        return []
+    out = []
+    for line in blob.splitlines():
+        line = line.strip()
+        if not line or ":" not in line:
+            continue
+        name, value = line.split(":", 1)
+        name, value = name.strip(), value.strip()
+        if name and value:
+            out.append({"name": name, "value": value})
+    return out
 from typing import List, Optional
 
 from fastapi import APIRouter, HTTPException, Query
@@ -33,6 +50,10 @@ class CreateEngagementRequest(BaseModel):
     budget_seconds: Optional[int] = None
     # Pause before the exploitation phase and wait for human approval.
     require_exploit_approval: bool = False
+    # Grey-box: headers of a SECOND identity, as a blob ("Name: value" per line,
+    # e.g. a Cookie or Authorization header). Enables true IDOR/BOLA proof by
+    # replaying a captured request as another user.
+    secondary_auth_headers: Optional[str] = None
     # The operator must attest they are authorized to test this target.
     attest_authorized: bool = False
 
@@ -57,6 +78,7 @@ async def create_engagement(req: CreateEngagementRequest) -> dict:
         budget_seconds=req.budget_seconds,
         attested=req.attest_authorized,
         require_exploit_approval=req.require_exploit_approval,
+        secondary_auth=_parse_headers_blob(req.secondary_auth_headers),
     )
     await _repo.create(e)
     await audit(
