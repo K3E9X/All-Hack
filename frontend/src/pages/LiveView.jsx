@@ -127,12 +127,11 @@ export default function LiveView() {
 
   return (
     <div className="liveview stack">
-      {/* Command bar (light, not a boxed card) */}
+      {/* Command bar: light header, no box */}
       <div className="cmdbar">
         <div className="cmdbar-title">
           <span className={`dot ${active ? 'dot-live' : ''}`} />
           <h2>Live view{e ? ` · ${e.target_host}` : ''}</h2>
-          <span className={`run-pill run-${r?.status || 'none'}`}>{r?.status || 'not started'}</span>
         </div>
         <div className="btn-row">
           <Link className="btn ghost" to="/engagements">Back</Link>
@@ -154,8 +153,15 @@ export default function LiveView() {
         </div>
       )}
 
-      {/* Status band: phase progress + vitals on a single strip */}
-      <div className="statusband">
+      {/* Progress */}
+      <section className="section">
+        <div className="section-head">
+          <span className="section-title">Progress</span>
+          <span className="section-meta muted small">
+            <span className={`run-${r?.status || 'none'}`}>{r?.status || 'not started'}</span>
+            {r ? ` · iteration ${r.iterations} · ${r.jobs_launched} jobs` : ''}
+          </span>
+        </div>
         <div className="phase-timeline">
           {PHASES.map((p) => {
             const isCurrent = r?.phase === p;
@@ -167,10 +173,16 @@ export default function LiveView() {
             );
           })}
         </div>
+      </section>
+
+      {/* Metrics */}
+      <section className="section">
+        <div className="section-head"><span className="section-title">Metrics</span></div>
         <div className="vitals">
           <div className="vital"><span className="vital-k">iter</span><span className="vital-v mono">{r?.iterations ?? 0}</span></div>
           <div className="vital"><span className="vital-k">jobs</span><span className="vital-v mono">{r?.jobs_launched ?? 0}</span></div>
           <div className="vital"><span className="vital-k">assets</span><span className="vital-v mono">{state?.assets?.length || 0}</span></div>
+          <div className="vital"><span className="vital-k">tech</span><span className="vital-v mono">{state?.technologies?.length || 0}</span></div>
           <div className="vital"><span className="vital-k">confirmed</span><span className="vital-v mono sev-high">{vsum.confirmed || 0}</span></div>
           <div className="vital"><span className="vital-k">FP rate</span><span className="vital-v mono">{vsum.false_positive_rate_pct != null ? `${vsum.false_positive_rate_pct}%` : '—'}</span></div>
           <div className="vital"><span className="vital-k">LLM calls</span><span className="vital-v mono">{llm.calls || 0}</span></div>
@@ -179,41 +191,56 @@ export default function LiveView() {
         {state?.technologies?.length > 0 && (
           <div className="muted small tech-line"><strong>tech</strong> · <span className="mono">{state.technologies.join(', ')}</span></div>
         )}
-      </div>
+      </section>
 
-      {/* Pending approvals (prominent, only when present) */}
-      {approvals.map((a) => (
-        <section key={a.id} className="card approval-card">
-          <h3 className="msg-h">Approval required</h3>
-          <p className="small">{a.summary}</p>
-          <p className="muted small mono">tools: {a.tools.join(', ')} · targets: {a.targets.join(', ')}</p>
-          <div className="btn-row">
-            <button className="btn" onClick={() => decide(a.id, 'approved')}>Approve exploitation</button>
-            <button className="btn ghost danger" onClick={() => decide(a.id, 'denied')}>Deny</button>
+      {/* Approvals (only when present) */}
+      {approvals.length > 0 && (
+        <section className="section">
+          <div className="section-head"><span className="section-title">Approvals</span></div>
+          <div className="stack-sm">
+            {approvals.map((a) => (
+              <div key={a.id} className="approval">
+                <p className="small">{a.summary}</p>
+                <p className="muted small mono">tools: {a.tools.join(', ')} · targets: {a.targets.join(', ')}</p>
+                <div className="btn-row">
+                  <button className="btn" onClick={() => decide(a.id, 'approved')}>Approve exploitation</button>
+                  <button className="btn ghost danger" onClick={() => decide(a.id, 'denied')}>Deny</button>
+                </div>
+              </div>
+            ))}
           </div>
         </section>
-      ))}
+      )}
 
       {/* Activity: the two consoles, equal, side by side (stack on narrow) */}
-      <div className="live-grid">
-        <Console
-          title="Agent"
-          events={infoEvents}
-          live={connected && active}
-          emptyText="No events yet. Press Run to start the engagement."
-        />
-        <Console
-          title="Verbose"
-          events={verboseEvents}
-          live={connected && active}
-          emptyText="No detail yet. Commands, jobs, findings and validation show here."
-        />
-      </div>
+      <section className="section">
+        <div className="section-head">
+          <span className="section-title">Activity</span>
+          <span className="section-meta muted small">{connected ? 'stream connected' : 'stream offline'}</span>
+        </div>
+        <div className="live-grid">
+          <Console
+            title="Agent"
+            events={infoEvents}
+            live={connected && active}
+            emptyText="No events yet. Press Run to start the engagement."
+          />
+          <Console
+            title="Verbose"
+            events={verboseEvents}
+            live={connected && active}
+            emptyText="No detail yet. Commands, jobs, findings and validation show here."
+          />
+        </div>
+      </section>
 
-      {/* Findings, partitioned by test category (homogeneous tabs) */}
+      {/* Findings, partitioned by test category */}
       {validated.length > 0 && (
-        <section className="card">
-          <h3 className="msg-h">Findings by category ({validated.length})</h3>
+        <section className="section">
+          <div className="section-head">
+            <span className="section-title">Findings</span>
+            <span className="section-meta muted small">{validated.length} total</span>
+          </div>
           <div className="tabs">
             <button className={activeCat === 'all' ? 'active' : ''} onClick={() => setActiveCat('all')}>
               All <span className="tab-count">{validated.length}</span>
@@ -246,10 +273,13 @@ export default function LiveView() {
         </section>
       )}
 
-      {/* Kill-chains */}
+      {/* Attack chains */}
       {chains.length > 0 && (
-        <section className="card">
-          <h3 className="msg-h">Kill-chains ({chains.length})</h3>
+        <section className="section">
+          <div className="section-head">
+            <span className="section-title">Attack chains</span>
+            <span className="section-meta muted small">{chains.length}</span>
+          </div>
           <div className="stack-sm">
             {chains.map((c) => (
               <div key={c.id} className="suggestion-card">
