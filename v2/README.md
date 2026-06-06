@@ -11,13 +11,19 @@ everything for you". Just a solid bench for manual + assisted pentesting.
 
 ## Status
 
-Earlier phases (Phase 0-3) built the bench: docker stack, MITM proxy
-capture, CLI wrappers (10 tools: nuclei, sqlmap, ffuf, dalfox, nmap,
-subfinder, httpx, katana, testssl.sh, wpscan), and a single-LLM copilot
-(suggest attacks / explain findings / markdown report).
+**All seven AutoPentester build phases are implemented.** allhack v2 is an
+autonomous web-app pentester: you authorize a target, the agent loop walks
+an OWASP-WSTG x MITRE-ATT&CK methodology end to end (recon -> mapping ->
+vuln analysis -> exploitation), every finding is confirmed with a safe
+proof-of-exploit, findings are linked into kill-chains, you watch it live
+and ship a client report. The phase-by-phase notes below document how it
+fits together.
 
-**Phase 1 of the AutoPentester rewrite (this commit family)** lays the
-foundation for the agent system that comes next:
+The original bench (Phase 0-3) provided: docker stack, MITM proxy capture,
+17 CLI tool wrappers, and a single-LLM copilot.
+
+**Phase 1 of the AutoPentester rewrite** lays the foundation for the agent
+system:
 
   - Storage moves SQLite -> **Postgres** (asyncpg pool, shared between
     the API, the worker, and the mitmproxy addon via psycopg sync).
@@ -115,8 +121,38 @@ findings update live; click **Stop** at any time.
     before exploitation" and the loop pauses before the exploitation phase
     until you Approve/Deny in the live view.
 
-Next phase (specced, not yet built): the client report generator
-(Markdown/PDF, WSTG/ATT&CK/CWE mapped) and the final docker packaging.
+**Phase 7 (this commit family)** adds the client report and completes the
+build. `GET /api/engagements/{id}/report.md` (download) and `/report.html`
+(printable -> PDF via the browser) assemble a deterministic report from the
+validated findings and kill-chains: executive summary with overall risk and
+FP rate, scope/methodology, findings grouped by severity with PoC and
+OWASP-WSTG / MITRE-ATT&CK / CWE mapping, attack chains, remediation
+priority, appendix. The live view has Report buttons.
+
+### End-to-end (docker compose)
+
+```
+cd v2
+./install.sh                 # build images (postgres, redis, backend, worker, frontend)
+# edit .env: OPENROUTER_API_KEY optional (the loop runs without an LLM)
+./start.sh
+```
+
+Then at http://localhost:3000 :
+
+1. **Engagements** -> create against a target you are authorized to test
+   (use an OWASP lab like `http://testphp.vulnweb.com`), attest, optionally
+   require approval before exploitation.
+2. Prove ownership (DNS TXT or `.well-known`), **Verify**.
+3. Open **live view** -> **Run**. Watch recon -> mapping -> vuln ->
+   exploitation -> validation stream in the agent console; approve the
+   exploitation checkpoint if you enabled it.
+4. Download the **Report** (`.md` or printable HTML) once findings are
+   validated and chains are built.
+
+All seven build phases (foundation, authorization gate, tool arsenal,
+methodology + agents, validation + chaining, live view, reporting) are
+implemented.
 
 ### Authorization workflow
 
