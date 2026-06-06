@@ -82,6 +82,13 @@ async def run_engagement_loop(run_id: str) -> dict:
     # Seed the surface: the verified host + the base URL.
     await state.add_asset("host", engagement.target_host, source="engagement")
     await state.add_asset("endpoint", engagement.target_url, source="engagement")
+    # Seed from real captured traffic (proxy): the actual parameterized
+    # endpoints the operator exercised - far richer than crawling alone.
+    seeded = await _seed_from_proxy(state, engagement)
+    if seeded:
+        await events.emit(engagement.id, events.ASSET_FOUND,
+                          f"Seeded {seeded} endpoint(s) from captured proxy traffic",
+                          run_id=run.id, level=events.LEVEL_VERBOSE)
 
     current_phase: Optional[str] = None
     try:
@@ -211,6 +218,35 @@ async def run_engagement_loop(run_id: str) -> dict:
                       f"Run {run.status}", run_id=run.id, status=run.status,
                       jobs=run.jobs_launched)
     return run.to_public()
+
+
+async def _seed_from_proxy(state: "EngagementState", engagement) -> int:
+    """Add in-scope captured proxy requests as endpoint assets. Endpoints with
+    query parameters unlock the param-gated tests (sqlmap/dalfox/nuclei-dast)
+    against the real surface the operator exercised."""
+    from urllib.parse import urlparse
+    from app.proxy import FlowRepository
+
+    try:
+        flows = await FlowRepository().list_flows(limit=1000)
+    except Exception:  # noqa: BLE001
+        return 0
+
+    seen = set()
+    count = 0
+    for f in flows:
+        host = (urlparse(f.url).hostname or "").lower()
+        if not engagement.host_in_scope(host):
+            continue
+        # Normalize (drop fragment); de-dupe identical URLs.
+        if f.url in seen:
+            continue
+        seen.add(f.url)
+        await state.add_asset("endpoint", f.url, source="proxy")
+        count += 1
+        if count >= 500:
+            break
+    return count
 
 
 async def _await_exploit_approval(
