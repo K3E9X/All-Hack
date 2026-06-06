@@ -191,6 +191,18 @@ docker-compose.yml   postgres, redis, backend, worker, frontend
 install.sh / start.sh
 ```
 
+## Tests
+
+Backend unit tests cover the pure logic (authorization/scope gate, finding
+classification, the JS/JWT/CORS/IDOR analyzers, the category taxonomy) without
+touching Postgres/Redis:
+
+```
+cd backend
+pip install -r requirements-dev.txt
+pytest
+```
+
 ## Architecture notes
 
 - Single Postgres holds everything (engagements, jobs, findings, proxy flows,
