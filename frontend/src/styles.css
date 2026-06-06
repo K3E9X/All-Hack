@@ -522,203 +522,28 @@ body {
   font-weight: 600;
 }
 
-/* The live view breaks out of the 960px column to breathe, on wide screens
-   only - other pages keep their narrow, readable width. */
-@media (min-width: 1040px) {
-  .liveview {
-    width: min(1280px, calc(100vw - 48px));
-    margin-left: calc((100% - min(1280px, 100vw - 48px)) / 2);
-  }
-}
-
-/* Command bar: a light header, not a boxed card. */
-.cmdbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
-  padding-bottom: 12px;
-  border-bottom: 1px solid var(--border);
-}
-.cmdbar-title {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.cmdbar-title h2 { margin: 0; font-size: 16px; }
-
-.dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--muted);
-  flex-shrink: 0;
-}
-.dot-live { background: var(--ok); animation: pulse 1.6s ease-in-out infinite; }
-@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.25; } }
-
-.run-pill {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  border: 1px solid currentColor;
-  padding: 1px 8px;
-}
-
-.notice {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  border: 1px dashed var(--border);
-  padding: 8px 12px;
-  background: var(--card-bg);
-}
-
-/* Open sections: a titled block separated by air and a thin rule - no box,
-   no fill. The page breathes instead of being a stack of closed cards. */
-.liveview.stack > * + * { margin-top: 30px; }
-
-.section { /* intentionally open: no border, no background */ }
-.section-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
-  padding-bottom: 8px;
-  margin-bottom: 16px;
-  border-bottom: 1px solid var(--border);
-}
-.section-title {
-  font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  color: var(--fg);
-  font-weight: 600;
-}
-.section-meta { display: inline-flex; align-items: center; gap: 8px; }
-
-.approval {
-  border-left: 2px solid #c9a400;
-  padding: 4px 0 4px 12px;
-}
-
-.vitals {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 28px;
-}
-.vital { display: flex; flex-direction: column; min-width: 64px; }
-.vital-k {
-  color: var(--muted);
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-.vital-v { font-size: 20px; line-height: 1.2; }
-.tech-line { margin-top: 10px; word-break: break-word; }
-
 .live-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;   /* equal, side by side */
+  /* verbose console (2nd) gets the wider column */
+  grid-template-columns: 1fr 1.6fr;
   gap: 16px;
-  align-items: start;
 }
 @media (max-width: 860px) {
   .live-grid { grid-template-columns: 1fr; }
 }
 
-/* Console panel = toolbar + scrollable body, framed as one brick. */
-.console-panel {
-  border: 1px solid var(--border);
-  background: transparent;
-  display: flex;
-  flex-direction: column;
-}
-.console-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  flex-wrap: wrap;
-  padding: 6px 8px;
-  border-bottom: 1px solid var(--border);
-}
-.console-title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: var(--muted);
-}
-.console-tools { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.console-search,
-.console-tools select {
-  border: 1px solid var(--border);
-  background: var(--bg);
-  color: var(--fg);
-  padding: 3px 6px;
-  font-size: 11px;
-  font-family: inherit;
-}
-.console-search { width: 120px; }
-.console-btn {
-  border: 1px solid var(--border);
-  background: transparent;
-  color: var(--muted);
-  padding: 3px 8px;
-  font-size: 11px;
-  cursor: pointer;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-}
-.console-btn:hover { color: var(--fg); }
-.console-btn.on { background: var(--fg); color: var(--bg); border-color: var(--fg); }
-
 .console {
   /* Malleable: drag the bottom-right corner to resize / shrink. */
-  height: 380px;
-  min-height: 120px;
+  height: 360px;
+  min-height: 80px;
   max-height: 80vh;
   resize: vertical;
   overflow: auto;
   background: var(--bg);
+  border: 1px solid var(--border);
   padding: 8px;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 12px;
-}
-.console-empty { padding: 8px 4px; }
-
-/* Colour-coded event badge (reuses the existing log palette, 1px pill). */
-.log-badge {
-  flex-shrink: 0;
-  border: 1px solid currentColor;
-  padding: 0 5px;
-  font-size: 10px;
-  border-radius: 2px;
-  opacity: 0.9;
-}
-.badge-error { color: var(--error); }
-.badge-warn  { color: #c9a400; }
-.badge-ok    { color: var(--ok); }
-.badge-info  { color: #4ea1ff; }
-.badge-cmd   { color: #7ed08b; }
-.badge-tech  { color: #b07aff; }
-.badge-muted { color: var(--muted); }
-
-/* Findings breathe in a 2-up grid on wide screens. */
-.findings-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 10px;
-  align-items: start;
-}
-@media (max-width: 860px) {
-  .findings-grid { grid-template-columns: 1fr; }
 }
 .logline { display: flex; gap: 8px; padding: 1px 0; }
 .log-ts { color: var(--muted); flex-shrink: 0; }
