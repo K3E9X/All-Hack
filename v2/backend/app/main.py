@@ -30,6 +30,7 @@ from app.api.llm import router as llm_router
 from app.api.methodology import router as methodology_router
 from app.api.orchestrator import router as orchestrator_router
 from app.api.proxy import router as proxy_router
+from app.api.reports import router as reports_router
 from app.api.scans import router as scans_router
 from app.api.stream import router as stream_router
 from app.config import settings
@@ -111,4 +112,5 @@ app.include_router(scans_router)
 app.include_router(llm_router)
 app.include_router(audit_router)
 app.include_router(methodology_router)
+app.include_router(reports_router)
 app.include_router(stream_router)
