@@ -102,9 +102,21 @@ findings update live; click **Stop** at any time.
     and validated findings with their status, confidence and PoC. A
     `POST /engagements/{id}/validate` re-runs validation after manual scans.
 
-Next phases (specced, not yet built): the full live operator view (agent
-reasoning console, kill-chain graph, approval checkpoints) and the
-client report generator (Markdown/PDF, WSTG/ATT&CK/CWE mapped).
+**Phase 6 (this commit family)** adds the live operator view (spec §10-11):
+
+  - **Event stream**: the loop emits typed events (phase_changed,
+    task_launched, batch_done, validated, chain_built, approval_required,
+    run_finished) to an append-only table; a WebSocket
+    `/ws/engagements/{id}/stream` tails it (Postgres-as-bus, no extra
+    broker). The `/engagements/:id/live` page renders an agent console,
+    a PTES phase timeline, surface stats, kill-chains and validated
+    findings in real time.
+  - **Approval checkpoints**: create an engagement with "require approval
+    before exploitation" and the loop pauses before the exploitation phase
+    until you Approve/Deny in the live view.
+
+Next phase (specced, not yet built): the client report generator
+(Markdown/PDF, WSTG/ATT&CK/CWE mapped) and the final docker packaging.
 
 ### Authorization workflow
 
