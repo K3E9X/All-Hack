@@ -28,8 +28,11 @@ CREATE TABLE IF NOT EXISTS engagements (
     closed_at            DOUBLE PRECISION,
     attested_at          DOUBLE PRECISION,
     budget_requests      INTEGER,
-    budget_seconds       INTEGER
+    budget_seconds       INTEGER,
+    require_exploit_approval BOOLEAN NOT NULL DEFAULT FALSE
 );
+
+ALTER TABLE engagements ADD COLUMN IF NOT EXISTS require_exploit_approval BOOLEAN NOT NULL DEFAULT FALSE;
 
 CREATE INDEX IF NOT EXISTS idx_engagements_created ON engagements(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_engagements_status  ON engagements(status);
@@ -48,8 +51,8 @@ class EngagementRepository:
                     id, target_url, target_host, scope_hosts_json, status,
                     verification_token, verification_method, title, notes,
                     created_at, verified_at, closed_at, attested_at,
-                    budget_requests, budget_seconds
-                ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+                    budget_requests, budget_seconds, require_exploit_approval
+                ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
                 """,
                 e.id,
                 e.target_url,
@@ -66,6 +69,7 @@ class EngagementRepository:
                 e.attested_at,
                 e.budget_requests,
                 e.budget_seconds,
+                e.require_exploit_approval,
             )
 
     async def update(self, e: Engagement) -> None:
@@ -85,8 +89,9 @@ class EngagementRepository:
                     closed_at = $10,
                     attested_at = $11,
                     budget_requests = $12,
-                    budget_seconds = $13
-                WHERE id = $14
+                    budget_seconds = $13,
+                    require_exploit_approval = $14
+                WHERE id = $15
                 """,
                 e.target_url,
                 e.target_host,
@@ -101,6 +106,7 @@ class EngagementRepository:
                 e.attested_at,
                 e.budget_requests,
                 e.budget_seconds,
+                e.require_exploit_approval,
                 e.id,
             )
 
@@ -146,4 +152,7 @@ def _row_to_engagement(row) -> Engagement:
         attested_at=row["attested_at"],
         budget_requests=row["budget_requests"],
         budget_seconds=row["budget_seconds"],
+        require_exploit_approval=(
+            row["require_exploit_approval"] if "require_exploit_approval" in row else False
+        ),
     )

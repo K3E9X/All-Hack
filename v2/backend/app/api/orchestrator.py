@@ -4,9 +4,12 @@ from __future__ import annotations
 import time
 
 from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
 
 from app.audit import audit
 from app.engagements import EngagementRepository, EngagementStatus
+from app import events as events_log
+from app.orchestrator.approvals import ApprovalRepository
 from app.orchestrator.runs import Run, RunRepository, new_run_id
 from app.orchestrator.state import EngagementState
 from app.scans.storage import JobRepository
@@ -25,6 +28,7 @@ _runs = RunRepository()
 _jobs = JobRepository()
 _vf = ValidatedFindingRepository()
 _chains = ChainRepository()
+_approvals = ApprovalRepository()
 
 
 @router.post("/{engagement_id}/run")
@@ -147,3 +151,34 @@ async def validated_findings(engagement_id: str) -> dict:
 async def chains(engagement_id: str) -> dict:
     items = await _chains.list(engagement_id)
     return {"count": len(items), "items": items}
+
+
+@router.get("/{engagement_id}/events")
+async def events_backfill(engagement_id: str, after_id: int = 0) -> dict:
+    items = await events_log.list_since(engagement_id, after_id)
+    return {"count": len(items), "items": items}
+
+
+@router.get("/{engagement_id}/approvals")
+async def list_approvals(engagement_id: str) -> dict:
+    items = await _approvals.list_for_engagement(engagement_id)
+    return {"count": len(items), "items": [a.to_public() for a in items]}
+
+
+class ApprovalDecision(BaseModel):
+    decision: str  # "approved" | "denied"
+
+
+@router.post("/{engagement_id}/approvals/{approval_id}")
+async def decide_approval(engagement_id: str, approval_id: str, body: ApprovalDecision) -> dict:
+    if body.decision not in ("approved", "denied"):
+        raise HTTPException(status_code=400, detail="decision must be 'approved' or 'denied'")
+    appr = await _approvals.get(approval_id)
+    if appr is None or appr.engagement_id != engagement_id:
+        raise HTTPException(status_code=404, detail="approval not found")
+    ok = await _approvals.decide(approval_id, body.decision)
+    if not ok:
+        raise HTTPException(status_code=409, detail="approval already decided")
+    await audit("engagement.approval_decided", engagement_id=engagement_id,
+                approval_id=approval_id, decision=body.decision)
+    return {"approval_id": approval_id, "decision": body.decision}

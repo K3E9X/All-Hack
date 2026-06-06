@@ -22,8 +22,10 @@ from app.queue import close_arq_pool, get_arq_pool  # noqa: F401
 from app.queue import redis_settings as _redis_settings
 import app.audit  # noqa: F401  - register schema
 import app.engagements.storage  # noqa: F401  - register schema
+import app.events  # noqa: F401  - register schema
 import app.orchestrator.state  # noqa: F401  - register schema
 import app.orchestrator.runs  # noqa: F401  - register schema
+import app.orchestrator.approvals  # noqa: F401  - register schema
 import app.proxy.storage  # noqa: F401  - register schema
 import app.scans.storage  # noqa: F401  - register schema
 import app.validation.storage  # noqa: F401  - register schema

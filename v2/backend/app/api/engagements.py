@@ -31,6 +31,8 @@ class CreateEngagementRequest(BaseModel):
     scope_hosts: Optional[List[str]] = None
     budget_requests: Optional[int] = None
     budget_seconds: Optional[int] = None
+    # Pause before the exploitation phase and wait for human approval.
+    require_exploit_approval: bool = False
     # The operator must attest they are authorized to test this target.
     attest_authorized: bool = False
 
@@ -54,6 +56,7 @@ async def create_engagement(req: CreateEngagementRequest) -> dict:
         budget_requests=req.budget_requests,
         budget_seconds=req.budget_seconds,
         attested=req.attest_authorized,
+        require_exploit_approval=req.require_exploit_approval,
     )
     await _repo.create(e)
     await audit(

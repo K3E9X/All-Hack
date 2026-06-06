@@ -16,11 +16,14 @@ import time
 from typing import List, Optional
 
 from app.audit import audit
+from app import events
 from app.engagements import EngagementRepository, EngagementStatus
+from app.orchestrator.approvals import ApprovalRepository, requires_exploit_approval
 from app.orchestrator.executor import Executor
 from app.orchestrator.planner import Planner
 from app.orchestrator.runs import Run, RunRepository
 from app.orchestrator.state import EngagementState
+from app.methodology import PHASE_EXPLOIT
 from app.scans.models import JobStatus
 from app.scans.storage import JobRepository
 from app.validation import build_chains, validate_engagement
@@ -62,15 +65,21 @@ async def run_engagement_loop(run_id: str) -> dict:
     max_jobs = engagement.budget_requests or DEFAULT_MAX_JOBS
     deadline = time.time() + (engagement.budget_seconds or DEFAULT_MAX_SECONDS)
 
+    approvals = ApprovalRepository()
+    need_approval = requires_exploit_approval(engagement)
+
     run.status = "running"
     run.started_at = time.time()
     await runs.update(run)
     await audit("engagement.run_started", engagement_id=engagement.id, run_id=run.id)
+    await events.emit(engagement.id, events.RUN_STARTED, "Autonomous run started",
+                      run_id=run.id, target=engagement.target_url)
 
     # Seed the surface: the verified host + the base URL.
     await state.add_asset("host", engagement.target_host, source="engagement")
     await state.add_asset("endpoint", engagement.target_url, source="engagement")
 
+    current_phase: Optional[str] = None
     try:
         for iteration in range(MAX_ITERATIONS):
             if await runs.stop_requested(run.id):
@@ -91,6 +100,20 @@ async def run_engagement_loop(run_id: str) -> dict:
             run.iterations = iteration + 1
             run.phase = batch[0].phase
             await runs.update(run)
+            if batch[0].phase != current_phase:
+                current_phase = batch[0].phase
+                await events.emit(engagement.id, events.PHASE_CHANGED,
+                                  f"Phase: {current_phase}", run_id=run.id, phase=current_phase)
+
+            # Human checkpoint before exploitation (spec §11 approval).
+            if need_approval and batch[0].phase == PHASE_EXPLOIT:
+                approved = await _await_exploit_approval(
+                    approvals, runs, engagement.id, run.id, batch
+                )
+                if not approved:
+                    # Stop requested or denied: end the active testing loop.
+                    run.status = "stopped"
+                    break
 
             # Launch the batch (respecting the remaining job budget).
             launched_ids: List[str] = []
@@ -101,6 +124,12 @@ async def run_engagement_loop(run_id: str) -> dict:
                 if job is not None:
                     launched_ids.append(job.id)
                     run.jobs_launched += 1
+                    await events.emit(
+                        engagement.id, events.TASK_LAUNCHED,
+                        f"{task.tool} -> {task.asset_value}",
+                        run_id=run.id, tool=task.tool, target=task.asset_value,
+                        catalog_item=task.catalog_item_id,
+                    )
             await runs.update(run)
 
             if not launched_ids:
@@ -110,8 +139,15 @@ async def run_engagement_loop(run_id: str) -> dict:
 
             # Wait for this batch to finish, then ingest.
             finished = await _wait_for_jobs(jobs_repo, launched_ids, runs, run.id)
+            new_findings = 0
             for job in finished:
                 await executor.ingest(job)
+                new_findings += len(job.findings)
+            await events.emit(
+                engagement.id, events.BATCH_DONE,
+                f"Batch done: {len(finished)} jobs, {new_findings} findings",
+                run_id=run.id, jobs=len(finished), findings=new_findings,
+            )
 
         else:
             logger.info("[%s] hit MAX_ITERATIONS", run.id)
@@ -120,13 +156,23 @@ async def run_engagement_loop(run_id: str) -> dict:
         # Always run it (even on stop) so partial results are still validated.
         run.phase = "validation"
         await runs.update(run)
+        await events.emit(engagement.id, events.PHASE_CHANGED, "Phase: validation",
+                          run_id=run.id, phase="validation")
         try:
             stats = await validate_engagement(engagement.id)
-            await build_chains(engagement.id)
+            chains = await build_chains(engagement.id)
             await audit(
                 "engagement.validated",
                 engagement_id=engagement.id, run_id=run.id, stats=stats,
             )
+            await events.emit(engagement.id, events.VALIDATED,
+                              f"Validated: {stats.get('confirmed',0)} confirmed, "
+                              f"{stats.get('false_positive',0)} false positive",
+                              run_id=run.id, stats=stats)
+            if chains:
+                await events.emit(engagement.id, events.CHAIN_BUILT,
+                                  f"{len(chains)} kill-chain(s) identified",
+                                  run_id=run.id, count=len(chains))
         except Exception:  # noqa: BLE001 - validation must not fail the run
             logger.exception("[%s] validation phase error", run.id)
 
@@ -151,7 +197,47 @@ async def run_engagement_loop(run_id: str) -> dict:
         jobs=run.jobs_launched,
         coverage=await state.coverage_summary(),
     )
+    await events.emit(engagement.id, events.RUN_FINISHED,
+                      f"Run {run.status}", run_id=run.id, status=run.status,
+                      jobs=run.jobs_launched)
     return run.to_public()
+
+
+async def _await_exploit_approval(
+    approvals: "ApprovalRepository",
+    runs: RunRepository,
+    engagement_id: str,
+    run_id: str,
+    batch,
+) -> bool:
+    """Create an approval request for the exploitation batch and block until a
+    human approves/denies it (or the run is stopped). Returns True to proceed."""
+    existing = await approvals.pending_for_run(run_id)
+    if existing is None:
+        tools = sorted({t.tool for t in batch})
+        targets = sorted({t.asset_value for t in batch})[:10]
+        appr = await approvals.create(
+            engagement_id, run_id,
+            summary=f"Approve exploitation phase: {', '.join(tools)} on {len(targets)} target(s)",
+            tools=tools, targets=targets,
+        )
+        await events.emit(engagement_id, events.APPROVAL_REQUIRED,
+                          "Exploitation requires approval", run_id=run_id,
+                          approval_id=appr.id, tools=tools, targets=targets)
+    # Poll until resolved or stopped.
+    while True:
+        if await runs.stop_requested(run_id):
+            return False
+        decision = await approvals.decision_for_run(run_id)
+        if decision == "approved":
+            await events.emit(engagement_id, events.APPROVAL_RESOLVED,
+                              "Exploitation approved", run_id=run_id, decision="approved")
+            return True
+        if decision == "denied":
+            await events.emit(engagement_id, events.APPROVAL_RESOLVED,
+                              "Exploitation denied", run_id=run_id, decision="denied")
+            return False
+        await asyncio.sleep(POLL_INTERVAL)
 
 
 async def _wait_for_jobs(

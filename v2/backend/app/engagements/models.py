@@ -60,6 +60,8 @@ class Engagement:
     budget_seconds: Optional[int] = None
     # Operator attestation (the legal checkbox) - timestamp when accepted.
     attested_at: Optional[float] = None
+    # Pause before the exploitation phase and wait for human approval.
+    require_exploit_approval: bool = False
 
     # ----- factory -----
     @classmethod
@@ -73,6 +75,7 @@ class Engagement:
         budget_requests: Optional[int] = None,
         budget_seconds: Optional[int] = None,
         attested: bool = False,
+        require_exploit_approval: bool = False,
     ) -> "Engagement":
         host = _host_of(target_url)
         scope = scope_hosts or [host]
@@ -92,6 +95,7 @@ class Engagement:
             budget_requests=budget_requests,
             budget_seconds=budget_seconds,
             attested_at=time.time() if attested else None,
+            require_exploit_approval=require_exploit_approval,
         )
 
     # ----- scope check -----

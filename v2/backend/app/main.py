@@ -14,9 +14,11 @@ from fastapi.middleware.cors import CORSMiddleware
 # Importing the storage modules registers their CREATE TABLE statements with
 # app.db; init_db() then runs them all in lifespan startup.
 import app.audit  # noqa: F401
+import app.events  # noqa: F401
 import app.engagements.storage  # noqa: F401
 import app.orchestrator.state  # noqa: F401
 import app.orchestrator.runs  # noqa: F401
+import app.orchestrator.approvals  # noqa: F401
 import app.proxy.storage  # noqa: F401
 import app.scans.storage  # noqa: F401
 import app.validation.storage  # noqa: F401
@@ -29,6 +31,7 @@ from app.api.methodology import router as methodology_router
 from app.api.orchestrator import router as orchestrator_router
 from app.api.proxy import router as proxy_router
 from app.api.scans import router as scans_router
+from app.api.stream import router as stream_router
 from app.config import settings
 from app.llm import LLMError, get_llm, get_router, iter_roles
 
@@ -108,3 +111,4 @@ app.include_router(scans_router)
 app.include_router(llm_router)
 app.include_router(audit_router)
 app.include_router(methodology_router)
+app.include_router(stream_router)
