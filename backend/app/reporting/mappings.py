@@ -101,6 +101,12 @@ MAPPING: Dict[str, Dict[str, Any]] = {
         "remediation": "Update the CMS core, plugins and themes; remove unused "
                        "extensions; restrict user enumeration.",
     },
+    "subdomain_takeover": {
+        "category": "config",
+        "wstg": "WSTG-CONF-10", "attack": ["T1584.001"], "cwe": "CWE-350",
+        "remediation": "Remove dangling DNS records pointing at deprovisioned "
+                       "services; claim or delete the CNAME target; monitor DNS.",
+    },
     "exposed_resource": {
         "category": "enumeration",
         "wstg": "WSTG-CONF-04", "attack": ["T1592"], "cwe": "CWE-538",

@@ -93,6 +93,7 @@ _TAG_CLASS = [
     (("lfi", "fileinclusion", "file-inclusion", "traversal", "path-traversal"), "lfi"),
     (("rce", "cmdi", "command-injection", "oast-rce"), "command_injection"),
     (("redirect", "open-redirect", "openredirect"), "open_redirect"),
+    (("takeover", "subdomain-takeover"), "subdomain_takeover"),
     (("cors",), "cors"),
     (("default-login", "auth-bypass", "auth-bypas", "weak-cred"), "auth"),
     (("exposure", "exposures", "disclosure", "backup", "config"), "exposed_resource"),

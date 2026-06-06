@@ -155,6 +155,18 @@ CATALOG: List[CatalogItem] = [
         description="Brute-force common paths/files (admin, backups, .git, .env).",
         applies_when={"always": True},
     ),
+    CatalogItem(
+        id="MAP-TAKEOVER",
+        wstg_id="WSTG-CONF-10",
+        attack_techniques=["T1584.001"],
+        vuln_class="subdomain_takeover",
+        phase=PHASE_MAPPING,
+        tool="nuclei",
+        description="Detect dangling DNS / subdomain takeover on discovered hosts.",
+        severity_default="high",
+        default_options=["-tags", "takeover"],
+        applies_when={"is_host": True},
+    ),
 
     # ----- VULN ANALYSIS -----
     CatalogItem(

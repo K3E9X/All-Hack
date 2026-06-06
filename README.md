@@ -92,9 +92,10 @@ For real coverage, run it authenticated:
 The **deep analysis** pass (autorun in the validation phase, or on demand via
 *Deep analysis* on the live view) mines everything captured through the proxy:
 
-- **JavaScript mining** - pulls secrets (cloud keys, tokens, private keys) and
-  hidden API endpoints out of JS bundles; discovered endpoints are seeded as
-  new scan targets.
+- **Secret & endpoint mining** - scans every captured text response (JS
+  bundles, HTML, JSON, source maps) for secrets (cloud keys, tokens, private
+  keys, JWTs) and pulls hidden API endpoints out of client code; discovered
+  endpoints are seeded as new scan targets.
 - **JWT analysis** - flags `alg=none`, cracks weak/known HMAC secrets offline,
   spots `kid`/`jku` injection surface, missing `exp`, and authz claims.
 - **Access control in depth** - replays authenticated GETs anonymously to find

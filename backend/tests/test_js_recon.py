@@ -5,6 +5,7 @@ from app.analysis.js_recon import (
     _ENDPOINT_RE,
     _FULLURL_RE,
     _SECRET_PATTERNS,
+    _content_label,
     _looks_like_js,
     _redact,
 )
@@ -64,6 +65,14 @@ def test_fullurl_extraction():
 def test_redact_keeps_head_and_tail():
     r = _redact("AKIAIOSFODNN7EXAMPLE")
     assert r.startswith("AKIAIOSF") and r.endswith("MPLE") and "..." in r
+
+
+def test_content_label():
+    assert _content_label("application/javascript", "https://t/app.js") == "JavaScript"
+    assert _content_label("text/html", "https://t/") == "HTML"
+    assert _content_label("application/json", "https://t/api/x") == "API response"
+    assert _content_label("application/json", "https://t/app.js.map") == "source map"
+    assert _content_label("text/plain", "https://t/robots.txt") == "response"
 
 
 def test_looks_like_js():
