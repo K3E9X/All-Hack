@@ -15,7 +15,9 @@
 #   - mitmproxy  (pip)
 # Python app runs FastAPI backend.
 
-FROM python:3.12-slim AS base
+# Pinned to bookworm (Debian 12): the default `slim` tag now tracks trixie
+# (Debian 13), which dropped `nikto` and `whatweb` from its apt repos.
+FROM python:3.12-slim-bookworm AS base
 
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1 \
