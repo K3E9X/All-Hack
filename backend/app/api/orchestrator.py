@@ -103,10 +103,13 @@ async def engagement_state(engagement_id: str) -> dict:
     validated = await _vf.list(engagement_id)
     chains = await _chains.list(engagement_id)
     validation_summary = await _vf.summary(engagement_id)
+    from app.llm import usage as llm_usage
+    llm = await llm_usage.summary(engagement_id)
 
     return {
         "engagement": e.to_public(),
         "run": run.to_public() if run else None,
+        "llm_usage": llm,
         "assets": [
             {"kind": a.kind, "value": a.value, "has_params": a.has_params,
              "is_https": a.is_https, "source": a.source}

@@ -23,13 +23,20 @@ CREATE TABLE IF NOT EXISTS events (
     run_id        TEXT,
     ts            DOUBLE PRECISION NOT NULL,
     type          TEXT NOT NULL,
+    level         TEXT NOT NULL DEFAULT 'info',
     message       TEXT,
     data_json     TEXT
 );
+ALTER TABLE events ADD COLUMN IF NOT EXISTS level TEXT NOT NULL DEFAULT 'info';
 CREATE INDEX IF NOT EXISTS idx_events_engagement ON events(engagement_id, id);
 """
 
 db.register_schema(SCHEMA_SQL)
+
+# Event levels: the main agent console shows 'info'; the verbose console
+# shows everything (info + verbose).
+LEVEL_INFO = "info"
+LEVEL_VERBOSE = "verbose"
 
 # Typed event names the UI knows how to render.
 PHASE_CHANGED = "phase_changed"
@@ -39,6 +46,7 @@ TASK_LAUNCHED = "task_launched"
 BATCH_DONE = "batch_done"
 ASSET_FOUND = "asset_found"
 FINDING = "finding"
+JOB_DONE = "job_done"
 VALIDATED = "validated"
 CHAIN_BUILT = "chain_built"
 APPROVAL_REQUIRED = "approval_required"
@@ -53,15 +61,16 @@ async def emit(
     message: str = "",
     *,
     run_id: Optional[str] = None,
+    level: str = LEVEL_INFO,
     **data: Any,
 ) -> None:
     """Append one event. Never raises into the caller (best-effort stream)."""
     try:
         async with db.acquire() as conn:
             await conn.execute(
-                "INSERT INTO events (engagement_id, run_id, ts, type, message, data_json) "
-                "VALUES ($1,$2,$3,$4,$5,$6)",
-                engagement_id, run_id, time.time(), type_, message,
+                "INSERT INTO events (engagement_id, run_id, ts, type, level, message, data_json) "
+                "VALUES ($1,$2,$3,$4,$5,$6,$7)",
+                engagement_id, run_id, time.time(), type_, level, message,
                 json.dumps(data, default=str) if data else None,
             )
     except Exception:  # noqa: BLE001
@@ -86,6 +95,8 @@ async def list_since(
                 data = {}
         out.append({
             "id": r["id"], "engagement_id": r["engagement_id"], "run_id": r["run_id"],
-            "ts": r["ts"], "type": r["type"], "message": r["message"], "data": data,
+            "ts": r["ts"], "type": r["type"],
+            "level": r["level"] if "level" in r else "info",
+            "message": r["message"], "data": data,
         })
     return out

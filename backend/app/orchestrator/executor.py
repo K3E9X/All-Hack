@@ -17,6 +17,7 @@ import logging
 from typing import List, Optional
 from urllib.parse import urlparse
 
+from app import events
 from app.scans import Job, get_runner
 from app.orchestrator.planner import Task
 from app.orchestrator.state import EngagementState
@@ -58,8 +59,25 @@ class Executor:
                 job.catalog_item_id, job.target, status, job_id=job.id
             )
 
+        # Verbose: one line per finished job (exit code + finding count).
+        await events.emit(
+            self.state.engagement_id, events.JOB_DONE,
+            f"{job.tool} {job.status.value} (exit {job.exit_code}) "
+            f"- {len(job.findings)} finding(s) on {job.target}",
+            level=events.LEVEL_VERBOSE,
+            tool=job.tool, target=job.target, status=job.status.value,
+            findings=len(job.findings),
+        )
+
         for f in job.findings:
             await self._ingest_finding(job, f)
+            # Verbose: one line per finding as it is ingested.
+            await events.emit(
+                self.state.engagement_id, events.FINDING,
+                f"[{f.severity}] {f.title} ({job.tool})",
+                level=events.LEVEL_VERBOSE,
+                severity=f.severity, tool=job.tool, target=f.target,
+            )
 
     async def _ingest_finding(self, job: Job, finding) -> None:
         tool = job.tool
@@ -79,20 +97,26 @@ class Executor:
             await self.state.add_fingerprint("wordpress", source="wpscan")
 
         # New endpoint assets from crawl / archive / content-discovery tools.
-        if tool in ("katana", "gau"):
+        new_asset = None  # (kind, value)
+        if tool in ("katana", "gau", "ffuf"):
             url = finding.target
             if _looks_like_http_url(url):
                 await self.state.add_asset("endpoint", url, source=tool)
-        elif tool == "ffuf":
-            url = finding.target
-            if _looks_like_http_url(url):
-                await self.state.add_asset("endpoint", url, source="ffuf")
+                new_asset = ("endpoint", url)
         elif tool == "subfinder":
             host = finding.target
             if host:
                 # New subdomains become host assets (scope gate still applies
                 # when an actual scan is submitted against them).
                 await self.state.add_asset("host", host, source="subfinder")
+                new_asset = ("host", host)
+
+        if new_asset:
+            await events.emit(
+                self.state.engagement_id, events.ASSET_FOUND,
+                f"{new_asset[0]}: {new_asset[1]} (via {tool})",
+                level=events.LEVEL_VERBOSE, kind=new_asset[0], value=new_asset[1],
+            )
 
 
 def _looks_like_http_url(value: str) -> bool:

@@ -534,6 +534,10 @@ body {
 .log-chain_built .log-type { color: var(--ok); }
 .log-approval_required .log-type { color: #c9a400; }
 .log-error .log-type { color: var(--error); }
+.log-verbose { opacity: 0.78; }
+.log-job_done .log-type { color: #6aa1ff; }
+.log-finding .log-type { color: #c9a400; }
+.log-asset_found .log-type { color: var(--muted); }
 
 .approval-card { border-color: #c9a400; }
 

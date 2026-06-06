@@ -16,7 +16,7 @@ actually answered, so the UI can show it.
 from __future__ import annotations
 
 import json
-from typing import AsyncIterator, Dict, List, Optional
+from typing import Any, AsyncIterator, Dict, List, Optional
 
 import httpx
 
@@ -41,7 +41,9 @@ class LLMClient:
         app_name: Optional[str] = None,
         fallback_models: Optional[List[str]] = None,
         timeout: float = 120.0,
+        role: Optional[str] = None,
     ) -> None:
+        self.role = role
         self.api_key = api_key or settings.openrouter_api_key
         self.model = model or settings.openrouter_model
         self.base_url = (base_url or settings.openrouter_base_url).rstrip("/")
@@ -153,9 +155,30 @@ class LLMClient:
         if isinstance(data, dict) and "error" in data and "choices" not in data:
             raise LLMError(f"OpenRouter error envelope: {json.dumps(data)[:500]}")
         try:
-            return data["choices"][0]["message"]["content"]
+            content = data["choices"][0]["message"]["content"]
         except (KeyError, IndexError) as exc:
             raise LLMError(f"Unexpected response shape: {data}") from exc
+
+        await self._record_usage(model, data.get("usage"))
+        return content
+
+    async def _record_usage(self, model: str, usage: Optional[Dict[str, Any]]) -> None:
+        """Best-effort token/cost accounting against the current engagement."""
+        if not isinstance(usage, dict):
+            return
+        try:
+            from app.llm import usage as usage_mod
+
+            await usage_mod.record(
+                role=self.role,
+                model=model,
+                prompt_tokens=int(usage.get("prompt_tokens") or 0),
+                completion_tokens=int(usage.get("completion_tokens") or 0),
+                # OpenRouter may include a real cost; otherwise estimate_cost runs.
+                cost_usd=usage.get("cost") if isinstance(usage.get("cost"), (int, float)) else None,
+            )
+        except Exception:  # noqa: BLE001
+            pass
 
     async def stream(
         self,

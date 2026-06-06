@@ -38,6 +38,11 @@ class Settings(BaseSettings):
     validator_api_key: str = ""
     validator_model: str = ""
 
+    # Optional cost accounting. Comma-separated 'model=IN/OUT' where IN/OUT are
+    # USD per 1M tokens, e.g. "glm-4.6=0.6/2.2,kimi-k2-0905-preview=0.6/2.5".
+    # Models not listed (e.g. OpenRouter :free) cost 0; tokens are still tracked.
+    llm_pricing: str = ""
+
     # Storage
     data_dir: Path = Path("/data")
     # Postgres + Redis are mandatory from Phase 1 onward. Defaults match the

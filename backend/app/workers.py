@@ -23,6 +23,7 @@ from app.queue import redis_settings as _redis_settings
 import app.audit  # noqa: F401  - register schema
 import app.engagements.storage  # noqa: F401  - register schema
 import app.events  # noqa: F401  - register schema
+import app.llm.usage  # noqa: F401  - register schema
 import app.orchestrator.state  # noqa: F401  - register schema
 import app.orchestrator.runs  # noqa: F401  - register schema
 import app.orchestrator.approvals  # noqa: F401  - register schema

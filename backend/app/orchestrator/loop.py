@@ -58,6 +58,10 @@ async def run_engagement_loop(run_id: str) -> dict:
         await _fail(runs, run, f"engagement is {engagement.status.value}, not authorized")
         return run.to_public()
 
+    # Bill every LLM call made during this run to the engagement.
+    from app.llm.usage import current_engagement
+    current_engagement.set(engagement.id)
+
     state = EngagementState(engagement.id)
     planner = Planner(state)
     executor = Executor(state)

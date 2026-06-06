@@ -64,6 +64,7 @@ class LLMRouter:
                 # primary provider 429/5xx's. Keeps the Phase 0-3 fallback
                 # behaviour even when planner/executor use paid providers.
                 fallback_models=settings.openrouter_fallback_list,
+                role=role,
             )
         self._clients[role] = client
         return client

@@ -13,6 +13,7 @@ export default function LiveView() {
   const wsRef = useRef(null);
   const lastIdRef = useRef(0);
   const consoleRef = useRef(null);
+  const verboseRef = useRef(null);
 
   const loadState = useCallback(async () => {
     try {
@@ -58,6 +59,7 @@ export default function LiveView() {
 
   useEffect(() => {
     consoleRef.current?.scrollTo(0, consoleRef.current.scrollHeight);
+    verboseRef.current?.scrollTo(0, verboseRef.current.scrollHeight);
   }, [eventsList]);
 
   async function decide(approvalId, decision) {
@@ -77,6 +79,8 @@ export default function LiveView() {
   const vsum = state?.validation_summary || {};
   const chains = state?.chains || [];
   const validated = state?.validated_findings || [];
+  const llm = state?.llm_usage || {};
+  const infoEvents = eventsList.filter((ev) => ev.level !== 'verbose');
 
   return (
     <div className="stack">
@@ -126,12 +130,12 @@ export default function LiveView() {
       ))}
 
       <div className="live-grid">
-        {/* Agent reasoning console */}
+        {/* High-level agent reasoning console (info events) */}
         <section className="card">
           <h3 className="msg-h">Agent console</h3>
           <div className="console" ref={consoleRef}>
-            {eventsList.length === 0 && <div className="muted small">No events yet.</div>}
-            {eventsList.map((ev) => (
+            {infoEvents.length === 0 && <div className="muted small">No events yet.</div>}
+            {infoEvents.map((ev) => (
               <div key={ev.id} className={`logline log-${ev.type}`}>
                 <span className="log-ts">{new Date(ev.ts * 1000).toLocaleTimeString()}</span>
                 <span className="log-type">[{ev.type}]</span>
@@ -141,20 +145,38 @@ export default function LiveView() {
           </div>
         </section>
 
-        {/* Stats + tech */}
+        {/* Verbose console: every event, including per-job / per-finding / per-asset */}
         <section className="card">
-          <h3 className="msg-h">Surface</h3>
-          <div className="grid-stats">
-            <div className="stat"><div className="muted small">Assets</div><div className="mono">{state?.assets?.length || 0}</div></div>
-            <div className="stat"><div className="muted small">Tech</div><div className="mono">{state?.technologies?.length || 0}</div></div>
-            <div className="stat"><div className="muted small">Confirmed</div><div className="mono sev-high">{vsum.confirmed || 0}</div></div>
-            <div className="stat"><div className="muted small">FP rate</div><div className="mono">{vsum.false_positive_rate_pct != null ? `${vsum.false_positive_rate_pct}%` : '-'}</div></div>
+          <h3 className="msg-h">Verbose console</h3>
+          <div className="console" ref={verboseRef}>
+            {eventsList.length === 0 && <div className="muted small">No events yet.</div>}
+            {eventsList.map((ev) => (
+              <div key={ev.id} className={`logline log-${ev.type} ${ev.level === 'verbose' ? 'log-verbose' : ''}`}>
+                <span className="log-ts">{new Date(ev.ts * 1000).toLocaleTimeString()}</span>
+                <span className="log-type">[{ev.type}]</span>
+                <span className="log-msg">{ev.message}</span>
+              </div>
+            ))}
           </div>
-          {state?.technologies?.length > 0 && (
-            <p className="small"><strong>Tech:</strong> <span className="mono">{state.technologies.join(', ')}</span></p>
-          )}
         </section>
       </div>
+
+      {/* Surface + cost stats */}
+      <section className="card">
+        <h3 className="msg-h">Surface &amp; cost</h3>
+        <div className="grid-stats">
+          <div className="stat"><div className="muted small">Assets</div><div className="mono">{state?.assets?.length || 0}</div></div>
+          <div className="stat"><div className="muted small">Tech</div><div className="mono">{state?.technologies?.length || 0}</div></div>
+          <div className="stat"><div className="muted small">Confirmed</div><div className="mono sev-high">{vsum.confirmed || 0}</div></div>
+          <div className="stat"><div className="muted small">FP rate</div><div className="mono">{vsum.false_positive_rate_pct != null ? `${vsum.false_positive_rate_pct}%` : '-'}</div></div>
+          <div className="stat"><div className="muted small">LLM calls</div><div className="mono">{llm.calls || 0}</div></div>
+          <div className="stat"><div className="muted small">Tokens</div><div className="mono">{(llm.total_tokens || 0).toLocaleString()}</div></div>
+          <div className="stat"><div className="muted small">API cost</div><div className="mono">${(llm.cost_usd || 0).toFixed(4)}</div></div>
+        </div>
+        {state?.technologies?.length > 0 && (
+          <p className="small"><strong>Tech:</strong> <span className="mono">{state.technologies.join(', ')}</span></p>
+        )}
+      </section>
 
       {/* Kill-chains */}
       {chains.length > 0 && (
