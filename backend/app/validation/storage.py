@@ -81,6 +81,17 @@ class ValidatedFindingRepository:
             )
         return [_row_to_vf(r) for r in rows]
 
+    async def get(self, vf_id: str) -> Optional[ValidatedFinding]:
+        async with db.acquire() as conn:
+            row = await conn.fetchrow("SELECT * FROM validated_findings WHERE id=$1", vf_id)
+        return _row_to_vf(row) if row else None
+
+    async def list_all(self) -> List[ValidatedFinding]:
+        async with db.acquire() as conn:
+            rows = await conn.fetch(
+                "SELECT * FROM validated_findings ORDER BY created_at DESC")
+        return [_row_to_vf(r) for r in rows]
+
     async def set_chain(self, vf_id: str, chain_id: str) -> None:
         async with db.acquire() as conn:
             await conn.execute(

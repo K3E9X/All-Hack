@@ -93,6 +93,21 @@ export const api = {
     }),
   },
 
+  findings: {
+    list: (params = {}) => {
+      const qs = new URLSearchParams(
+        Object.entries(params).filter(([, v]) => v !== undefined && v !== '' && v !== null)
+      ).toString();
+      return request(`/api/findings${qs ? `?${qs}` : ''}`);
+    },
+    setStatus: (id, status) => request(`/api/findings/${id}/status`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status }),
+    }),
+    retest: (id) => request(`/api/findings/${id}/retest`, { method: 'POST' }),
+    exportUrl: (id) => `/api/findings/${id}/export?format=h1`,
+  },
+
   sandbox: {
     run: (payload) => request('/api/sandbox/run', {
       method: 'POST',

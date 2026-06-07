@@ -1,75 +1,125 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { api } from '../lib/api.js';
 
-// Global, cross-engagement findings view. The deduped backend
-// (GET /api/findings + status/retest/export) is wired in the next milestone;
-// for now this aggregates each engagement's validated findings client-side.
-const SEV_ORDER = { critical: 0, high: 1, medium: 2, low: 3, info: 4 };
+const SEVS = ['critical', 'high', 'medium', 'low'];
+const STATUSES = ['new', 'triaged', 'confirmed', 'reported', 'false_positive'];
+const CVSS_CLASS = (s) => s >= 9 ? 'c' : s >= 7 ? 'h' : s >= 4 ? 'm' : 'l';
+
+function ago(ts) {
+  if (!ts) return '-';
+  const sec = Math.max(0, Date.now() / 1000 - ts);
+  if (sec < 90) return Math.round(sec) + 's ago';
+  if (sec < 5400) return Math.round(sec / 60) + 'm ago';
+  if (sec < 86400) return Math.round(sec / 3600) + 'h ago';
+  return Math.round(sec / 86400) + 'd ago';
+}
 
 export default function Findings() {
   const [rows, setRows] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [sev, setSev] = useState('');
+  const [sevFilter, setSevFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
   const [q, setQ] = useState('');
+  const [sel, setSel] = useState(null);
+  const [toast, setToast] = useState(null);
+  const flash = (m) => { setToast(m); setTimeout(() => setToast(null), 2000); };
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const r = await api.engagements.list();
-        const engs = r.items || [];
-        const all = [];
-        for (const e of engs) {
-          try {
-            const s = await api.engagements.state(e.id);
-            for (const f of (s.validated_findings || [])) {
-              if (f.status === 'false_positive') continue;
-              all.push({ ...f, engagement: e.target_host || e.target_url, engagement_id: e.id });
-            }
-          } catch { /* ignore */ }
-        }
-        all.sort((a, b) => (SEV_ORDER[a.severity] ?? 9) - (SEV_ORDER[b.severity] ?? 9));
-        setRows(all);
-      } finally { setLoading(false); }
-    })();
-  }, []);
+  const load = useCallback(async () => {
+    try {
+      const r = await api.findings.list({
+        severity: sevFilter !== 'all' ? sevFilter : undefined,
+        status: statusFilter !== 'all' ? statusFilter : undefined,
+        q: q || undefined,
+      });
+      setRows(r.items || []);
+    } catch { /* ignore */ }
+  }, [sevFilter, statusFilter, q]);
+  useEffect(() => { load(); }, [load]);
 
-  const shown = rows.filter((f) =>
-    (!sev || f.severity === sev) &&
-    (!q || (`${f.title} ${f.target} ${f.vuln_class}`).toLowerCase().includes(q.toLowerCase())));
+  const counts = SEVS.reduce((o, s) => (o[s] = rows.filter((f) => f.severity === s).length, o), {});
+  const f = rows.find((x) => x.id === sel) || (rows.length && sevFilter === 'all' && statusFilter === 'all' && !q ? null : null);
+
+  async function setStatus(id, status, msg) {
+    try { await api.findings.setStatus(id, status); flash(msg); await load(); } catch (e) { flash(e.message); }
+  }
+  async function retest(id) {
+    flash('Re-testing...');
+    try { const r = await api.findings.retest(id); flash(r.status === 'false_positive' ? 'Retest: no longer reproduced' : 'Retest complete'); await load(); } catch (e) { flash(e.message); }
+  }
 
   return (
     <div className="page">
-      <div className="card">
-        <div className="card__head"><span className="card__title">Findings</span><span className="card__meta">{shown.length} shown &middot; cross-engagement</span></div>
-        <div className="card__body" style={{ paddingBottom: 12 }}>
-          <div className="px-filters">
-            <div className="select-box"><select className="select" value={sev} onChange={(e) => setSev(e.target.value)}>
-              <option value="">All severities</option>{['critical', 'high', 'medium', 'low', 'info'].map((s) => <option key={s} value={s}>{s}</option>)}
-            </select></div>
-            <input className="px-search" placeholder="filter title / target / class..." value={q} onChange={(e) => setQ(e.target.value)} />
+      <div className="metrics" style={{ gridTemplateColumns: 'repeat(4,1fr)' }}>
+        <div className="metric metric--alert"><div className="metric__l">Critical</div><div className="metric__v">{counts.critical}</div></div>
+        <div className="metric"><div className="metric__l" style={{ color: 'var(--severity-high)' }}>High</div><div className="metric__v" style={{ color: 'var(--severity-high)' }}>{counts.high}</div></div>
+        <div className="metric"><div className="metric__l" style={{ color: 'var(--severity-medium)' }}>Medium</div><div className="metric__v" style={{ color: 'var(--severity-medium)' }}>{counts.medium}</div></div>
+        <div className="metric"><div className="metric__l">Low</div><div className="metric__v">{counts.low}</div></div>
+      </div>
+
+      <div className="filters">
+        <div className="filter-seg">
+          <button className={sevFilter === 'all' ? 'on' : ''} onClick={() => setSevFilter('all')}>All sev</button>
+          {SEVS.map((s) => <button key={s} className={(sevFilter === s ? 'on sev-' + s[0] : '')} onClick={() => setSevFilter(s)}>{s}</button>)}
+        </div>
+        <div className="filter-seg">
+          <button className={statusFilter === 'all' ? 'on' : ''} onClick={() => setStatusFilter('all')}>All status</button>
+          {STATUSES.map((s) => <button key={s} className={statusFilter === s ? 'on' : ''} onClick={() => setStatusFilter(s)}>{s.replace('_', ' ')}</button>)}
+        </div>
+        <input className="filter-search" placeholder="search title / target / class..." value={q} onChange={(e) => setQ(e.target.value)} />
+      </div>
+
+      <div className="layout">
+        <div className="card">
+          <div className="card__head"><span className="card__title">Findings <span style={{ color: 'var(--text-faint)' }}>({rows.length})</span></span><span className="card__meta">deduped across engagements</span></div>
+          <div className="tbl-scroll">
+            <table className="tbl">
+              <thead><tr><th>Sev</th><th>CVSS</th><th>Title</th><th>Target</th><th>Status</th><th>Eng.</th><th></th></tr></thead>
+              <tbody>
+                {rows.map((r) => (
+                  <tr key={r.id} className={'clickable' + (r.id === sel ? ' selected' : '')} onClick={() => setSel(r.id)}>
+                    <td><span className={'sev sev--' + r.severity}>{r.severity}</span></td>
+                    <td><span className={'cvss cvss--' + CVSS_CLASS(r.cvss)}>{(r.cvss || 0).toFixed(1)}</span></td>
+                    <td className="col-title">{r.title}{r.dup > 1 ? <span className="dedup"> &middot; <b>{r.dup}x</b></span> : null}</td>
+                    <td className="mono truncate" style={{ maxWidth: 180, color: 'var(--text-secondary)' }} title={r.target}>{r.target}</td>
+                    <td><span className={'status-pill ' + r.status}>{(r.status || 'new').replace('_', ' ')}</span></td>
+                    <td className="mono" style={{ color: 'var(--text-faint)', fontSize: 11 }}>{r.engagement}</td>
+                    <td className="mono" style={{ color: 'var(--text-faint)', fontSize: 11 }}>{ago(r.last_seen)}</td>
+                  </tr>
+                ))}
+                {rows.length === 0 && <tr><td colSpan={7}><div className="empty-detail">No findings match.</div></td></tr>}
+              </tbody>
+            </table>
           </div>
         </div>
-        <div className="tbl-scroll">
-          <table className="tbl">
-            <thead><tr><th>Severity</th><th>Title</th><th>Target</th><th>Class</th><th>Tool</th><th>Status</th><th>Engagement</th></tr></thead>
-            <tbody>
-              {shown.map((f) => (
-                <tr key={f.id}>
-                  <td><span className={'sev sev--' + (f.severity || 'info')}>{f.severity}</span></td>
-                  <td>{f.title}</td>
-                  <td className="mono truncate" style={{ maxWidth: 240, color: 'var(--text-secondary)' }} title={f.target}>{f.target}</td>
-                  <td className="mono" style={{ color: 'var(--text-secondary)' }}>{f.vuln_class}</td>
-                  <td className="mono">{f.tool}</td>
-                  <td><span className={'vstatus vstatus--' + f.status}>{f.status}</span></td>
-                  <td className="mono" style={{ color: 'var(--text-faint)' }}>{f.engagement}</td>
-                </tr>
-              ))}
-              {!loading && shown.length === 0 && <tr><td colSpan={7}><div className="empty">No findings match.</div></td></tr>}
-              {loading && <tr><td colSpan={7}><div className="empty">Loading findings...</div></td></tr>}
-            </tbody>
-          </table>
+
+        <div className="card detail">
+          {!f ? <div className="empty-detail">Select a finding.</div> : (
+            <div className="card__body">
+              <div className="detail__row"><span className={'sev sev--' + f.severity}>{f.severity}</span><span className={'cvss cvss--' + CVSS_CLASS(f.cvss)}>CVSS {(f.cvss || 0).toFixed(1)}</span><span className={'status-pill ' + f.status}>{(f.status || 'new').replace('_', ' ')}</span></div>
+              <h2 className="detail__title">{f.title}</h2>
+              <div className="detail__target">{f.target}</div>
+              {f.desc && <p style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.55, margin: '0 0 4px' }}>{f.desc}</p>}
+              <dl className="detail__meta">
+                <dt>Class</dt><dd>{f.cls}</dd>
+                <dt>Tool</dt><dd>{f.tool}</dd>
+                <dt>Engagement</dt><dd>{f.engagement}</dd>
+                <dt>Occurrences</dt><dd>{f.dup}</dd>
+                <dt>Last seen</dt><dd>{ago(f.last_seen)}</dd>
+              </dl>
+              {f.evidence && <><div className="detail__block-t">Evidence</div><div className="detail__pre">{f.evidence}</div></>}
+              {f.poc && <><div className="detail__block-t">Proof of concept</div><div className="detail__pre poc">{f.poc}</div></>}
+              {f.req && <><div className="detail__block-t">Request</div><div className="detail__pre">{f.req}</div></>}
+              {f.resp && <><div className="detail__block-t">Response</div><div className="detail__pre">{f.resp}</div></>}
+              <div className="detail__actions">
+                <button className="btn btn--solid" onClick={() => retest(f.id)}>Retest</button>
+                <a className="btn" href={api.findings.exportUrl(f.id)} target="_blank" rel="noreferrer">Export H1</a>
+                <button className="btn btn--muted" onClick={() => setStatus(f.id, 'reported', 'Marked as reported')}>Mark reported</button>
+                <button className="btn btn--danger" onClick={() => setStatus(f.id, 'false_positive', 'Marked false positive')}>False positive</button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
+      {toast && <div className="toast">{toast}</div>}
     </div>
   );
 }
