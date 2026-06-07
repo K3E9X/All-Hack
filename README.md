@@ -56,6 +56,14 @@ around `docker compose up`. You can run those directly if you prefer.
 | API docs   | http://localhost:8000/docs   |
 | MITM proxy | http://localhost:8080        |
 
+The operator console (dark "terminal" theme) has eleven screens: Home (status +
+toolchain SBOM), Engagements (with a per-area test radar), Live view (consoles,
+assets, coverage, jobs, findings, kill-chains), Scans, Findings (deduped,
+cross-engagement, triage + HackerOne export), Surface (hosts/ports/endpoints),
+Methodology (WSTG x ATT&CK coverage matrix), Sandbox (safe in-scope PoC replay),
+Proxy, Reports (md/pdf/json/sarif), and Settings (model router + masked keys,
+persisted server-side with keys encrypted at rest).
+
 ## Run an engagement
 
 1. **Engagements** -> enter a target you own, tick the authorization box,
