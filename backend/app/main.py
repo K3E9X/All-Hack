@@ -34,6 +34,7 @@ from app.api.methodology import router as methodology_router
 from app.api.orchestrator import router as orchestrator_router
 from app.api.proxy import router as proxy_router
 from app.api.reports import router as reports_router
+from app.api.sandbox import router as sandbox_router
 from app.api.scans import router as scans_router
 from app.api.settings import router as settings_router
 from app.api.stream import router as stream_router
@@ -125,3 +126,4 @@ app.include_router(dashboard_router)
 app.include_router(settings_router)
 app.include_router(findings_router)
 app.include_router(surface_router)
+app.include_router(sandbox_router)
