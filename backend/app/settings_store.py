@@ -1,0 +1,252 @@
+"""Operator settings: persisted server-side, secrets encrypted at rest.
+
+A single-row `settings` table holds the non-secret config (model router, scope,
+safety toggles, integrations, OOB server) as JSON, plus a Fernet-encrypted blob
+of provider API keys. Keys are NEVER returned to the UI - the API exposes only
+`set` / `unset` per provider.
+
+The Fernet key comes from env ALLHACK_SECRET_KEY (urlsafe-b64, 32 bytes); if it
+is unset we generate one and persist it to {data_dir}/.settings.key (0600) so
+restarts can still decrypt.
+"""
+from __future__ import annotations
+
+import base64
+import hashlib
+import hmac
+import json
+import logging
+import os
+from typing import Any, Dict, Optional
+
+from app import db
+from app.config import settings as app_settings
+
+logger = logging.getLogger("allhack.settings")
+
+SCHEMA_SQL = """
+CREATE TABLE IF NOT EXISTS settings (
+    id      TEXT PRIMARY KEY,
+    data    TEXT NOT NULL,
+    secrets TEXT
+);
+"""
+db.register_schema(SCHEMA_SQL)
+
+_ROW_ID = "global"
+PROVIDERS = ("zai", "moonshot", "openrouter")
+
+DEFAULTS: Dict[str, Any] = {
+    "model_router": {
+        "planner": {"base_url": "", "model": ""},
+        "executor": {"base_url": "", "model": ""},
+        "validator": {"base_url": "", "model": ""},
+    },
+    "scope": {"rate": 10, "concurrency": 4, "egress": []},
+    "safety": {"safe_mode": True, "require_approval": False,
+               "auto_validate": True, "oob_enabled": True},
+    "integrations": {"slack": "", "discord": "", "jira": "", "webhook": ""},
+    "oob_server": "",
+}
+
+# At-rest encryption. Prefer cryptography/Fernet (used in the container image);
+# if its native bindings are unavailable, fall back to a keyed stdlib AEAD
+# (SHA-256 keystream + HMAC tag) so the store still encrypts everywhere.
+_key_cache: Optional[bytes] = None
+_fernet_cache = None
+_fernet_ok: Optional[bool] = None
+
+
+def _secret_material() -> str:
+    key = os.environ.get("ALLHACK_SECRET_KEY", "").strip()
+    if key:
+        return key
+    key_path = app_settings.data_dir / ".settings.key"
+    if key_path.exists():
+        return key_path.read_text().strip()
+    new = base64.urlsafe_b64encode(os.urandom(32)).decode()
+    try:
+        key_path.write_text(new)
+        os.chmod(key_path, 0o600)
+    except Exception:  # noqa: BLE001
+        logger.warning("could not persist settings key to %s", key_path)
+    return new
+
+
+def _fernet():
+    """Return a working Fernet, or None if the native bindings can't load."""
+    global _fernet_cache, _fernet_ok
+    if _fernet_ok is False:
+        return None
+    if _fernet_cache is not None:
+        return _fernet_cache
+    try:
+        from cryptography.fernet import Fernet  # noqa: PLC0415
+        mat = _secret_material()
+        # Fernet needs a urlsafe-b64 32-byte key; derive one deterministically.
+        fkey = base64.urlsafe_b64encode(hashlib.sha256(mat.encode()).digest())
+        f = Fernet(fkey)
+        f.decrypt(f.encrypt(b"selftest"))  # prove the bindings actually work
+        _fernet_cache, _fernet_ok = f, True
+        return f
+    except BaseException:  # noqa: BLE001 - pyo3 panic is a BaseException
+        _fernet_ok = False
+        logger.warning("cryptography unavailable; using stdlib at-rest cipher")
+        return None
+
+
+def _xor_key() -> bytes:
+    global _key_cache
+    if _key_cache is None:
+        _key_cache = hashlib.sha256(("allhack:" + _secret_material()).encode()).digest()
+    return _key_cache
+
+
+def _keystream(nonce: bytes, n: int, key: bytes) -> bytes:
+    out = bytearray()
+    counter = 0
+    while len(out) < n:
+        out += hashlib.sha256(key + nonce + counter.to_bytes(8, "big")).digest()
+        counter += 1
+    return bytes(out[:n])
+
+
+def encrypt(plain: str) -> str:
+    f = _fernet()
+    if f is not None:
+        return "f1:" + f.encrypt(plain.encode()).decode()
+    key = _xor_key()
+    data = plain.encode()
+    nonce = os.urandom(16)
+    ct = bytes(a ^ b for a, b in zip(data, _keystream(nonce, len(data), key)))
+    tag = hmac.new(key, nonce + ct, hashlib.sha256).digest()
+    return "x1:" + base64.urlsafe_b64encode(nonce + tag + ct).decode()
+
+
+def decrypt(token: str) -> str:
+    try:
+        if token.startswith("f1:"):
+            f = _fernet()
+            return f.decrypt(token[3:].encode()).decode() if f else ""
+        if token.startswith("x1:"):
+            raw = base64.urlsafe_b64decode(token[3:].encode())
+            nonce, tag, ct = raw[:16], raw[16:48], raw[48:]
+            key = _xor_key()
+            if not hmac.compare_digest(tag, hmac.new(key, nonce + ct, hashlib.sha256).digest()):
+                return ""
+            return bytes(a ^ b for a, b in zip(ct, _keystream(nonce, len(ct), key))).decode()
+        return ""
+    except Exception:  # noqa: BLE001
+        return ""
+
+
+def _merge(base: Dict[str, Any], patch: Dict[str, Any]) -> Dict[str, Any]:
+    out = dict(base)
+    for k, v in (patch or {}).items():
+        if isinstance(v, dict) and isinstance(out.get(k), dict):
+            out[k] = _merge(out[k], v)
+        else:
+            out[k] = v
+    return out
+
+
+async def _read_row() -> Dict[str, Any]:
+    async with db.acquire() as conn:
+        row = await conn.fetchrow("SELECT data, secrets FROM settings WHERE id=$1", _ROW_ID)
+    data = _merge(DEFAULTS, json.loads(row["data"]) if row and row["data"] else {})
+    secrets: Dict[str, str] = {}
+    if row and row["secrets"]:
+        raw = decrypt(row["secrets"])
+        if raw:
+            try:
+                secrets = json.loads(raw)
+            except json.JSONDecodeError:
+                secrets = {}
+    return {"data": data, "secrets": secrets}
+
+
+async def get_public() -> Dict[str, Any]:
+    """Settings as returned to the UI: secrets reduced to set/unset."""
+    row = await _read_row()
+    data = dict(row["data"])
+    data["provider_keys"] = {
+        p: ("set" if row["secrets"].get(p) else "unset") for p in PROVIDERS
+    }
+    return data
+
+
+async def get_provider_key(provider: str) -> str:
+    row = await _read_row()
+    return row["secrets"].get(provider, "")
+
+
+async def save(patch: Dict[str, Any]) -> Dict[str, Any]:
+    """Merge non-secret settings; apply provider-key updates.
+
+    `patch['provider_keys']` may map provider -> raw key to SET, '' to leave
+    unchanged, or the literal '__unset__' to clear. Raw keys are never stored
+    in the public `data` blob.
+    """
+    row = await _read_row()
+    secrets = dict(row["secrets"])
+    pk = (patch or {}).pop("provider_keys", None)
+    if isinstance(pk, dict):
+        for p in PROVIDERS:
+            if p not in pk:
+                continue
+            val = pk[p]
+            if val == "__unset__":
+                secrets.pop(p, None)
+            elif isinstance(val, str) and val.strip():
+                secrets[p] = val.strip()
+            # empty / non-string -> leave unchanged
+
+    data = _merge(row["data"], {k: v for k, v in (patch or {}).items()})
+
+    async with db.acquire() as conn:
+        await conn.execute(
+            "INSERT INTO settings (id, data, secrets) VALUES ($1,$2,$3) "
+            "ON CONFLICT (id) DO UPDATE SET data=EXCLUDED.data, secrets=EXCLUDED.secrets",
+            _ROW_ID, json.dumps(data),
+            encrypt(json.dumps(secrets)) if secrets else None,
+        )
+    await apply_to_router(data, secrets)
+    return await get_public()
+
+
+def provider_for_base_url(base_url: str) -> str:
+    b = (base_url or "").lower()
+    if "z.ai" in b or "zhipu" in b or "bigmodel" in b:
+        return "zai"
+    if "moonshot" in b:
+        return "moonshot"
+    return "openrouter"
+
+
+async def apply_to_router(data: Dict[str, Any], secrets: Dict[str, str]) -> None:
+    """Push the saved model router + keys into the live LLM router, and the OOB
+    server into the environment the nuclei wrapper reads."""
+    try:
+        from app.llm import get_router
+        router = get_router()
+        mr = data.get("model_router") or {}
+        for role in ("planner", "executor", "validator"):
+            cfg = mr.get(role) or {}
+            base_url = cfg.get("base_url") or ""
+            model = cfg.get("model") or ""
+            key = secrets.get(provider_for_base_url(base_url), "") if base_url else ""
+            router.reconfigure(role, base_url=base_url, api_key=key, model=model)
+    except Exception:  # noqa: BLE001
+        logger.exception("failed to apply model router from settings")
+    oob = (data.get("oob_server") or "").strip()
+    if oob:
+        os.environ["INTERACTSH_SERVER"] = oob
+
+
+async def apply_saved_on_startup() -> None:
+    """Re-apply persisted settings to the router at process start."""
+    try:
+        row = await _read_row()
+        await apply_to_router(row["data"], row["secrets"])
+    except Exception:  # noqa: BLE001
+        logger.debug("no saved settings to apply on startup")

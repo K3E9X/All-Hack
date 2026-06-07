@@ -34,6 +34,7 @@ from app.api.orchestrator import router as orchestrator_router
 from app.api.proxy import router as proxy_router
 from app.api.reports import router as reports_router
 from app.api.scans import router as scans_router
+from app.api.settings import router as settings_router
 from app.api.stream import router as stream_router
 from app.config import settings
 from app.llm import LLMError, get_llm, get_router, iter_roles
@@ -42,6 +43,8 @@ from app.llm import LLMError, get_llm, get_router, iter_roles
 @asynccontextmanager
 async def lifespan(app: FastAPI):  # noqa: ARG001
     await db.init_db()
+    from app import settings_store
+    await settings_store.apply_saved_on_startup()
     yield
     await db.close_pool()
 
@@ -117,3 +120,4 @@ app.include_router(methodology_router)
 app.include_router(reports_router)
 app.include_router(stream_router)
 app.include_router(dashboard_router)
+app.include_router(settings_router)

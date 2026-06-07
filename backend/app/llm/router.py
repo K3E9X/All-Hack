@@ -69,6 +69,22 @@ class LLMRouter:
         self._clients[role] = client
         return client
 
+    def reconfigure(self, role: str, *, base_url: str, api_key: str, model: str) -> None:
+        """Override a role's client at runtime (from saved Settings). An empty
+        api_key drops back to the OpenRouter fallback for that role."""
+        if role not in ROLES:
+            raise KeyError(f"unknown LLM role: {role}")
+        if not api_key:
+            self._clients.pop(role, None)  # next get() rebuilds from env/fallback
+            return
+        self._clients[role] = LLMClient(
+            base_url=base_url or None,
+            api_key=api_key,
+            model=model or settings.openrouter_model,
+            fallback_models=settings.openrouter_fallback_list,
+            role=role,
+        )
+
     def status(self) -> Dict[str, Dict[str, object]]:
         """Per-role view: which provider answers, is it configured, last used."""
         out: Dict[str, Dict[str, object]] = {}
