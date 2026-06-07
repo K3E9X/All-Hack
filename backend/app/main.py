@@ -26,6 +26,7 @@ import app.validation.storage  # noqa: F401
 
 from app import db
 from app.api.audit import router as audit_router
+from app.api.dashboard import router as dashboard_router
 from app.api.engagements import router as engagements_router
 from app.api.llm import router as llm_router
 from app.api.methodology import router as methodology_router
@@ -115,3 +116,4 @@ app.include_router(audit_router)
 app.include_router(methodology_router)
 app.include_router(reports_router)
 app.include_router(stream_router)
+app.include_router(dashboard_router)

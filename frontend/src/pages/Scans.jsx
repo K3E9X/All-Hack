@@ -1,330 +1,193 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
 import { api } from '../lib/api.js';
 
-const POLL_MS = 2000;
+const SEV_ORDER = { critical: 0, high: 1, medium: 2, low: 3, info: 4 };
+function Sev({ s }) { return <span className={'sev sev--' + s}>{s}</span>; }
 
 export default function Scans() {
-  const [searchParams] = useSearchParams();
   const [tools, setTools] = useState([]);
-  const [jobs, setJobs] = useState([]);
-  const [total, setTotal] = useState(0);
   const [engagements, setEngagements] = useState([]);
-  const [selectedId, setSelectedId] = useState(() => searchParams.get('job'));
-
-  // Keep selection in sync if the URL changes (e.g. navigating from Proxy).
-  useEffect(() => {
-    const fromUrl = searchParams.get('job');
-    if (fromUrl) setSelectedId(fromUrl);
-  }, [searchParams]);
-  const [form, setForm] = useState({ engagement_id: '', tool: '', target: '', options: '' });
-  const [submitting, setSubmitting] = useState(false);
+  const [form, setForm] = useState({ engagement_id: '', tool: 'nuclei', target: '', options: '' });
+  const [jobs, setJobs] = useState([]);
+  const [selectedId, setSelectedId] = useState(null);
+  const [detail, setDetail] = useState(null);
+  const [tab, setTab] = useState('findings');
   const [error, setError] = useState(null);
+  const [explain, setExplain] = useState({ loading: false, md: null });
+  const set = (p) => setForm((f) => ({ ...f, ...p }));
 
-  const loadAll = useCallback(async () => {
-    try {
-      const [t, j, eng] = await Promise.all([
-        api.scans.tools(),
-        api.scans.list({ limit: 100 }),
-        api.engagements.list(),
-      ]);
-      setTools(t);
-      setJobs(j.items);
-      setTotal(j.total);
-      const authorized = (eng.items || []).filter((e) => e.status === 'authorized');
-      setEngagements(authorized);
-      setForm((f) => ({
-        ...f,
-        tool: f.tool || t.find((x) => x.available)?.name || '',
-        engagement_id: f.engagement_id || authorized[0]?.id || '',
-      }));
-    } catch (err) {
-      setError(err.message);
-    }
+  const loadJobs = useCallback(async () => {
+    try { const r = await api.scans.list(); setJobs(r.items || []); } catch (e) { setError(e.message); }
   }, []);
 
-  useEffect(() => { loadAll(); }, [loadAll]);
+  useEffect(() => {
+    api.scans.tools().then((t) => setTools(Array.isArray(t) ? t : [])).catch(() => {});
+    api.engagements.list().then((r) => {
+      const items = r.items || [];
+      setEngagements(items);
+      if (items.length) set({ engagement_id: items[0].id });
+    }).catch(() => {});
+    loadJobs();
+  }, [loadJobs]);
 
   useEffect(() => {
-    const t = setInterval(loadAll, POLL_MS);
+    const t = setInterval(loadJobs, 4000);
     return () => clearInterval(t);
-  }, [loadAll]);
+  }, [loadJobs]);
+
+  const avail = tools.filter((t) => t.available).length;
 
   async function onSubmit(e) {
     e.preventDefault();
     setError(null);
-    if (!form.engagement_id) {
-      setError('Select an authorized engagement. Create and verify one on the Engagements page first.');
-      return;
-    }
-    if (!form.tool || !form.target) {
-      setError('Tool and target are required.');
-      return;
-    }
-    setSubmitting(true);
+    if (!form.tool || !form.target) { setError('Tool and target are required.'); return; }
+    if (!form.engagement_id) { setError('Select an authorized engagement (scope gate).'); return; }
     try {
-      const opts = form.options
-        .split(' ')
-        .map((s) => s.trim())
-        .filter(Boolean);
       const job = await api.scans.submit({
+        tool: form.tool, target: form.target,
+        options: form.options.split(' ').filter(Boolean),
         engagement_id: form.engagement_id,
-        tool: form.tool,
-        target: form.target,
-        options: opts,
       });
-      setSelectedId(job.id);
-      setForm((f) => ({ ...f, target: '' }));
-      loadAll();
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setSubmitting(false);
-    }
+      set({ target: '' });
+      await loadJobs();
+      if (job?.id) select(job.id);
+    } catch (err) { setError(err.message); }
   }
+
+  async function select(id) {
+    setSelectedId(id); setTab('findings'); setExplain({ loading: false, md: null }); setDetail(null);
+    try { setDetail(await api.scans.get(id)); } catch (e) { setError(e.message); }
+  }
+  async function cancelJob(id) { try { await api.scans.cancel(id); await loadJobs(); select(id); } catch (e) { setError(e.message); } }
+  async function deleteJob(id) { try { await api.scans.delete(id); setSelectedId(null); setDetail(null); await loadJobs(); } catch (e) { setError(e.message); } }
+  async function doExplain() {
+    setExplain({ loading: true, md: null });
+    try { const r = await api.llm.explainJob(selectedId); setExplain({ loading: false, md: r.explanation || r.text || r.raw || '(no explanation)' }); }
+    catch (e) { setExplain({ loading: false, md: 'error: ' + e.message }); }
+  }
+
+  const job = detail || jobs.find((j) => j.id === selectedId);
+  const dur = (ms) => ms != null ? (ms / 1000).toFixed(1) + 's' : '-';
 
   return (
-    <div className="stack">
-      <section className="card">
-        <h2>Launch a scan</h2>
-        {engagements.length === 0 && (
-          <p className="result error small">
-            No authorized engagement. Go to Engagements, create one and verify
-            target ownership before you can scan.
-          </p>
-        )}
-        <form onSubmit={onSubmit} className="scan-form">
-          <label>
-            <span className="muted small">Engagement</span>
-            <select
-              value={form.engagement_id}
-              onChange={(e) => setForm((f) => ({ ...f, engagement_id: e.target.value }))}
-            >
-              <option value="">- select -</option>
-              {engagements.map((e) => (
-                <option key={e.id} value={e.id}>{e.target_host} ({e.id})</option>
-              ))}
-            </select>
-          </label>
-          <label>
-            <span className="muted small">Tool</span>
-            <select
-              value={form.tool}
-              onChange={(e) => setForm((f) => ({ ...f, tool: e.target.value }))}
-            >
-              {tools.map((t) => (
-                <option key={t.name} value={t.name} disabled={!t.available}>
-                  {t.name}{!t.available ? ' (not installed)' : ''}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="grow">
-            <span className="muted small">Target URL or host</span>
-            <input
-              type="text"
-              placeholder="https://example.com   (ffuf: use FUZZ, e.g. https://example.com/FUZZ)"
-              value={form.target}
-              onChange={(e) => setForm((f) => ({ ...f, target: e.target.value }))}
-            />
-          </label>
-          <label className="grow">
-            <span className="muted small">Extra CLI options (optional)</span>
-            <input
-              type="text"
-              placeholder="e.g. --level=3 --risk=3"
-              value={form.options}
-              onChange={(e) => setForm((f) => ({ ...f, options: e.target.value }))}
-            />
-          </label>
-          <button type="submit" className="btn" disabled={submitting}>
-            {submitting ? 'Launching...' : 'Run'}
-          </button>
-        </form>
-        {error && <p className="result error">{error}</p>}
-        <p className="muted small">
-          {tools.filter((t) => t.available).length}/{tools.length} tools available in this container.
-        </p>
-      </section>
-
-      <section className="card">
-        <div className="row-between">
-          <h2>Jobs ({total})</h2>
-          <button className="btn ghost" onClick={loadAll}>Refresh</button>
-        </div>
-        <JobsTable
-          jobs={jobs}
-          selectedId={selectedId}
-          onSelect={setSelectedId}
-        />
-      </section>
-
-      {selectedId && (
-        <JobInspector
-          jobId={selectedId}
-          onClose={() => setSelectedId(null)}
-        />
-      )}
-    </div>
-  );
-}
-
-function JobsTable({ jobs, selectedId, onSelect }) {
-  if (!jobs.length) return <p className="muted small">No jobs yet.</p>;
-  return (
-    <div className="table-wrap">
-      <table className="table mono">
-        <thead>
-          <tr>
-            <th style={{ width: 160 }}>ID</th>
-            <th style={{ width: 80 }}>Tool</th>
-            <th>Target</th>
-            <th style={{ width: 100 }}>Status</th>
-            <th style={{ width: 80 }}>Findings</th>
-            <th style={{ width: 100 }}>Duration</th>
-          </tr>
-        </thead>
-        <tbody>
-          {jobs.map((j) => (
-            <tr
-              key={j.id}
-              className={j.id === selectedId ? 'selected' : ''}
-              onClick={() => onSelect(j.id)}
-            >
-              <td>{j.id}</td>
-              <td>{j.tool}</td>
-              <td className="truncate" title={j.target}>{j.target}</td>
-              <td className={`status-${j.status}`}>{j.status}</td>
-              <td>{j.findings_count}</td>
-              <td>{j.duration_ms != null ? `${(j.duration_ms / 1000).toFixed(1)}s` : '-'}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-function JobInspector({ jobId, onClose }) {
-  const [job, setJob] = useState(null);
-  const [tab, setTab] = useState('findings');
-  const [err, setErr] = useState(null);
-  const [explain, setExplain] = useState({ loading: false, markdown: null, error: null });
-
-  const load = useCallback(async () => {
-    try {
-      const data = await api.scans.get(jobId);
-      setJob(data);
-      setErr(null);
-    } catch (e) {
-      setErr(e.message);
-    }
-  }, [jobId]);
-
-  useEffect(() => { load(); }, [load]);
-  useEffect(() => {
-    // Poll while running.
-    const t = setInterval(() => {
-      if (!job || job.status === 'running' || job.status === 'queued') load();
-    }, POLL_MS);
-    return () => clearInterval(t);
-  }, [load, job]);
-
-  async function onCancel() {
-    try { await api.scans.cancel(jobId); load(); } catch (e) { setErr(e.message); }
-  }
-  async function onDelete() {
-    if (!confirm('Delete this job?')) return;
-    try { await api.scans.delete(jobId); onClose(); } catch (e) { setErr(e.message); }
-  }
-  async function onExplain() {
-    setExplain({ loading: true, markdown: null, error: null });
-    try {
-      const res = await api.llm.explainJob(jobId);
-      setExplain({ loading: false, markdown: res.markdown, error: null });
-    } catch (e) {
-      setExplain({ loading: false, markdown: null, error: e.message });
-    }
-  }
-
-  return (
-    <section className="card">
-      <div className="row-between">
-        <h2>Job inspector</h2>
-        <div className="btn-row">
-          {job && (job.status === 'queued' || job.status === 'running') && (
-            <button className="btn ghost" onClick={onCancel}>Cancel</button>
-          )}
-          <button className="btn ghost danger" onClick={onDelete}>Delete</button>
-          <button className="btn ghost" onClick={onClose}>Close</button>
+    <div className="page">
+      <div className="card">
+        <div className="card__head"><span className="card__title">Launch a scan</span></div>
+        <div className="card__body">
+          <form className="scan-form" onSubmit={onSubmit}>
+            <div className="field">
+              <label className="field__label">Engagement</label>
+              <div className="select-box">
+                <select className="select" value={form.engagement_id} onChange={(e) => set({ engagement_id: e.target.value })}>
+                  {engagements.length === 0 && <option value="">no engagements</option>}
+                  {engagements.map((e) => <option key={e.id} value={e.id}>{e.target_host || e.target_url}</option>)}
+                </select>
+              </div>
+            </div>
+            <div className="field">
+              <label className="field__label">Tool</label>
+              <div className="select-box">
+                <select className="select" value={form.tool} onChange={(e) => set({ tool: e.target.value })}>
+                  {tools.map((t) => <option key={t.name} value={t.name} disabled={!t.available}>{t.name}{t.available ? '' : ' (not installed)'}</option>)}
+                </select>
+              </div>
+            </div>
+            <div className="field">
+              <label className="field__label">Target URL or host</label>
+              <input className="input" placeholder="https://example.com  (ffuf: use FUZZ)" value={form.target} onChange={(e) => set({ target: e.target.value })} />
+            </div>
+            <div className="field">
+              <label className="field__label">Extra CLI options</label>
+              <input className="input" placeholder="--level=3 --risk=3" value={form.options} onChange={(e) => set({ options: e.target.value })} />
+            </div>
+            <button type="submit" className="btn btn--solid">Run</button>
+          </form>
+          {error && <div className="scan-error">{error}</div>}
+          <div className="scan-note">{avail}/{tools.length} tools available in this container.</div>
         </div>
       </div>
-      {err && <p className="result error">{err}</p>}
-      {!job ? (
-        <p className="muted small">Loading...</p>
-      ) : (
-        <>
-          <div className="inspect-head mono">
-            <div><strong>{job.tool}</strong> {job.target}</div>
-            <div className="muted small">
-              id {job.id} &middot;
-              {' '}status <span className={`status-${job.status}`}>{job.status}</span> &middot;
-              {' '}exit {job.exit_code ?? '-'} &middot;
-              {' '}{job.duration_ms != null ? `${(job.duration_ms / 1000).toFixed(1)}s` : '-'}
-              {job.args?.length ? ` · args: ${job.args.join(' ')}` : ''}
-            </div>
-            {job.error && <div className="error small">error: {job.error}</div>}
-          </div>
 
-          <div className="tabs">
-            <button className={tab === 'findings' ? 'active' : ''} onClick={() => setTab('findings')}>
-              Findings ({job.findings_count})
-            </button>
-            <button className={tab === 'stdout' ? 'active' : ''} onClick={() => setTab('stdout')}>stdout</button>
-            <button className={tab === 'stderr' ? 'active' : ''} onClick={() => setTab('stderr')}>stderr</button>
-          </div>
-
-          {tab === 'findings' && <FindingsList findings={job.findings} />}
-          {tab === 'stdout' && <pre className="body mono">{job.stdout_tail || '(empty)'}</pre>}
-          {tab === 'stderr' && <pre className="body mono">{job.stderr_tail || '(empty)'}</pre>}
-
-          <div className="explain-wrap">
-            <div className="row-between">
-              <h3 className="msg-h">LLM explanation</h3>
-              <button className="btn ghost" onClick={onExplain} disabled={explain.loading}>
-                {explain.loading ? 'Generating...' : 'Explain findings'}
-              </button>
-            </div>
-            {explain.error && <p className="result error">{explain.error}</p>}
-            {explain.markdown && <pre className="body mono">{explain.markdown}</pre>}
-          </div>
-        </>
-      )}
-    </section>
-  );
-}
-
-function FindingsList({ findings }) {
-  if (!findings?.length) return <p className="muted small">No findings.</p>;
-  return (
-    <div className="stack">
-      {findings.map((f, i) => (
-        <div key={i} className="finding">
-          <div className="row-between">
-            <span className={`sev sev-${(f.severity || 'info').toLowerCase()}`}>{f.severity}</span>
-            <span className="muted small mono truncate" title={f.target}>{f.target}</span>
-          </div>
-          <div className="finding-title">{f.title}</div>
-          {f.description && <div className="finding-desc">{f.description}</div>}
-          {f.evidence && <pre className="body mono small">{f.evidence}</pre>}
-          {f.metadata && Object.keys(f.metadata).length > 0 && (
-            <details className="finding-meta">
-              <summary className="muted small">metadata</summary>
-              <pre className="body mono small">{JSON.stringify(f.metadata, null, 2)}</pre>
-            </details>
-          )}
+      <div className="card">
+        <div className="card__head">
+          <span className="card__title">Jobs <span style={{ color: 'var(--text-faint)' }}>({jobs.length})</span></span>
+          <button className="btn btn--muted" onClick={loadJobs}>Refresh</button>
         </div>
-      ))}
+        <div className="tbl-scroll">
+          <table className="tbl">
+            <thead><tr><th>ID</th><th>Tool</th><th>Target</th><th>Status</th><th>Findings</th><th>Duration</th></tr></thead>
+            <tbody>
+              {jobs.map((j) => (
+                <tr key={j.id} className={'clickable' + (j.id === selectedId ? ' selected' : '')} onClick={() => select(j.id)}>
+                  <td className="mono" style={{ color: 'var(--text-secondary)' }}>{j.id}</td>
+                  <td className="mono">{j.tool}</td>
+                  <td className="mono truncate" style={{ maxWidth: 240, color: 'var(--text-secondary)' }} title={j.target}>{j.target}</td>
+                  <td><span className={'st st--' + j.status}>{j.status === 'running' ? <span className="blink">{j.status}</span> : j.status}</span></td>
+                  <td><span className={'fcount ' + ((j.findings_count || 0) > 0 ? 'fcount--hit' : 'fcount--zero')}>{j.findings_count || 0}</span></td>
+                  <td className="mono" style={{ color: 'var(--text-faint)' }}>{dur(j.duration_ms)}</td>
+                </tr>
+              ))}
+              {jobs.length === 0 && <tr><td colSpan={6}><div className="empty">No jobs yet.</div></td></tr>}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {job && (
+        <div className="card">
+          <div className="card__head">
+            <span className="card__title">Job inspector</span>
+            <div style={{ display: 'flex', gap: 8 }}>
+              {(job.status === 'running' || job.status === 'queued') && <button className="btn btn--muted" onClick={() => cancelJob(job.id)}>Cancel</button>}
+              <button className="btn btn--danger" onClick={() => deleteJob(job.id)}>Delete</button>
+              <button className="btn btn--muted" onClick={() => { setSelectedId(null); setDetail(null); }}>Close</button>
+            </div>
+          </div>
+
+          <div className="inspect-head">
+            <div className="inspect-head__main"><b>{job.tool}</b> {job.target}</div>
+            <div className="inspect-head__meta">
+              <span>id {job.id}</span><span className="sep">|</span>
+              <span>status <span className={'st st--' + job.status}>{job.status}</span></span><span className="sep">|</span>
+              <span>exit {job.exit_code ?? '-'}</span><span className="sep">|</span>
+              <span>{dur(job.duration_ms)}</span>
+              {(job.args || []).length ? <><span className="sep">|</span><span>args: {job.args.join(' ')}</span></> : null}
+            </div>
+            {job.error && <div style={{ marginTop: 6, fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--severity-critical)' }}>error: {job.error}</div>}
+          </div>
+
+          <div style={{ padding: '12px 16px 0' }}>
+            <div className="tabs" style={{ margin: 0 }}>
+              <button className={'tab' + (tab === 'findings' ? ' tab--active' : '')} onClick={() => setTab('findings')}>Findings <span className="tab__count">{job.findings_count ?? (job.findings || []).length}</span></button>
+              <button className={'tab' + (tab === 'stdout' ? ' tab--active' : '')} onClick={() => setTab('stdout')}>stdout</button>
+              <button className={'tab' + (tab === 'stderr' ? ' tab--active' : '')} onClick={() => setTab('stderr')}>stderr</button>
+            </div>
+          </div>
+
+          {tab === 'findings' && (
+            <div className="findings-pad">
+              {(job.findings || []).length === 0 ? <div className="io-empty" style={{ fontFamily: 'var(--font-mono)', fontSize: 13 }}>No findings.</div> :
+                job.findings.slice().sort((a, b) => SEV_ORDER[a.severity] - SEV_ORDER[b.severity]).map((f, i) => (
+                  <div key={i} className="finding">
+                    <div className="finding__top"><Sev s={f.severity} /><span className="mono truncate" style={{ fontSize: 11, color: 'var(--text-faint)', maxWidth: 280 }} title={f.target}>{f.target}</span></div>
+                    <div className="finding__title">{f.title}</div>
+                    {f.description && <div className="finding__desc">{f.description}</div>}
+                    {f.evidence && <pre className="finding__poc">{f.evidence}</pre>}
+                  </div>
+                ))}
+            </div>
+          )}
+          {tab === 'stdout' && <pre className="io-pre">{job.stdout_tail || <span className="io-empty">(empty)</span>}</pre>}
+          {tab === 'stderr' && <pre className="io-pre">{job.stderr_tail || <span className="io-empty">(empty)</span>}</pre>}
+
+          <div className="explain">
+            <div className="explain__head">
+              <span className="explain__title">LLM explanation</span>
+              <button className="btn btn--muted" onClick={doExplain} disabled={explain.loading}>{explain.loading ? 'Generating...' : 'Explain findings'}</button>
+            </div>
+            {explain.md && <div className="explain__md" dangerouslySetInnerHTML={{ __html: String(explain.md).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br/>') }}></div>}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

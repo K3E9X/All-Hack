@@ -1,42 +1,67 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { api } from '../lib/api.js';
 
-const POLL_MS = 5000;
+/* custom checkbox - square + CSS check, no icon */
+function Check({ checked, onChange, children, className = '' }) {
+  return (
+    <label className={'check ' + className}>
+      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
+      <span className={'check__box' + (checked ? ' check__box--on' : '')}></span>
+      <span className="check__txt">{children}</span>
+    </label>
+  );
+}
+
+const COV_AXES = ['Recon', 'Config', 'Injection', 'Auth', 'Session', 'API'];
+function Radar({ values, size = 168 }) {
+  const c = size / 2, r = c - 26, n = COV_AXES.length;
+  const pt = (i, rad) => { const a = (-90 + i * 360 / n) * Math.PI / 180; return [c + rad * Math.cos(a), c + rad * Math.sin(a)]; };
+  const poly = values.map((v, i) => pt(i, r * v / 100).join(',')).join(' ');
+  return (
+    <svg width={size} height={size} viewBox={'0 0 ' + size + ' ' + size}>
+      {[0.33, 0.66, 1].map((rg, k) => <polygon key={k} points={COV_AXES.map((_, i) => pt(i, r * rg).join(',')).join(' ')} fill="none" stroke="#262626" strokeWidth="1" />)}
+      {COV_AXES.map((_, i) => { const [x, y] = pt(i, r); return <line key={i} x1={c} y1={c} x2={x} y2={y} stroke="#262626" strokeWidth="1" />; })}
+      <polygon points={poly} fill="rgba(34,211,238,0.15)" stroke="#22d3ee" strokeWidth="1.5" />
+      {values.map((v, i) => { const [x, y] = pt(i, r * v / 100); return <circle key={i} cx={x} cy={y} r="2.5" fill="#22d3ee" />; })}
+      {COV_AXES.map((lab, i) => { const [x, y] = pt(i, r + 13); return <text key={i} x={x} y={y} fill="#737373" fontSize="9" fontFamily="monospace" textAnchor="middle" dominantBaseline="middle">{lab}</text>; })}
+    </svg>
+  );
+}
+function SevMini({ sev }) {
+  const map = [['critical', 'var(--severity-critical)'], ['high', 'var(--severity-high)'], ['medium', 'var(--severity-medium)'], ['low', 'var(--severity-low)']];
+  const tot = (sev.critical || 0) + (sev.high || 0) + (sev.medium || 0) + (sev.low || 0);
+  if (!tot) return <span style={{ color: 'var(--text-faint)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>-</span>;
+  return <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, display: 'inline-flex', gap: 8 }}>{map.filter(([k]) => sev[k]).map(([k, col]) => <span key={k} style={{ color: col }}>{sev[k]}{k[0].toUpperCase()}</span>)}</span>;
+}
+
+const BLANK = {
+  target_url: '', scope_hosts: '', auth: '', secondary_auth: '',
+  require_approval: false, allow_active_exploit: false,
+  allow_sql_os_cmd: false, allow_data_proof: false, attest: false,
+};
 
 export default function Engagements() {
+  const nav = useNavigate();
+  const [form, setForm] = useState(BLANK);
   const [items, setItems] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
-  const [form, setForm] = useState({ target_url: '', scope_hosts: '', attest: false, require_approval: false, auth: '', secondary_auth: '', allow_active_exploit: false, allow_sql_os_cmd: false, allow_data_proof: false });
-  const [creating, setCreating] = useState(false);
   const [error, setError] = useState(null);
+  const set = (patch) => setForm((f) => ({ ...f, ...patch }));
 
   const load = useCallback(async () => {
-    try {
-      const res = await api.engagements.list();
-      setItems(res.items);
-    } catch (err) {
-      setError(err.message);
-    }
+    try { const r = await api.engagements.list(); setItems(r.items || []); }
+    catch (e) { setError(e.message); }
   }, []);
-
   useEffect(() => { load(); }, [load]);
-  useEffect(() => {
-    const t = setInterval(load, POLL_MS);
-    return () => clearInterval(t);
-  }, [load]);
 
   async function onCreate(e) {
     e.preventDefault();
     setError(null);
     if (!form.target_url) { setError('Target URL is required.'); return; }
     if (!form.attest) { setError('You must attest you are authorized to test this target.'); return; }
-    setCreating(true);
+    const scope = form.scope_hosts.split(',').map((s) => s.trim()).filter(Boolean);
     try {
-      const scope = form.scope_hosts
-        .split(',')
-        .map((s) => s.trim())
-        .filter(Boolean);
       const res = await api.engagements.create({
         target_url: form.target_url,
         scope_hosts: scope.length ? scope : undefined,
@@ -48,262 +73,144 @@ export default function Engagements() {
         auth_headers: form.auth || undefined,
         secondary_auth_headers: form.secondary_auth || undefined,
       });
-      setForm({ target_url: '', scope_hosts: '', attest: false, require_approval: false, auth: '', secondary_auth: '', allow_active_exploit: false, allow_sql_os_cmd: false, allow_data_proof: false });
-      setSelectedId(res.engagement.id);
-      load();
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setCreating(false);
-    }
+      setForm(BLANK);
+      await load();
+      if (res?.engagement?.id) setSelectedId(res.engagement.id);
+    } catch (err) { setError(err.message); }
   }
+
+  async function closeEng(id) {
+    try { await api.engagements.close(id); await load(); } catch (e) { setError(e.message); }
+  }
+
+  const selected = items.find((x) => x.id === selectedId);
+  const radarOf = (e) => e.radar || [0, 0, 0, 0, 0, 0];
+  const sevOf = (e) => e.severity_counts || {};
 
   return (
-    <div className="stack">
-      <section className="card">
-        <h2>New engagement</h2>
-        <p className="muted small">
-          Enter a target you own, tick the authorization box, and create. The
-          engagement is authorized immediately - open its live view to run the
-          autonomous test. The scope list limits what will be touched.
-        </p>
-        <form onSubmit={onCreate} className="stack-sm">
-          <label className="grow">
-            <span className="muted small">Target URL</span>
-            <input
-              type="text"
-              placeholder="https://app.example.com"
-              value={form.target_url}
-              onChange={(e) => setForm((f) => ({ ...f, target_url: e.target.value }))}
-            />
-          </label>
-          <label className="grow">
-            <span className="muted small">
-              Extra in-scope hosts (comma-separated, optional). Prefix with '.' to allow subdomains.
-            </span>
-            <input
-              type="text"
-              placeholder="api.example.com, .example.com"
-              value={form.scope_hosts}
-              onChange={(e) => setForm((f) => ({ ...f, scope_hosts: e.target.value }))}
-            />
-          </label>
-          <label className="grow">
-            <span className="muted small">
-              Authenticated scan (optional): the PRIMARY identity's headers,
-              one per line (e.g. <code>Cookie: session=...</code> or
-              <code>Authorization: Bearer ...</code>). Injected into every
-              scanner so they test behind the login.
-            </span>
-            <textarea
-              rows={2}
-              placeholder="Cookie: session=AAAAA..."
-              value={form.auth}
-              onChange={(e) => setForm((f) => ({ ...f, auth: e.target.value }))}
-            />
-          </label>
-          <label className="grow">
-            <span className="muted small">
-              Grey-box (optional): a SECOND identity's headers, one per line
-              (e.g. <code>Cookie: session=...</code> or <code>Authorization: Bearer ...</code>).
-              Enables true IDOR/BOLA proof by replaying a captured request as another user.
-            </span>
-            <textarea
-              rows={2}
-              placeholder="Cookie: session=BBBBB..."
-              value={form.secondary_auth}
-              onChange={(e) => setForm((f) => ({ ...f, secondary_auth: e.target.value }))}
-            />
-          </label>
-          <label className="checkbox-row">
-            <input
-              type="checkbox"
-              checked={form.require_approval}
-              onChange={(e) => setForm((f) => ({ ...f, require_approval: e.target.checked }))}
-            />
-            <span className="small">
-              Require my approval before the exploitation phase.
-            </span>
-          </label>
-          <label className="checkbox-row">
-            <input
-              type="checkbox"
-              checked={form.allow_active_exploit}
-              onChange={(e) => setForm((f) => ({ ...f, allow_active_exploit: e.target.checked }))}
-            />
-            <span className="small">
-              Prove impact: run a benign read-only command through confirmed
-              injections (RCE/SQLi) to demonstrate access. Never destructive.
-            </span>
-          </label>
-          {form.allow_active_exploit && (
-            <label className="checkbox-row" style={{ marginLeft: 24 }}>
-              <input
-                type="checkbox"
-                checked={form.allow_sql_os_cmd}
-                onChange={(e) => setForm((f) => ({ ...f, allow_sql_os_cmd: e.target.checked }))}
-              />
-              <span className="small">
-                Also attempt OS command execution through SQLi (sqlmap --os-cmd).
-              </span>
-            </label>
-          )}
-          {form.allow_active_exploit && (
-            <label className="checkbox-row" style={{ marginLeft: 24 }}>
-              <input
-                type="checkbox"
-                checked={form.allow_data_proof}
-                onChange={(e) => setForm((f) => ({ ...f, allow_data_proof: e.target.checked }))}
-              />
-              <span className="small">
-                Prove a data breach: retrieve a small bounded sample (≤3 rows) of
-                sensitive tables via confirmed SQLi.
-              </span>
-            </label>
-          )}
-          <label className="checkbox-row">
-            <input
-              type="checkbox"
-              checked={form.attest}
-              onChange={(e) => setForm((f) => ({ ...f, attest: e.target.checked }))}
-            />
-            <span className="small">
-              I am authorized to perform security testing against this target.
-            </span>
-          </label>
-          <div>
-            <button type="submit" className="btn" disabled={creating}>
-              {creating ? 'Creating...' : 'Create engagement'}
-            </button>
-          </div>
-        </form>
-        {error && <p className="result error">{error}</p>}
-      </section>
+    <div className="page">
+      <div className="card">
+        <div className="card__head"><span className="card__title">New engagement</span></div>
+        <div className="card__body">
+          <p className="intro">Enter a target you own, attest authorization, and create. The engagement is authorized immediately. Open its live view to run the autonomous test. The scope list limits what will be touched.</p>
+          <form className="form" onSubmit={onCreate}>
+            <div className="field-grid">
+              <div className="field">
+                <label className="field__label">Target URL</label>
+                <input className="input" placeholder="https://app.example.com" value={form.target_url} onChange={(e) => set({ target_url: e.target.value })} />
+              </div>
+              <div className="field">
+                <label className="field__label">In-scope hosts <span style={{ textTransform: 'none', color: 'var(--text-faint)', fontWeight: 400 }}>optional</span></label>
+                <input className="input" placeholder="api.example.com, .example.com" value={form.scope_hosts} onChange={(e) => set({ scope_hosts: e.target.value })} />
+                <span className="field__hint">Comma-separated. Prefix with <code>.</code> to allow subdomains.</span>
+              </div>
+            </div>
 
-      <section className="card">
-        <div className="row-between">
-          <h2>Engagements ({items.length})</h2>
-          <button className="btn ghost" onClick={load}>Refresh</button>
-        </div>
-        {items.length === 0 ? (
-          <p className="muted small">No engagements yet.</p>
-        ) : (
-          <div className="table-wrap">
-            <table className="table mono">
-              <thead>
-                <tr>
-                  <th>ID</th>
-                  <th>Target</th>
-                  <th>Status</th>
-                  <th>Scope</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {items.map((e) => (
-                  <tr
-                    key={e.id}
-                    className={e.id === selectedId ? 'selected' : ''}
-                    onClick={() => setSelectedId(e.id)}
-                  >
-                    <td>{e.id}</td>
-                    <td className="truncate" title={e.target_url}>{e.target_url}</td>
-                    <td className={`eng-${e.status}`}>{e.status}</td>
-                    <td className="truncate">{(e.scope_hosts || []).join(', ')}</td>
-                    <td onClick={(ev) => ev.stopPropagation()}>
-                      {e.status === 'authorized' && (
-                        <Link className="text-link" to={`/engagements/${e.id}/live`}>live view</Link>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
+            <div className="form-sub">Authenticated testing</div>
+            <div className="field">
+              <label className="field__label">Primary identity headers <span style={{ textTransform: 'none', color: 'var(--text-faint)', fontWeight: 400 }}>optional</span></label>
+              <textarea className="textarea" placeholder="Cookie: session=AAAAA..." value={form.auth} onChange={(e) => set({ auth: e.target.value })}></textarea>
+              <span className="field__hint">One per line (e.g. <code>Cookie: session=...</code> or <code>Authorization: Bearer ...</code>). Injected into every scanner so they test behind the login.</span>
+            </div>
+            <div className="field">
+              <label className="field__label">Grey-box: second identity <span style={{ textTransform: 'none', color: 'var(--text-faint)', fontWeight: 400 }}>optional</span></label>
+              <textarea className="textarea" placeholder="Cookie: session=BBBBB..." value={form.secondary_auth} onChange={(e) => set({ secondary_auth: e.target.value })}></textarea>
+              <span className="field__hint">A second identity's headers. Enables true IDOR/BOLA proof by replaying a captured request as another user.</span>
+            </div>
 
-      {selectedId && (
-        <EngagementInspector engagementId={selectedId} onChange={load} />
-      )}
-    </div>
-  );
-}
+            <div className="form-sub">Run options</div>
+            <div className="checks">
+              <Check checked={form.require_approval} onChange={(v) => set({ require_approval: v })}>
+                <b>Require my approval</b> before the exploitation phase.
+              </Check>
+              <Check checked={form.allow_active_exploit} onChange={(v) => set({ allow_active_exploit: v, allow_sql_os_cmd: v && form.allow_sql_os_cmd, allow_data_proof: v && form.allow_data_proof })}>
+                <b>Prove impact:</b> run a benign read-only command through confirmed injections (RCE/SQLi) to demonstrate access. Never destructive.
+              </Check>
+              {form.allow_active_exploit && (
+                <div className="check-nested">
+                  <div className="danger-note">sensitive - only on targets you fully own</div>
+                  <Check checked={form.allow_sql_os_cmd} onChange={(v) => set({ allow_sql_os_cmd: v })}>
+                    Also attempt OS command execution through SQLi <code>(sqlmap --os-cmd)</code>.
+                  </Check>
+                  <Check checked={form.allow_data_proof} onChange={(v) => set({ allow_data_proof: v })}>
+                    Prove a data breach: retrieve a small bounded sample <code>(&le;3 rows)</code> of sensitive tables via confirmed SQLi.
+                  </Check>
+                </div>
+              )}
+            </div>
 
-function EngagementInspector({ engagementId, onChange }) {
-  const [data, setData] = useState(null);
-  const [err, setErr] = useState(null);
-  const [verifying, setVerifying] = useState(false);
+            <div className="attest">
+              <Check checked={form.attest} onChange={(v) => set({ attest: v })}>
+                <b>I am authorized</b> to perform security testing against this target.
+              </Check>
+            </div>
 
-  const load = useCallback(async () => {
-    try {
-      setData(await api.engagements.get(engagementId));
-      setErr(null);
-    } catch (e) {
-      setErr(e.message);
-    }
-  }, [engagementId]);
-
-  useEffect(() => { load(); }, [load]);
-
-  async function onClose() {
-    if (!confirm('Close this engagement? No further scans will be allowed.')) return;
-    try { await api.engagements.close(engagementId); await load(); onChange && onChange(); }
-    catch (e) { setErr(e.message); }
-  }
-
-  // Fallback only: an engagement created without attestation stays pending and
-  // can be authorized via DNS/.well-known. The normal flow auto-authorizes.
-  async function onVerify() {
-    setVerifying(true);
-    try { await api.engagements.verify(engagementId); await load(); onChange && onChange(); }
-    catch (e) { setErr(e.message); }
-    finally { setVerifying(false); }
-  }
-
-  if (err) return <section className="card"><p className="result error">{err}</p></section>;
-  if (!data) return <section className="card"><p className="muted small">Loading...</p></section>;
-
-  const e = data.engagement;
-
-  return (
-    <section className="card">
-      <div className="row-between">
-        <h2>Engagement {e.id}</h2>
-        <div className="btn-row">
-          {e.status === 'authorized' && (
-            <Link className="btn" to={`/engagements/${e.id}/live`}>Open live view</Link>
-          )}
-          {e.status === 'pending_authorization' && (
-            <button className="btn" onClick={onVerify} disabled={verifying}>
-              {verifying ? 'Verifying...' : 'Verify ownership'}
-            </button>
-          )}
-          <button className="btn ghost danger" onClick={onClose}>Close</button>
+            <div className="form-actions">
+              <button type="submit" className="btn btn--solid">Create engagement</button>
+              {error && <span className="form-error">{error}</span>}
+            </div>
+          </form>
         </div>
       </div>
 
-      <dl className="kv">
-        <dt>Target</dt><dd className="mono">{e.target_url}</dd>
-        <dt>Status</dt><dd className={`mono eng-${e.status}`}>{e.status}</dd>
-        <dt>Scope</dt><dd className="mono">{(e.scope_hosts || []).join(', ')}</dd>
-        {e.verification_method && (<><dt>Authorized via</dt><dd className="mono">{e.verification_method}</dd></>)}
-      </dl>
+      <div className="card">
+        <div className="card__head">
+          <span className="card__title">Engagements <span style={{ color: 'var(--text-faint)' }}>({items.length})</span></span>
+          <button className="btn btn--muted" onClick={load}>Refresh</button>
+        </div>
+        {items.length === 0 ? (
+          <div className="card__body"><div className="empty">No engagements yet.</div></div>
+        ) : (
+          <table className="tbl">
+            <thead><tr><th>ID</th><th>Target</th><th>Status</th><th>Progress</th><th>Findings</th><th></th></tr></thead>
+            <tbody>
+              {items.map((e) => (
+                <tr key={e.id} className={'clickable' + (e.id === selectedId ? ' selected' : '')} onClick={() => setSelectedId(e.id)}>
+                  <td className="mono" style={{ color: 'var(--text-secondary)' }}>{e.id}</td>
+                  <td className="mono truncate" style={{ maxWidth: 220 }} title={e.target_url}>{e.target_url}</td>
+                  <td><span className={'st eng-' + e.status}>{e.status}</span></td>
+                  <td><div className="eng-progress"><div className="eng-progress__bar"><div className="eng-progress__fill" style={{ width: (e.progress || 0) + '%' }}></div></div><span className="eng-progress__n">{e.progress || 0}%</span></div></td>
+                  <td><SevMini sev={sevOf(e)} /></td>
+                  <td onClick={(ev) => ev.stopPropagation()}>{e.status === 'authorized' && <span className="text-link" onClick={() => nav(`/engagements/${e.id}/live`)}>live view</span>}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
 
-      {e.status === 'authorized' && (
-        <p className="muted small">
-          Authorized. Open the live view to run the autonomous test and watch
-          recon, findings, kill-chains and the report build in real time.
-        </p>
+      {selected && (
+        <div className="card inspector">
+          <div className="card__head">
+            <span className="card__title">Engagement {selected.id}</span>
+            <div style={{ display: 'flex', gap: 8 }}>
+              {selected.status === 'authorized' && <button className="btn" onClick={() => nav(`/engagements/${selected.id}/live`)}>Open live view</button>}
+              <button className="btn btn--danger" onClick={() => closeEng(selected.id)}>Close</button>
+            </div>
+          </div>
+          <div className="card__body">
+            <div className="insp-cols">
+              <dl className="kv">
+                <dt>Target</dt><dd>{selected.target_url}</dd>
+                <dt>Status</dt><dd className={'eng-' + selected.status}>{selected.status}</dd>
+                <dt>Scope</dt><dd>{(selected.scope_hosts || []).join(', ')}</dd>
+                <dt>Authorized via</dt><dd>{selected.verification_method || '-'}</dd>
+                <dt>Phase</dt><dd>{selected.phase || '-'}</dd>
+                <dt>Progress</dt><dd><div className="eng-progress"><div className="eng-progress__bar"><div className="eng-progress__fill" style={{ width: (selected.progress || 0) + '%' }}></div></div><span className="eng-progress__n">{selected.progress || 0}%</span></div></dd>
+                <dt>Findings</dt><dd><SevMini sev={sevOf(selected)} /></dd>
+              </dl>
+              <div className="radar-wrap">
+                <Radar values={radarOf(selected)} />
+                <div className="radar-legend">
+                  <div style={{ color: 'var(--text-secondary)', marginBottom: 4 }}>Coverage by area</div>
+                  {COV_AXES.map((a, i) => <div key={a} style={{ color: 'var(--text-faint)' }}>{a} <span style={{ color: 'var(--text-primary)' }}>{radarOf(selected)[i]}%</span></div>)}
+                </div>
+              </div>
+            </div>
+            <p className="inspector__note">Authorized. Open the live view to run the autonomous test and watch recon, findings, kill-chains and the report build in real time.</p>
+          </div>
+        </div>
       )}
-      {e.status === 'pending_authorization' && data.challenge && (
-        <p className="muted small">
-          Not authorized. Either re-create with the authorization checkbox, or
-          prove ownership: add DNS TXT
-          <code> {data.challenge.methods.dns_txt.record_value}</code> on
-          <code> {e.target_host}</code> and click Verify.
-        </p>
-      )}
-    </section>
+    </div>
   );
 }

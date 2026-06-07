@@ -1,0 +1,112 @@
+/* ============================================================
+   All-Hack — Color tokens
+   Dark-first "Mr. Robot" terminal palette. Deep blacks, a single
+   muted-cyan accent, and a 5-step severity scale for findings.
+   Source of truth: frontend/src/index.css (:root + .dark).
+   ============================================================ */
+
+:root {
+  /* ---- Base neutrals (near-black to near-white ramp) ---- */
+  --black:        #0a0a0a;   /* page background, deepest surface */
+  --neutral-950:  #0a0a0a;
+  --neutral-900:  #111111;   /* raised surface / cards */
+  --neutral-850:  #161616;
+  --neutral-800:  #1a1a1a;   /* hover fill */
+  --neutral-700:  #262626;   /* borders, dividers */
+  --neutral-600:  #404040;   /* strong border / scrollbar hover */
+  --neutral-500:  #525252;   /* disabled / faint icon */
+  --neutral-400:  #737373;   /* secondary text */
+  --neutral-300:  #a3a3a3;
+  --neutral-200:  #d4d4d4;
+  --neutral-100:  #e5e5e5;   /* primary text on dark */
+  --white:        #ffffff;
+
+  /* ---- Brand accent: muted cyan (terminal phosphor) ---- */
+  --cyan-400:     #22d3ee;   /* dark-theme accent */
+  --cyan-500:     #06b6d4;   /* accent pressed / dim */
+  --blue-500:     #3b82f6;   /* light-theme accent */
+  --blue-600:     #2563eb;
+
+  /* ---- Severity scale (vuln findings) ---- */
+  --sev-critical: #ef4444;
+  --sev-high:     #f97316;
+  --sev-medium:   #eab308;
+  --sev-low:      #06b6d4;
+  --sev-info:     #525252;
+
+  /* ---- Terminal log colors ---- */
+  --term-vuln:    #f87171;   /* FOUND / vulnerable lines */
+  --term-ok:      #4ade80;   /* success / live indicator */
+  --term-warn:    #facc15;
+  --term-cmd:     #4ade80;   /* reproduce / curl */
+  --term-data:    #facc15;   /* extracted data */
+
+  /* ============================================================
+     SEMANTIC ALIASES — default theme is DARK.
+     Components should reference these, not the raw ramps above.
+     ============================================================ */
+  --bg:              var(--neutral-950);  /* app background */
+  --surface:         var(--neutral-900);  /* cards, sidebar, panels */
+  --surface-raised:  var(--neutral-850);  /* nested surface */
+  --hover:           var(--neutral-800);  /* row / control hover fill */
+  --border:          var(--neutral-700);  /* hairline borders */
+  --border-strong:   var(--neutral-600);
+
+  --text-primary:    var(--neutral-100);  /* body + headings */
+  --text-secondary:  var(--neutral-400);  /* labels, captions, meta */
+  --text-faint:      var(--neutral-500);  /* timestamps, ghost text */
+  --text-inverse:    var(--neutral-950);  /* text on accent/white fills */
+
+  --accent:          var(--cyan-400);
+  --accent-dim:      var(--cyan-500);
+  --accent-tint:     rgba(34, 211, 238, 0.10);  /* active nav bg, badge fill */
+  --accent-ring:     rgba(34, 211, 238, 0.30);  /* focus ring */
+
+  --focus-ring:      rgba(34, 211, 238, 0.40);
+  --selection-bg:    var(--cyan-400);
+  --selection-fg:    var(--neutral-950);
+
+  /* severity semantic (same values, semantic name) */
+  --severity-critical: var(--sev-critical);
+  --severity-high:     var(--sev-high);
+  --severity-medium:   var(--sev-medium);
+  --severity-low:      var(--sev-low);
+  --severity-info:     var(--sev-info);
+
+  color-scheme: dark;
+}
+
+/* ============================================================
+   LIGHT THEME — opt-in via .light on <html> or any scope.
+   Mirrors frontend :root light values.
+   ============================================================ */
+.light {
+  --bg:              #fafafa;
+  --surface:         #ffffff;
+  --surface-raised:  #ffffff;
+  --hover:           #f5f5f5;
+  --border:          #e5e5e5;
+  --border-strong:   #d4d4d4;
+
+  --text-primary:    #171717;
+  --text-secondary:  #737373;
+  --text-faint:      #a3a3a3;
+  --text-inverse:    #ffffff;
+
+  --accent:          var(--blue-500);
+  --accent-dim:      var(--blue-600);
+  --accent-tint:     rgba(59, 130, 246, 0.10);
+  --accent-ring:     rgba(59, 130, 246, 0.30);
+
+  --focus-ring:      rgba(59, 130, 246, 0.30);
+  --selection-bg:    var(--blue-500);
+  --selection-fg:    #ffffff;
+
+  --severity-critical: #dc2626;
+  --severity-high:     #ea580c;
+  --severity-medium:   #d97706;
+  --severity-low:      #0891b2;
+  --severity-info:     #6b7280;
+
+  color-scheme: light;
+}

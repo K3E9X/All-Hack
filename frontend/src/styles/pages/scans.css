@@ -1,0 +1,44 @@
+/* All-Hack — Scans page. Reuses liveview.css chrome (topnav, page, card,
+   btn, tbl, tabs, st, sev, finding). Adds the launch form, custom selects
+   (CSS chevron, no icon), and the job inspector. */
+
+/* fields (local, sober) */
+.field { display: flex; flex-direction: column; gap: 7px; }
+.field__label { font-family: var(--font-sans); font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: .05em; color: var(--text-secondary); }
+.input { width: 100%; box-sizing: border-box; background: var(--bg); color: var(--text-primary); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 9px 12px; font-family: var(--font-mono); font-size: 13px; transition: border-color .15s, box-shadow .15s; }
+.input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); }
+.input::placeholder { color: var(--text-faint); }
+
+/* custom select: native + CSS chevron */
+.select-box { position: relative; }
+.select { width: 100%; box-sizing: border-box; appearance: none; -webkit-appearance: none; background: var(--bg); color: var(--text-primary); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 9px 32px 9px 12px; font-family: var(--font-mono); font-size: 13px; cursor: pointer; transition: border-color .15s, box-shadow .15s; }
+.select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); }
+.select option { background: var(--surface); color: var(--text-primary); }
+.select option:disabled { color: var(--text-faint); }
+.select-box::after { content: ''; position: absolute; right: 14px; top: 50%; width: 7px; height: 7px; border-right: 1.5px solid var(--text-secondary); border-bottom: 1.5px solid var(--text-secondary); transform: translateY(-70%) rotate(45deg); pointer-events: none; }
+
+/* launch form layout */
+.scan-form { display: grid; grid-template-columns: 1.1fr 1fr 1.6fr 1fr auto; gap: 14px; align-items: end; }
+.scan-form .btn { height: 37px; }
+.scan-note { margin-top: 14px; font-family: var(--font-mono); font-size: 11px; color: var(--text-faint); }
+.scan-error { margin-top: 12px; font-family: var(--font-mono); font-size: 12px; color: var(--severity-critical); }
+
+/* job inspector */
+.inspect-head { padding: 14px 16px; border-bottom: 1px solid var(--border); }
+.inspect-head__main { font-family: var(--font-mono); font-size: 14px; color: var(--text-primary); margin-bottom: 6px; }
+.inspect-head__main b { font-weight: 600; }
+.inspect-head__meta { font-family: var(--font-mono); font-size: 11px; color: var(--text-faint); display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.inspect-head__meta .sep { color: var(--border-strong); }
+.io-pre { background: var(--neutral-950); border: 1px solid var(--border); border-radius: var(--radius-sm); margin: 16px; padding: 12px 14px; font-family: var(--font-mono); font-size: 11.5px; line-height: 1.65; color: var(--neutral-300); white-space: pre-wrap; max-height: 300px; overflow-y: auto; }
+.io-empty { color: var(--text-faint); }
+
+.explain { border-top: 1px solid var(--border); padding: 16px; }
+.explain__head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.explain__title { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--text-secondary); }
+.explain__md { background: var(--neutral-950); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 14px 16px; font-size: 13px; line-height: 1.65; color: var(--neutral-300); white-space: pre-wrap; }
+.explain__md strong { color: var(--text-primary); }
+
+.findings-pad { padding: 16px; }
+.finding__desc { font-size: 13px; color: var(--text-secondary); line-height: 1.5; margin-top: 6px; }
+
+@media (max-width: 920px) { .scan-form { grid-template-columns: 1fr 1fr; } .scan-form .btn { grid-column: span 2; } }

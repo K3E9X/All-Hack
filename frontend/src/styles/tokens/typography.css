@@ -1,0 +1,50 @@
+/* ============================================================
+   All-Hack — Typography tokens
+   Inter for prose/UI, JetBrains Mono for data, logs, payloads.
+   The product leans heavily on mono + UPPERCASE tracked labels.
+   ============================================================ */
+
+:root {
+  /* ---- Families ---- */
+  --font-sans: 'Inter', 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'SF Mono', 'Monaco', 'Consolas', monospace;
+
+  /* ---- Type scale (px). Compact, dense — a tooling UI. ---- */
+  --text-2xs:   10px;   /* micro badges, [10px] severity tags */
+  --text-xs:    11px;   /* table heads, uppercase labels */
+  --text-sm:    13px;   /* default UI / button text */
+  --text-base:  14px;   /* body, app default */
+  --text-md:    16px;   /* section titles */
+  --text-lg:    18px;   /* page title (Attack Console) */
+  --text-xl:    20px;   /* dashboard H1 */
+  --text-2xl:   24px;   /* large numerals / hero */
+  --text-3xl:   32px;
+  --text-4xl:   44px;   /* marketing / splash */
+
+  /* ---- Weights ---- */
+  --weight-regular:  400;
+  --weight-medium:   500;
+  --weight-semibold: 600;
+  --weight-bold:     700;
+
+  /* ---- Line heights ---- */
+  --leading-tight:  1.2;   /* headings, ascii art */
+  --leading-snug:   1.4;
+  --leading-normal: 1.5;   /* body default */
+
+  /* ---- Letter spacing ---- */
+  --tracking-tight:  -0.01em;
+  --tracking-normal: 0;
+  --tracking-wide:   0.05em;   /* the signature uppercase labels */
+  --tracking-wider:  0.1em;
+
+  /* ---- Semantic roles ---- */
+  --font-display:  var(--weight-semibold) var(--text-xl)/var(--leading-tight) var(--font-sans);
+  --font-title:    var(--weight-semibold) var(--text-lg)/var(--leading-tight) var(--font-sans);
+  --font-heading:  var(--weight-semibold) var(--text-md)/var(--leading-snug) var(--font-sans);
+  --font-body:     var(--weight-regular) var(--text-base)/var(--leading-normal) var(--font-sans);
+  --font-ui:       var(--weight-medium) var(--text-sm)/var(--leading-snug) var(--font-sans);
+  --font-data:     var(--weight-regular) var(--text-sm)/var(--leading-snug) var(--font-mono);
+  --font-code:     var(--weight-regular) var(--text-xs)/var(--leading-snug) var(--font-mono);
+  --font-label:    var(--weight-medium) var(--text-xs)/1 var(--font-sans);  /* + uppercase + tracking-wide */
+}

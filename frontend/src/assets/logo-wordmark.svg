@@ -1,0 +1,8 @@
+<svg width="220" height="48" viewBox="0 0 220 48" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="All-Hack">
+  <rect width="48" height="48" rx="10" fill="#22d3ee" fill-opacity="0.10"></rect>
+  <g stroke="#22d3ee" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="16 30 24 24 16 18"></polyline>
+    <line x1="26" y1="32" x2="34" y2="32"></line>
+  </g>
+  <text x="62" y="31" font-family="Inter, sans-serif" font-size="22" font-weight="600" fill="#e5e5e5" letter-spacing="0.3">All-Hack</text>
+</svg>

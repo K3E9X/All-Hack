@@ -1,73 +1,134 @@
 import { useEffect, useState } from 'react';
+import { api } from '../lib/api.js';
+
+const PHASE_ORDER = ['Reconnaissance', 'Scanning & enumeration', 'Exploitation', 'Capture & analysis', 'Other'];
 
 export default function Home() {
   const [config, setConfig] = useState(null);
-  const [pingStatus, setPingStatus] = useState({ state: 'idle', text: '' });
+  const [dash, setDash] = useState(null);
+  const [tools, setTools] = useState([]);
+  const [ping, setPing] = useState({ state: 'idle', text: '' });
 
   useEffect(() => {
-    fetch('/api/config')
-      .then((r) => r.json())
-      .then(setConfig)
-      .catch(() => setConfig({ error: true }));
+    api.config().then(setConfig).catch(() => {});
+    api.dashboard().then(setDash).catch(() => {});
+    api.tools().then((t) => setTools(Array.isArray(t) ? t : [])).catch(() => {});
   }, []);
 
   async function testLlm() {
-    setPingStatus({ state: 'pending', text: 'Pinging LLM...' });
+    setPing({ state: 'pending', text: 'Pinging LLM...' });
     try {
-      const r = await fetch('/api/llm/ping', { method: 'POST' });
-      const body = await r.json();
-      if (!r.ok) {
-        setPingStatus({ state: 'error', text: body.detail || 'Error' });
-      } else {
-        const note = body.fallback_used
-          ? ` (fallback from ${body.primary_model})`
-          : '';
-        setPingStatus({
-          state: 'ok',
-          text: `${body.model_used} replied: ${body.reply}${note}`,
-        });
-      }
-    } catch (err) {
-      setPingStatus({ state: 'error', text: String(err) });
+      const r = await api.llmPing('planner');
+      setPing({ state: 'ok', text: `${r.model_used} replied: ${r.reply}` });
+    } catch (e) {
+      setPing({ state: 'err', text: e.message });
     }
   }
 
-  return (
-    <div className="stack">
-      <section className="card">
-        <h2>Backend status</h2>
-        {config === null && <p className="muted">Loading...</p>}
-        {config?.error && <p className="error">Cannot reach backend.</p>}
-        {config && !config.error && (
-          <dl className="kv">
-            <dt>LLM configured</dt>
-            <dd>{config.llm_configured ? 'yes' : 'no (set OPENROUTER_API_KEY)'}</dd>
-            <dt>LLM model</dt>
-            <dd className="mono">{config.llm_model}</dd>
-            <dt>LLM fallbacks</dt>
-            <dd className="mono">
-              {config.llm_fallback_models?.length
-                ? config.llm_fallback_models.join(', ')
-                : '(none)'}
-            </dd>
-            <dt>MITM proxy port</dt>
-            <dd className="mono">{config.mitm_port}</dd>
-            <dt>Data directory</dt>
-            <dd className="mono">{config.data_dir}</dd>
-          </dl>
-        )}
-      </section>
+  const roles = config?.llm_roles || {};
+  const usage = dash?.llm_usage || { calls: 0, total_tokens: 0, cost_usd: 0, by_model: [] };
+  const conf = dash?.confirmed_findings || {};
+  const confTotal = Object.values(conf).reduce((a, b) => a + b, 0);
 
-      <section className="card">
-        <h2>LLM sanity check</h2>
-        <p className="muted">Send a tiny request to OpenRouter to verify the key and model work.</p>
-        <button className="btn" onClick={testLlm} disabled={pingStatus.state === 'pending'}>
-          {pingStatus.state === 'pending' ? 'Pinging...' : 'Ping LLM'}
-        </button>
-        {pingStatus.text && (
-          <p className={`result ${pingStatus.state}`}>{pingStatus.text}</p>
-        )}
-      </section>
+  const byPhase = {};
+  for (const t of tools) (byPhase[t.phase] = byPhase[t.phase] || []).push(t);
+  const phases = PHASE_ORDER.filter((p) => byPhase[p]);
+  const okTools = tools.filter((t) => t.available).length;
+
+  return (
+    <div className="page">
+      <div className="metrics">
+        <div className="metric">
+          <div className="metric__l">Active engagements</div>
+          <div className="metric__v">{dash?.active_engagements ?? '-'}</div>
+          <div className="metric__sub">authorized</div>
+        </div>
+        <div className="metric metric--ok">
+          <div className="metric__l">Jobs running</div>
+          <div className="metric__v">{dash?.running_jobs ?? '-'}</div>
+          <div className="metric__sub">queued + running</div>
+        </div>
+        <div className="metric metric--alert">
+          <div className="metric__l">Confirmed findings</div>
+          <div className="metric__v">{confTotal}</div>
+          <div className="metric__sub">{conf.critical || 0} critical &middot; {conf.high || 0} high</div>
+        </div>
+        <div className="metric">
+          <div className="metric__l">API spend</div>
+          <div className="metric__v"><small>$</small>{(usage.cost_usd || 0).toFixed(2)}</div>
+          <div className="metric__sub">{(usage.total_tokens / 1e6).toFixed(2)}M tokens &middot; {usage.calls} calls</div>
+        </div>
+      </div>
+
+      <div className="dash-grid">
+        <div>
+          <div className="card">
+            <div className="card__head"><span className="card__title">Backend status</span></div>
+            <div className="card__body">
+              <dl className="kv">
+                <dt>LLM configured</dt><dd className={config?.llm_configured ? 'kv-yes' : ''}>{config?.llm_configured ? 'yes' : 'no'}</dd>
+                <dt>Model router</dt>
+                <dd className="mono">
+                  {Object.keys(roles).length
+                    ? Object.entries(roles).map(([r, v]) => `${r}: ${(v && v.model) || v}`).join('  ·  ')
+                    : (config?.llm_model || '-')}
+                </dd>
+                <dt>MITM proxy</dt><dd className="mono kv-yes">:{config?.mitm_port ?? '-'} listening</dd>
+                <dt>Data directory</dt><dd className="mono">{config?.data_dir || '-'}</dd>
+              </dl>
+            </div>
+          </div>
+
+          <div className="card">
+            <div className="card__head"><span className="card__title">Model usage</span><span className="card__meta">${(usage.cost_usd || 0).toFixed(2)}</span></div>
+            <div className="card__body">
+              <div className="usage">
+                {(usage.by_model || []).length === 0 && <div className="empty">No LLM calls yet.</div>}
+                {(usage.by_model || []).map((m) => (
+                  <div key={m.model} className="usage__row">
+                    <span className="usage__l">{m.model}</span>
+                    <span className="usage__bar"><span className="usage__fill" style={{ width: m.pct + '%' }}></span></span>
+                    <span className="usage__n">{(m.tokens / 1000).toFixed(0)}k</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="card">
+            <div className="card__head"><span className="card__title">LLM sanity check</span></div>
+            <div className="card__body">
+              <p className="home-intro">Send a tiny request to the model provider to verify the key and model work.</p>
+              <button className="btn btn--solid" onClick={testLlm} disabled={ping.state === 'pending'}>{ping.state === 'pending' ? 'Pinging...' : 'Ping LLM'}</button>
+              {ping.text && <p className={'ping-result ping-result--' + ping.state}>{ping.text}</p>}
+            </div>
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="card__head"><span className="card__title">Toolchain / SBOM</span><span className="card__meta">{okTools}/{tools.length} available &middot; container image</span></div>
+          <div className="card__body" style={{ paddingTop: 4 }}>
+            {phases.length === 0 && <div className="empty">Loading tools...</div>}
+            {phases.map((p) => (
+              <div key={p} className="sbom-phase">
+                <div className="sbom-phase__t">{p}</div>
+                <table className="sbom">
+                  <tbody>
+                    {byPhase[p].map((t) => (
+                      <tr key={t.name}>
+                        <td className="sbom__name">{t.name}</td>
+                        <td className="sbom__ver">{t.version ? 'v' + t.version : '-'}</td>
+                        <td className="sbom__src">{t.source}</td>
+                        <td className={t.available ? 'sbom__ok' : 'sbom__missing'}>{t.available ? 'ready' : 'missing'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

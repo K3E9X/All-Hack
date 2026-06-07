@@ -1,305 +1,157 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useCallback, useEffect, useState } from 'react';
 import { api } from '../lib/api.js';
-import Suggestions from '../components/Suggestions.jsx';
 
-const POLL_MS = 2000;
+const METHODS = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS', 'HEAD'];
+const fmtBytes = (n) => n == null ? '-' : n < 1024 ? n + ' B' : (n / 1024).toFixed(1) + ' KB';
+const scClass = (c) => c >= 500 ? 'sc-5xx' : c >= 400 ? 'sc-4xx' : c >= 300 ? 'sc-3xx' : 'sc-2xx';
+const timeOf = (ts) => ts ? new Date(ts * 1000).toLocaleTimeString('en-US', { hour12: false }) : '-';
 
 export default function Proxy() {
   const [status, setStatus] = useState(null);
-  const [flows, setFlows] = useState([]);
-  const [total, setTotal] = useState(0);
   const [hosts, setHosts] = useState([]);
-  const [filters, setFilters] = useState({ host: '', method: '', search: '' });
-  const [selectedId, setSelectedId] = useState(null);
-  const [paused, setPaused] = useState(false);
-  const [error, setError] = useState(null);
+  const [flows, setFlows] = useState([]);
+  const [host, setHost] = useState('');
+  const [method, setMethod] = useState('');
+  const [search, setSearch] = useState('');
+  const [sel, setSel] = useState(null);
+  const [detail, setDetail] = useState(null);
+  const [tab, setTab] = useState('request');
+  const [engagementId, setEngagementId] = useState('');
+  const [sugg, setSugg] = useState({ loading: false, items: null });
+  const [toast, setToast] = useState(null);
+  const flash = (m) => { setToast(m); setTimeout(() => setToast(null), 1800); };
 
-  const load = useCallback(async () => {
+  const loadFlows = useCallback(async () => {
     try {
-      const [statusRes, flowsRes, hostsRes] = await Promise.all([
-        api.proxy.status(),
-        api.proxy.flows({
-          limit: 300,
-          host: filters.host || undefined,
-          method: filters.method || undefined,
-          search: filters.search || undefined,
-        }),
-        api.proxy.hosts(),
-      ]);
-      setStatus(statusRes);
-      setFlows(flowsRes.items);
-      setTotal(flowsRes.total);
-      setHosts(hostsRes);
-      setError(null);
-    } catch (err) {
-      setError(err.message);
-    }
-  }, [filters.host, filters.method, filters.search]);
+      const r = await api.proxy.flows({ host: host || undefined, method: method || undefined, search: search || undefined, limit: 200 });
+      setFlows(r.items || r || []);
+    } catch (e) { /* ignore */ }
+  }, [host, method, search]);
 
-  // Initial + on-filter reload
-  useEffect(() => { load(); }, [load]);
-
-  // Polling
   useEffect(() => {
-    if (paused) return undefined;
-    const t = setInterval(load, POLL_MS);
-    return () => clearInterval(t);
-  }, [load, paused]);
+    api.proxy.status().then(setStatus).catch(() => {});
+    api.proxy.hosts().then((r) => setHosts((r.items || r || []).map((h) => h.host || h))).catch(() => {});
+    api.engagements.list().then((r) => {
+      const a = (r.items || []).find((e) => e.status === 'authorized') || (r.items || [])[0];
+      if (a) setEngagementId(a.id);
+    }).catch(() => {});
+  }, []);
+  useEffect(() => { loadFlows(); }, [loadFlows]);
 
-  async function onClear() {
-    if (!confirm('Delete all captured flows?')) return;
-    await api.proxy.clear();
-    setSelectedId(null);
-    load();
+  async function select(id) {
+    setSel(id); setTab('request'); setDetail(null); setSugg({ loading: false, items: null });
+    try { setDetail(await api.proxy.flow(id)); } catch (e) { /* ignore */ }
+  }
+  async function clearFlows() { try { await api.proxy.clear(); await loadFlows(); flash('Cleared captured flows'); } catch (e) { flash(e.message); } }
+  async function suggest() {
+    if (!sel) return;
+    setSugg({ loading: true, items: null });
+    try {
+      const r = await api.llm.suggestForFlow(sel);
+      const items = r?.parsed?.suggestions || r?.suggestions || [];
+      setSugg({ loading: false, items });
+    } catch (e) { setSugg({ loading: false, items: [] }); flash(e.message); }
+  }
+  async function runScan(s) {
+    try {
+      await api.scans.submit({ tool: s.tool, target: s.target, options: s.options || [], engagement_id: engagementId, flow_id: sel });
+      flash('Launched ' + s.tool + ' against ' + s.target);
+    } catch (e) { flash(e.message); }
   }
 
+  const f = detail;
+
   return (
-    <div className="stack">
-      <section className="card">
-        <div className="row-between">
-          <h2>Proxy capture</h2>
-          <div className="btn-row">
-            <button className="btn ghost" onClick={() => setPaused((p) => !p)}>
-              {paused ? 'Resume polling' : 'Pause polling'}
-            </button>
-            <button className="btn ghost" onClick={load}>Refresh</button>
-            <button className="btn ghost danger" onClick={onClear}>Clear</button>
+    <div className="page">
+      <div className="card">
+        <div className="card__head"><span className="card__title">Proxy capture</span>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="btn btn--muted" onClick={loadFlows}>Refresh</button>
+            <button className="btn btn--danger" onClick={clearFlows}>Clear</button>
           </div>
         </div>
-        <dl className="kv">
-          <dt>Listen port</dt>
-          <dd className="mono">{status?.listen_port ?? '-'}</dd>
-          <dt>Flows captured</dt>
-          <dd className="mono">{total}</dd>
-          <dt>CA certificate</dt>
-          <dd>
-            {status?.ca_available ? (
-              <a href={api.proxy.caUrl()} download>Download allhack-mitmproxy-ca.pem</a>
-            ) : (
-              <span className="muted">Not generated yet. Send any HTTPS request through the proxy first.</span>
-            )}
-          </dd>
-        </dl>
-        {error && <p className="result error">{error}</p>}
-      </section>
-
-      <section className="card">
-        <div className="filters">
-          <select
-            value={filters.host}
-            onChange={(e) => setFilters((f) => ({ ...f, host: e.target.value }))}
-          >
-            <option value="">All hosts ({hosts.reduce((n, h) => n + h.count, 0)})</option>
-            {hosts.map((h) => (
-              <option key={h.host} value={h.host}>{h.host} ({h.count})</option>
-            ))}
-          </select>
-          <select
-            value={filters.method}
-            onChange={(e) => setFilters((f) => ({ ...f, method: e.target.value }))}
-          >
-            <option value="">All methods</option>
-            {['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS', 'HEAD'].map((m) => (
-              <option key={m} value={m}>{m}</option>
-            ))}
-          </select>
-          <input
-            type="text"
-            placeholder="Filter URL..."
-            value={filters.search}
-            onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))}
-          />
+        <div className="card__body">
+          <div className="px-status">
+            <div className="px-status__item"><div className="px-status__l">Status</div><div className="px-status__v"><span className="px-live">{status?.running ? 'listening' : 'unknown'}</span></div></div>
+            <div className="px-status__item"><div className="px-status__l">Listen port</div><div className="px-status__v">{status?.port ?? 8080}</div></div>
+            <div className="px-status__item"><div className="px-status__l">Flows captured</div><div className="px-status__v">{status?.flow_count ?? flows.length}</div></div>
+            <div className="px-status__item"><div className="px-status__l">CA certificate</div><div className="px-status__v"><a href={api.proxy.caUrl()} target="_blank" rel="noreferrer">allhack-mitmproxy-ca.pem</a></div></div>
+          </div>
         </div>
-
-        <FlowTable
-          flows={flows}
-          selectedId={selectedId}
-          onSelect={setSelectedId}
-        />
-      </section>
-
-      {selectedId && (
-        <FlowInspector
-          flowId={selectedId}
-          onClose={() => setSelectedId(null)}
-        />
-      )}
-    </div>
-  );
-}
-
-function SuggestionsWrapper({ flowId }) {
-  const navigate = useNavigate();
-  return (
-    <Suggestions
-      flowId={flowId}
-      onLaunched={(jobId) => navigate(`/scans?job=${jobId}`)}
-    />
-  );
-}
-
-function FlowTable({ flows, selectedId, onSelect }) {
-  if (flows.length === 0) {
-    return <p className="muted small">No captured flows yet.</p>;
-  }
-  return (
-    <div className="table-wrap">
-      <table className="table mono">
-        <thead>
-          <tr>
-            <th style={{ width: 80 }}>Time</th>
-            <th style={{ width: 60 }}>Method</th>
-            <th style={{ width: 60 }}>Status</th>
-            <th>Host</th>
-            <th>Path</th>
-            <th style={{ width: 80 }}>Size</th>
-            <th style={{ width: 70 }}>Time (ms)</th>
-          </tr>
-        </thead>
-        <tbody>
-          {flows.map((f) => (
-            <tr
-              key={f.id}
-              className={f.id === selectedId ? 'selected' : ''}
-              onClick={() => onSelect(f.id)}
-            >
-              <td>{formatTime(f.timestamp)}</td>
-              <td>{f.method}</td>
-              <td className={statusClass(f.status_code)}>{f.status_code ?? '-'}</td>
-              <td>{f.host}</td>
-              <td className="truncate" title={f.path}>{f.path}</td>
-              <td>{f.response_size != null ? formatBytes(f.response_size) : '-'}</td>
-              <td>{f.duration_ms ?? '-'}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-function FlowInspector({ flowId, onClose }) {
-  const [flow, setFlow] = useState(null);
-  const [tab, setTab] = useState('request');
-  const [err, setErr] = useState(null);
-  const reqId = useRef(flowId);
-
-  useEffect(() => {
-    reqId.current = flowId;
-    setFlow(null);
-    setErr(null);
-    api.proxy.flow(flowId)
-      .then((data) => { if (reqId.current === flowId) setFlow(data); })
-      .catch((e) => setErr(e.message));
-  }, [flowId]);
-
-  return (
-    <section className="card">
-      <div className="row-between">
-        <h2>Inspector</h2>
-        <button className="btn ghost" onClick={onClose}>Close</button>
       </div>
-      {err && <p className="result error">{err}</p>}
-      {!flow && !err && <p className="muted small">Loading...</p>}
-      {flow && (
-        <>
-          <div className="inspect-head mono">
-            <div><strong>{flow.method}</strong> {flow.url}</div>
-            <div className="muted small">
-              {formatTime(flow.timestamp)} &middot;{' '}
-              status {flow.status_code ?? '-'} &middot;{' '}
-              {flow.response_size != null ? formatBytes(flow.response_size) : '-'} &middot;{' '}
-              {flow.duration_ms ?? '-'} ms
+
+      <div className="card">
+        <div className="card__body" style={{ paddingBottom: 14 }}>
+          <div className="px-filters">
+            <div className="select-box"><select className="select" value={host} onChange={(e) => setHost(e.target.value)}><option value="">All hosts</option>{hosts.map((h) => <option key={h} value={h}>{h}</option>)}</select></div>
+            <div className="select-box"><select className="select" value={method} onChange={(e) => setMethod(e.target.value)}><option value="">All methods</option>{METHODS.map((m) => <option key={m} value={m}>{m}</option>)}</select></div>
+            <input className="px-search" placeholder="filter URL..." value={search} onChange={(e) => setSearch(e.target.value)} />
+          </div>
+        </div>
+        <div className="tbl-scroll">
+          <table className="tbl">
+            <thead><tr><th>Time</th><th>Method</th><th>Status</th><th>Host</th><th>Path</th><th>Size</th><th>ms</th></tr></thead>
+            <tbody>
+              {flows.map((fl) => (
+                <tr key={fl.id} className={'clickable' + (fl.id === sel ? ' selected' : '')} onClick={() => select(fl.id)}>
+                  <td className="mono" style={{ color: 'var(--text-faint)' }}>{timeOf(fl.timestamp)}</td>
+                  <td><span className={'method m-' + fl.method}>{fl.method}</span></td>
+                  <td><span className={'mono ' + scClass(fl.status_code || 0)}>{fl.status_code ?? '-'}</span></td>
+                  <td className="mono" style={{ color: 'var(--text-secondary)' }}>{fl.host}</td>
+                  <td className="mono truncate" style={{ maxWidth: 240 }} title={fl.path}>{fl.path}</td>
+                  <td className="mono" style={{ color: 'var(--text-faint)' }}>{fmtBytes(fl.response_size)}</td>
+                  <td className="mono" style={{ color: (fl.duration_ms || 0) > 1000 ? 'var(--severity-medium)' : 'var(--text-faint)' }}>{fl.duration_ms ?? '-'}</td>
+                </tr>
+              ))}
+              {flows.length === 0 && <tr><td colSpan={7}><div className="empty">No flows captured yet. Browse the target through the proxy on :{status?.port ?? 8080}.</div></td></tr>}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {f && (
+        <div className="card">
+          <div className="card__head"><span className="card__title">Inspector</span><button className="btn btn--muted" onClick={() => { setSel(null); setDetail(null); }}>Close</button></div>
+          <div className="px-head">
+            <div className="px-head__main"><span className={'method m-' + f.method}>{f.method}</span> {f.url}</div>
+            <div className="px-head__meta">{timeOf(f.timestamp)} &middot; status {f.status_code} &middot; {fmtBytes(f.response_size)} &middot; {f.duration_ms ?? '-'} ms</div>
+          </div>
+          <div style={{ padding: '12px 16px 0' }}>
+            <div className="tabs" style={{ margin: 0 }}>
+              <button className={'tab' + (tab === 'request' ? ' tab--active' : '')} onClick={() => setTab('request')}>Request</button>
+              <button className={'tab' + (tab === 'response' ? ' tab--active' : '')} onClick={() => setTab('response')}>Response</button>
             </div>
           </div>
-
-          <div className="tabs">
-            <button className={tab === 'request' ? 'active' : ''} onClick={() => setTab('request')}>Request</button>
-            <button className={tab === 'response' ? 'active' : ''} onClick={() => setTab('response')}>Response</button>
+          {(() => {
+            const H = (tab === 'request' ? f.request_headers : f.response_headers) || [];
+            const B = (tab === 'request' ? f.request_body_preview : f.response_body_preview) || {};
+            const text = B.encoding === 'text' ? B.text : '';
+            return (
+              <>
+                <div className="msg-lbl">Headers</div>
+                <div className="hdr-wrap"><table className="hdr-table"><tbody>{H.map((p, i) => <tr key={i}><td className="hdr-key">{p[0]}</td><td className="hdr-val">{p[1]}</td></tr>)}</tbody></table></div>
+                <div className="msg-lbl">Body</div>
+                {text ? <pre className="body-pre">{text}</pre> : <div className="body-meta" style={{ marginBottom: 16 }}>{B.present ? 'Binary or empty body.' : 'Empty body.'}</div>}
+              </>
+            );
+          })()}
+          <div className="sugg">
+            <div className="sugg__head"><span className="sugg__title">Suggest attacks (send to scan)</span>
+              <button className="btn btn--muted" onClick={suggest} disabled={sugg.loading}>{sugg.loading ? 'Analyzing...' : 'Suggest attacks'}</button>
+            </div>
+            {sugg.items == null ? <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-faint)' }}>Use the LLM to propose scans for this flow.</div> :
+              sugg.items.length === 0 ? <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-faint)' }}>No attack suggestions for this flow.</div> :
+                sugg.items.map((s, i) => (
+                  <div key={i} className="sugg__item">
+                    <span className="sugg__tool">{s.tool}</span>
+                    <span className="sugg__why">{s.reason || s.why || s.target}</span>
+                    <button className="btn btn--solid btn--sm" onClick={() => runScan(s)} disabled={!engagementId}>Run</button>
+                  </div>
+                ))}
           </div>
-
-          {tab === 'request' ? (
-            <MessageView
-              headers={flow.request_headers}
-              body={flow.request_body_preview}
-              contentType={flow.request_content_type}
-            />
-          ) : (
-            <MessageView
-              headers={flow.response_headers}
-              body={flow.response_body_preview}
-              contentType={flow.response_content_type}
-            />
-          )}
-
-          <div className="suggestions-wrap">
-            <SuggestionsWrapper flowId={flow.id} />
-          </div>
-        </>
+        </div>
       )}
-    </section>
-  );
-}
-
-function MessageView({ headers, body, contentType }) {
-  return (
-    <div className="msg">
-      <h3 className="msg-h">Headers</h3>
-      {headers && headers.length ? (
-        <table className="headers-table mono">
-          <tbody>
-            {headers.map((pair, i) => (
-              <tr key={i}>
-                <td className="header-key">{pair[0]}</td>
-                <td className="header-val">{pair[1]}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      ) : (
-        <p className="muted small">No headers.</p>
-      )}
-
-      <h3 className="msg-h">Body</h3>
-      <BodyView body={body} contentType={contentType} />
+      {toast && <div className="toast">{toast}</div>}
     </div>
   );
-}
-
-function BodyView({ body, contentType }) {
-  if (!body || !body.present) return <p className="muted small">Empty body.</p>;
-  const meta = (
-    <p className="muted small">
-      {contentType || '(no content-type)'} &middot; {formatBytes(body.size)}
-      {body.truncated && ' (truncated)'}
-    </p>
-  );
-  if (body.encoding === 'text') {
-    return (<>{meta}<pre className="body mono">{body.text}</pre></>);
-  }
-  return (<>{meta}<pre className="body mono">{body.hex}{body.hex_truncated ? '\n...' : ''}</pre></>);
-}
-
-// --- utils ---
-
-function formatTime(ts) {
-  if (!ts) return '-';
-  const d = new Date(ts * 1000);
-  return d.toLocaleTimeString([], { hour12: false });
-}
-
-function formatBytes(n) {
-  if (n < 1024) return `${n} B`;
-  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
-  return `${(n / 1024 / 1024).toFixed(1)} MB`;
-}
-
-function statusClass(code) {
-  if (code == null) return '';
-  if (code >= 500) return 'status-5xx';
-  if (code >= 400) return 'status-4xx';
-  if (code >= 300) return 'status-3xx';
-  if (code >= 200) return 'status-2xx';
-  return '';
 }

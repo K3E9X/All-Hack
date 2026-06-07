@@ -18,7 +18,9 @@ function safeJson(text) {
 
 export const api = {
   config: () => request('/api/config'),
-  llmPing: () => request('/api/llm/ping', { method: 'POST' }),
+  llmPing: (role) => request(`/api/llm/ping${role ? `?role=${role}` : ''}`, { method: 'POST' }),
+  dashboard: () => request('/api/dashboard'),
+  tools: () => request('/api/tools'),
 
   engagements: {
     list: () => request('/api/engagements'),
@@ -86,6 +88,23 @@ export const api = {
     explainJob: (jobId) => request(`/api/llm/jobs/${jobId}/explain`, { method: 'POST' }),
     report: (payload) => request('/api/llm/report', {
       method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }),
+  },
+
+  sandbox: {
+    run: (payload) => request('/api/sandbox/run', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }),
+  },
+
+  settings: {
+    get: () => request('/api/settings'),
+    save: (payload) => request('/api/settings', {
+      method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     }),

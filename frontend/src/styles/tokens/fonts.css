@@ -1,0 +1,5 @@
+/* All-Hack webfonts — Inter for prose, JetBrains Mono for data/terminal.
+   Both are the real fonts used in the product frontend (frontend/src/index.css).
+   Loaded from Google Fonts; swap to self-hosted woff2 if offline use is needed. */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');

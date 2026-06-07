@@ -1,0 +1,47 @@
+/* All-Hack — Home / Dashboard. Reuses liveview.css chrome. */
+
+/* metric row */
+.metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; }
+.metric { border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface); padding: 16px 18px; }
+.metric__l { font-size: 10px; text-transform: uppercase; letter-spacing: .05em; color: var(--text-faint); margin-bottom: 8px; }
+.metric__v { font-family: var(--font-mono); font-size: 26px; font-weight: 500; line-height: 1; }
+.metric__v small { font-size: 13px; color: var(--text-faint); }
+.metric__sub { font-family: var(--font-mono); font-size: 11px; color: var(--text-secondary); margin-top: 7px; }
+.metric--alert .metric__v { color: var(--severity-high); }
+.metric--ok .metric__v { color: var(--term-ok); }
+
+.dash-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+
+.kv { display: grid; grid-template-columns: 160px 1fr; gap: 9px 18px; margin: 0; }
+.kv dt { font-size: 13px; color: var(--text-secondary); }
+.kv dd { margin: 0; font-size: 13px; color: var(--text-primary); }
+.kv dd.mono { font-family: var(--font-mono); }
+.kv-yes { color: var(--term-ok); }
+.kv-no { color: var(--severity-medium); }
+
+/* usage bars */
+.usage { display: flex; flex-direction: column; gap: 12px; }
+.usage__row { display: grid; grid-template-columns: 110px 1fr 70px; gap: 12px; align-items: center; font-family: var(--font-mono); font-size: 12px; }
+.usage__l { color: var(--text-secondary); }
+.usage__bar { height: 6px; border-radius: 2px; background: var(--neutral-800); overflow: hidden; }
+.usage__fill { height: 100%; background: var(--accent); border-radius: 2px; }
+.usage__n { text-align: right; color: var(--text-primary); }
+
+/* SBOM toolchain */
+.sbom-phase { margin-top: 4px; }
+.sbom-phase__t { font-size: 10px; text-transform: uppercase; letter-spacing: .05em; color: var(--text-faint); padding: 12px 0 8px; }
+.sbom { width: 100%; border-collapse: collapse; font-size: 12px; }
+.sbom td { padding: 6px 10px; border-bottom: 1px solid var(--border); font-family: var(--font-mono); }
+.sbom tr:last-child td { border-bottom: none; }
+.sbom__name { color: var(--text-primary); }
+.sbom__ver { color: var(--text-secondary); }
+.sbom__src { color: var(--text-faint); }
+.sbom__ok { color: var(--term-ok); text-align: right; }
+.sbom__missing { color: var(--severity-medium); text-align: right; }
+
+.home-intro { font-size: 13px; color: var(--text-secondary); line-height: 1.55; margin: 0 0 14px; }
+.ping-result { margin-top: 14px; font-family: var(--font-mono); font-size: 12px; line-height: 1.6; padding: 10px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--neutral-950); }
+.ping-result--ok { color: var(--term-ok); border-color: rgba(74,222,128,.3); }
+.ping-result--pending { color: var(--text-secondary); }
+
+@media (max-width: 900px) { .metrics { grid-template-columns: repeat(2,1fr); } .dash-grid { grid-template-columns: 1fr; } .kv { grid-template-columns: 1fr; gap: 2px 0; } .kv dt { margin-top: 8px; } }

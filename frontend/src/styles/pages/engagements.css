@@ -1,0 +1,84 @@
+/* All-Hack — Engagements page — form + list styles.
+   Reuses liveview.css for chrome (topnav, btn, card, tbl, st, page).
+   This file adds the New Engagement form controls, custom checkboxes,
+   the authorization gate, and the inspector. Sober, icon-free. */
+
+.form { display: flex; flex-direction: column; gap: 20px; max-width: 780px; }
+.intro { font-size: 13px; color: var(--text-secondary); line-height: 1.6; margin: 0 0 4px; max-width: 780px; }
+.intro code { font-family: var(--font-mono); color: var(--text-primary); }
+
+/* fields */
+.field { display: flex; flex-direction: column; gap: 7px; }
+.field__label { font-family: var(--font-sans); font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: .05em; color: var(--text-secondary); }
+.field__hint { font-size: 12px; color: var(--text-faint); line-height: 1.5; }
+.field__hint code { font-family: var(--font-mono); color: var(--text-secondary); }
+.input, .textarea {
+  width: 100%; box-sizing: border-box; background: var(--bg); color: var(--text-primary);
+  border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 9px 12px;
+  font-family: var(--font-mono); font-size: 13px; transition: border-color .15s, box-shadow .15s;
+}
+.textarea { resize: vertical; min-height: 64px; line-height: 1.5; }
+.input:focus, .textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); }
+.input::placeholder, .textarea::placeholder { color: var(--text-faint); }
+
+.field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+
+/* section divider label */
+.form-sub { font-family: var(--font-sans); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--text-faint); padding-top: 6px; border-top: 1px solid var(--border); }
+
+/* custom checkbox (square + CSS check, no icon) */
+.checks { display: flex; flex-direction: column; gap: 14px; }
+.check { display: grid; grid-template-columns: 18px 1fr; gap: 11px; align-items: start; cursor: pointer; }
+.check input { position: absolute; opacity: 0; width: 0; height: 0; }
+.check__box { width: 18px; height: 18px; border: 1px solid var(--border-strong); border-radius: 4px; background: var(--bg); position: relative; margin-top: 1px; flex: none; transition: background .12s, border-color .12s; }
+.check__box--on { background: var(--accent); border-color: var(--accent); }
+.check__box--on::after { content: ''; position: absolute; left: 5px; top: 1.5px; width: 4px; height: 8px; border: solid var(--text-inverse); border-width: 0 2px 2px 0; transform: rotate(45deg); }
+.check:hover .check__box { border-color: var(--accent); }
+.attest .check__box--on { background: var(--term-ok); border-color: var(--term-ok); }
+.check__txt { font-size: 13px; color: var(--text-secondary); line-height: 1.5; }
+.check__txt b { color: var(--text-primary); font-weight: 500; }
+.check__txt code { font-family: var(--font-mono); color: var(--text-primary); }
+
+/* nested sub-options revealed under a parent */
+.check-nested { margin-left: 29px; padding-left: 16px; border-left: 1px solid var(--border); display: flex; flex-direction: column; gap: 14px; }
+
+/* sensitive block (exploit) */
+.danger-note { font-family: var(--font-mono); font-size: 11px; color: var(--severity-medium); }
+
+/* authorization gate */
+.attest { border: 1px solid rgba(234,179,8,.35); border-radius: var(--radius-md); background: var(--surface); padding: 14px 16px; }
+.attest .check__txt b { color: var(--text-primary); }
+
+.form-actions { display: flex; align-items: center; gap: 14px; }
+.form-error { font-family: var(--font-mono); font-size: 12px; color: var(--severity-critical); }
+.btn--solid { background: var(--text-primary); color: var(--bg); border-color: var(--text-primary); font-weight: 600; }
+.btn--solid:hover { background: var(--neutral-200); border-color: var(--neutral-200); }
+
+/* engagement status colors */
+.eng-authorized { color: var(--term-ok); }
+.eng-pending_authorization, .eng-pending { color: var(--severity-medium); }
+.eng-closed { color: var(--text-faint); }
+.text-link { color: var(--accent); cursor: pointer; }
+.text-link:hover { text-decoration: underline; }
+
+/* inspector */
+.inspector .kv { display: grid; grid-template-columns: 130px 1fr; gap: 8px 16px; margin: 0; }
+.inspector .kv dt { font-size: 12px; color: var(--text-faint); }
+.inspector .kv dd { margin: 0; font-family: var(--font-mono); font-size: 13px; color: var(--text-primary); word-break: break-all; }
+.inspector__note { margin-top: 16px; font-size: 13px; color: var(--text-secondary); line-height: 1.55; }
+.inspector__note code { font-family: var(--font-mono); color: var(--accent); background: var(--neutral-950); padding: 1px 6px; border-radius: 4px; }
+
+.insp-cols { display: grid; grid-template-columns: 1fr auto; gap: 24px; align-items: start; }
+.eng-progress { display: inline-flex; align-items: center; gap: 8px; }
+.eng-progress__bar { width: 90px; height: 5px; border-radius: 2px; background: var(--neutral-800); overflow: hidden; }
+.eng-progress__fill { height: 100%; background: var(--accent); border-radius: 2px; }
+.eng-progress__n { font-family: var(--font-mono); font-size: 11px; color: var(--text-secondary); }
+.radar-wrap { display: flex; gap: 16px; align-items: center; }
+.radar-legend { font-family: var(--font-mono); font-size: 11px; line-height: 1.7; }
+
+@media (max-width: 720px) {
+  .field-grid { grid-template-columns: 1fr; }
+  .insp-cols { grid-template-columns: 1fr; }
+  .inspector .kv { grid-template-columns: 1fr; gap: 2px 0; }
+  .inspector .kv dt { margin-top: 8px; }
+}

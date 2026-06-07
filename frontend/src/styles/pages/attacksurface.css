@@ -1,0 +1,41 @@
+/* All-Hack — Attack surface map. Reuses liveview.css chrome + home.css metrics. */
+.surf-layout { display: grid; grid-template-columns: 1fr 460px; gap: 16px; align-items: start; }
+
+.host-row { display: grid; grid-template-columns: 1fr 70px 70px; gap: 12px; align-items: center; padding: 11px 14px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background .12s; }
+.host-row:last-child { border-bottom: none; }
+.host-row:hover { background: var(--hover); }
+.host-row.sel { background: var(--hover); }
+.host-row__name { font-family: var(--font-mono); font-size: 13px; color: var(--text-primary); }
+.host-row__sub { font-family: var(--font-mono); font-size: 11px; color: var(--text-faint); margin-top: 2px; }
+.host-row__n { font-family: var(--font-mono); font-size: 12px; color: var(--text-secondary); text-align: right; }
+.host-row__n small { color: var(--text-faint); font-size: 10px; }
+.host-row__n.hit { color: var(--severity-high); }
+
+.detail { position: sticky; top: 60px; }
+.detail__h { font-family: var(--font-mono); font-size: 15px; color: var(--text-primary); margin: 0 0 4px; }
+.detail__hsub { font-family: var(--font-mono); font-size: 11px; color: var(--text-faint); margin-bottom: 16px; }
+.block-t { font-size: 10px; text-transform: uppercase; letter-spacing: .05em; color: var(--text-faint); margin: 18px 0 8px; }
+.block-t:first-child { margin-top: 0; }
+
+.ports { width: 100%; border-collapse: collapse; font-family: var(--font-mono); font-size: 12px; }
+.ports th { text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: .05em; color: var(--text-faint); font-weight: 500; padding: 6px 8px; border-bottom: 1px solid var(--border); }
+.ports td { padding: 6px 8px; border-bottom: 1px solid var(--border); }
+.ports tr:last-child td { border-bottom: none; }
+.ports__port { color: var(--accent); }
+.ports__state { color: var(--term-ok); }
+.ports__state.filtered { color: var(--text-faint); }
+
+.tech-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.tech-chip { font-family: var(--font-mono); font-size: 11px; padding: 2px 9px; border-radius: var(--radius-xs); background: var(--hover); border: 1px solid var(--border); color: var(--text-secondary); }
+
+.ep { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--border); font-family: var(--font-mono); font-size: 12px; }
+.ep:last-child { border-bottom: none; }
+.ep__m { color: var(--text-faint); width: 38px; flex: none; font-size: 10px; }
+.ep__path { color: var(--text-primary); flex: 1; word-break: break-all; }
+.ep__param { color: var(--severity-medium); font-size: 10px; }
+.ep__status { color: var(--text-secondary); flex: none; }
+
+.surf-search { width: 100%; box-sizing: border-box; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 8px 12px; color: var(--text-primary); font-family: var(--font-mono); font-size: 12px; margin-bottom: 14px; }
+.surf-search:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); }
+
+@media (max-width: 980px) { .surf-layout { grid-template-columns: 1fr; } .detail { position: static; } }

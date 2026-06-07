@@ -1,0 +1,83 @@
+/* ============================================================
+   All-Hack — base layer
+   Element defaults + signature terminal motifs (scanlines,
+   blink cursor, glitch, thin scrollbar, selection). Built on
+   the tokens. Imported last from styles.css.
+   ============================================================ */
+
+* { box-sizing: border-box; }
+
+html, body { margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text-primary);
+  font: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  transition: background-color var(--dur-slow), color var(--dur-slow);
+}
+
+.font-mono, code, pre, .mono, .terminal-output { font-family: var(--font-mono); }
+
+/* Signature uppercase tracked label */
+.label-caps {
+  font: var(--font-label);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wide);
+  color: var(--text-secondary);
+}
+
+/* ---- Thin scrollbar (4px) ---- */
+::-webkit-scrollbar { width: var(--scrollbar-w); height: var(--scrollbar-w); }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 0; }
+::-webkit-scrollbar-thumb:hover { background: var(--border-strong); }
+
+/* ---- Selection ---- */
+::selection { background: var(--selection-bg); color: var(--selection-fg); }
+
+/* ---- Focus ---- */
+:focus { outline: none; }
+:focus-visible { outline: 1px solid var(--accent); outline-offset: 1px; }
+
+/* ============================================================
+   Terminal motifs — used sparingly for hacker character.
+   ============================================================ */
+
+/* Blinking terminal cursor: <span class="cursor"></span> or .cursor::after on text */
+@keyframes ah-blink { 0%, 50% { opacity: 1; } 51%, 100% { opacity: 0; } }
+.cursor::after { content: '_'; animation: ah-blink 1s step-end infinite; color: var(--accent); }
+.blink { animation: ah-blink 1s step-end infinite; }
+
+/* Pulse for live/running indicators */
+@keyframes ah-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+.pulse { animation: ah-pulse 1.5s ease-in-out infinite; }
+
+/* Spin for loaders */
+@keyframes ah-spin { from { transform: rotate(0); } to { transform: rotate(360deg); } }
+.spin { animation: ah-spin 1s linear infinite; }
+
+/* Scanline overlay — put on a positioned ancestor */
+.scanlines { position: relative; }
+.scanlines::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(0,0,0,0.10), rgba(0,0,0,0.10) 1px,
+    transparent 1px, transparent 2px
+  );
+  pointer-events: none;
+}
+
+/* Animated "scan" sweep line */
+@keyframes ah-scan { 0% { transform: translateY(-100%); } 100% { transform: translateY(100%); } }
+
+/* Loading dots: <span class="loading-dots"></span> */
+@keyframes ah-dots { 0% { content: ''; } 25% { content: '.'; } 50% { content: '..'; } 75% { content: '...'; } 100% { content: ''; } }
+.loading-dots::after { content: ''; animation: ah-dots 1.5s steps(4, end) infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .blink, .pulse, .spin, .cursor::after, .loading-dots::after { animation: none; }
+}

@@ -1,0 +1,64 @@
+/* ============================================================
+   All-Hack — Spacing, radii, borders, shadows, motion
+   The product is a dense tooling UI: tight spacing, hairline
+   borders, mostly-square corners (radius is restrained), and
+   almost no shadow in dark mode — depth comes from borders.
+   ============================================================ */
+
+:root {
+  /* ---- Spacing scale (4px base) ---- */
+  --space-0:   0;
+  --space-1:   4px;
+  --space-2:   8px;
+  --space-3:   12px;
+  --space-4:   16px;
+  --space-5:   20px;
+  --space-6:   24px;
+  --space-8:   32px;
+  --space-10:  40px;
+  --space-12:  48px;
+  --space-16:  64px;
+
+  /* Common component paddings */
+  --pad-control:  6px 14px;    /* buttons, inputs */
+  --pad-card:     16px 20px;   /* card interior */
+  --pad-cell:     6px 8px;     /* table cells */
+
+  /* ---- Radii — kept tight. Cards 8px, controls 6px, pills full ---- */
+  --radius-none:  0;
+  --radius-xs:    4px;    /* badges, tags, severity chips */
+  --radius-sm:    6px;    /* buttons, inputs, nav items */
+  --radius-md:    8px;    /* cards, panels */
+  --radius-lg:    10px;   /* logo tile, modals */
+  --radius-full:  9999px; /* status dots, pills */
+
+  /* ---- Borders ---- */
+  --border-width:    1px;
+  --border-hair:     1px solid var(--border);
+  --border-strong-1: 1px solid var(--border-strong);
+  --border-dashed:   1px dashed var(--border);
+
+  /* ---- Shadows — subtle; dark UI relies on borders, light uses lift ---- */
+  --shadow-none: none;
+  --shadow-sm:   0 1px 3px rgba(0, 0, 0, 0.05);   /* card lift (light) */
+  --shadow-md:   0 4px 12px rgba(0, 0, 0, 0.25);
+  --shadow-pop:  0 8px 28px rgba(0, 0, 0, 0.45);  /* dialogs, menus (dark) */
+  --shadow-glow: 0 0 0 1px var(--accent-ring), 0 0 16px -2px var(--accent-tint); /* live/active accent */
+
+  /* ---- Focus ---- */
+  --ring:        0 0 0 3px var(--accent-ring);
+
+  /* ---- Motion — short, mechanical. No bounce. ---- */
+  --ease-out:    cubic-bezier(0.16, 1, 0.3, 1);  /* @kind other */
+  --ease-std:    ease;                            /* @kind other */
+  --dur-fast:    0.12s; /* @kind other */
+  --dur-base:    0.15s; /* @kind other */
+  --dur-slow:    0.3s; /* @kind other */
+
+  /* ---- Layout dimensions (from product) ---- */
+  --sidebar-w:        192px;   /* w-48 */
+  --sidebar-w-min:    56px;    /* w-14 collapsed */
+  --topbar-h:         56px;    /* h-14 */
+  --content-max:      960px;
+  --scrollbar-w:      4px;     /* signature thin scrollbar */
+}

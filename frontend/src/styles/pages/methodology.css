@@ -1,0 +1,36 @@
+/* All-Hack — Methodology coverage (WSTG x ATT&CK). Reuses liveview.css + home.css. */
+.meth-filters { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+.meth-seg { display: flex; border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; }
+.meth-seg button { padding: 6px 12px; border: none; background: transparent; color: var(--text-secondary); font: var(--font-ui); font-size: 12px; cursor: pointer; border-right: 1px solid var(--border); }
+.meth-seg button:last-child { border-right: none; }
+.meth-seg button:hover { color: var(--text-primary); background: var(--hover); }
+.meth-seg button.on { background: var(--surface); color: var(--text-primary); }
+
+.cat { margin-bottom: 12px; }
+.cat__head { display: grid; grid-template-columns: 1fr 200px 90px 24px; gap: 16px; align-items: center; padding: 13px 16px; cursor: pointer; }
+.cat__name { font-size: 14px; font-weight: 500; color: var(--text-primary); }
+.cat__wstg { font-family: var(--font-mono); font-size: 10px; color: var(--text-faint); margin-top: 2px; }
+.cat__bar { height: 6px; border-radius: 2px; background: var(--neutral-800); overflow: hidden; display: flex; }
+.cat__seg { height: 100%; }
+.cat__seg--done { background: var(--term-ok); }
+.cat__seg--running { background: var(--accent); }
+.cat__seg--queued { background: var(--border-strong); }
+.cat__counts { font-family: var(--font-mono); font-size: 11px; color: var(--text-secondary); text-align: right; }
+.cat__counts .hit { color: var(--severity-high); }
+.cat__chev { width: 8px; height: 8px; border-right: 1.5px solid var(--text-secondary); border-bottom: 1.5px solid var(--text-secondary); transform: rotate(45deg); transition: transform .15s; justify-self: center; }
+.cat__chev.open { transform: rotate(-135deg); }
+
+.items { border-top: 1px solid var(--border); }
+.item { display: grid; grid-template-columns: 1fr 150px 130px 90px; gap: 16px; align-items: center; padding: 9px 16px; border-bottom: 1px solid var(--border); font-size: 12px; }
+.item:last-child { border-bottom: none; }
+.item:hover { background: var(--hover); }
+.item__name { color: var(--text-primary); }
+.item__id { font-family: var(--font-mono); font-size: 10px; color: var(--text-faint); }
+.item__attack { font-family: var(--font-mono); font-size: 11px; color: var(--text-secondary); }
+.item__asset { font-family: var(--font-mono); font-size: 11px; color: var(--text-faint); }
+.item__status { font-family: var(--font-mono); font-size: 11px; text-align: right; }
+.st-done { color: var(--term-ok); }
+.st-running { color: var(--severity-medium); }
+.st-queued { color: var(--text-faint); }
+.st-skipped { color: var(--text-faint); text-decoration: line-through; }
+.st-hit { color: var(--severity-high); }
