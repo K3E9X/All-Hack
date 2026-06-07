@@ -38,9 +38,8 @@ export default function Reports() {
 
   function exportAs(fmt) {
     if (!engId) return;
-    if (fmt === 'md') window.open(`/api/engagements/${engId}/report.md`, '_blank');
-    else if (fmt === 'print') window.open(`/api/engagements/${engId}/report.html`, '_blank');
-    else flash(`${fmt.toUpperCase()} export arrives with the multi-format report endpoint.`);
+    const map = { md: 'md', print: 'pdf', json: 'json', sarif: 'sarif' };
+    window.open(`/api/engagements/${engId}/report?format=${map[fmt] || 'md'}`, '_blank');
   }
 
   return (

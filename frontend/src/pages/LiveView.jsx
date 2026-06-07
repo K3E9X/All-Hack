@@ -69,7 +69,14 @@ export default function LiveView() {
   async function stop() { setBusy(true); try { await api.engagements.stop(id); await loadState(); } catch (e) { flash(e.message); } finally { setBusy(false); } }
   async function analyze() { setBusy(true); try { const r = await api.engagements.analyzeTraffic(id); await loadState(); flash('Deep analysis complete'); } catch (e) { flash(e.message); } finally { setBusy(false); } }
   async function decide(aid, decision) { try { await api.engagements.decideApproval(id, aid, decision); await loadState(); } catch (e) { flash(e.message); } }
-  async function retest() { try { await api.engagements.validate(id); await loadState(); flash('Re-validated findings'); } catch (e) { flash(e.message); } }
+  async function retest(fid) {
+    flash('Re-testing...');
+    try {
+      const r = await api.engagements.retestFinding(id, fid);
+      await loadState();
+      flash(r.status === 'false_positive' ? 'Retest: no longer reproduced' : 'Retest complete');
+    } catch (e) { flash(e.message); }
+  }
   async function toggleJob(jid) {
     if (openJob === jid) { setOpenJob(null); setJobDetail(null); return; }
     setOpenJob(jid); setJobDetail(null);
@@ -291,7 +298,7 @@ export default function LiveView() {
                 <div className="finding__meta">{f.tool} &middot; {f.vuln_class}{f.method ? ' · ' + f.method : ''}</div>
                 {f.poc && <pre className="finding__poc">{f.poc}</pre>}
                 <div className="finding__actions">
-                  <button className="btn btn--muted btn--sm" onClick={retest}>Retest</button>
+                  <button className="btn btn--muted btn--sm" onClick={() => retest(f.id)}>Retest</button>
                   {(f.req || f.resp) && <button className="btn btn--muted btn--sm" onClick={() => setOpenReq(openReq === f.id ? null : f.id)}>{openReq === f.id ? 'Hide' : 'Request / response'}</button>}
                 </div>
                 {openReq === f.id && (f.req || f.resp) && (

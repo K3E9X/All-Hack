@@ -41,6 +41,7 @@ export const api = {
     approvals: (id) => request(`/api/engagements/${id}/approvals`),
     surface: (id) => request(`/api/engagements/${id}/surface`),
     coverage: (id) => request(`/api/engagements/${id}/coverage`),
+    retestFinding: (id, fid) => request(`/api/engagements/${id}/findings/${fid}/retest`, { method: 'POST' }),
     decideApproval: (id, approvalId, decision) =>
       request(`/api/engagements/${id}/approvals/${approvalId}`, {
         method: 'POST',

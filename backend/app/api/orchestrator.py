@@ -117,6 +117,11 @@ async def engagement_state(engagement_id: str) -> dict:
     def _vf_public(v) -> dict:
         d = v.to_public()
         d["category"] = category_for_class(v.vuln_class)
+        # Surface request/response when an analyzer captured them in metadata,
+        # so the live view can show the per-finding req/resp panel.
+        md = v.metadata or {}
+        d["req"] = md.get("req") or ""
+        d["resp"] = md.get("resp") or ""
         return d
 
     return {
