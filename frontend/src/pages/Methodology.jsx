@@ -1,49 +1,97 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { api } from '../lib/api.js';
 
-const PHASE_LABEL = { recon: 'Reconnaissance', mapping: 'Mapping & enumeration', vuln_analysis: 'Vulnerability analysis', exploitation: 'Exploitation' };
+const FILTERS = ['all', 'done', 'running', 'queued', 'skipped'];
 
 export default function Methodology() {
-  const [catalog, setCatalog] = useState([]);
-  useEffect(() => {
-    api.methodology.catalog().then((r) => setCatalog(r.items || r || [])).catch(() => {});
-  }, []);
+  const [engagements, setEngagements] = useState([]);
+  const [engId, setEngId] = useState('');
+  const [cats, setCats] = useState([]);
+  const [filter, setFilter] = useState('all');
+  const [open, setOpen] = useState([]);
 
-  const byPhase = useMemo(() => {
-    const m = {};
-    for (const it of catalog) (m[it.phase] = m[it.phase] || []).push(it);
-    return m;
-  }, [catalog]);
-  const phases = Object.keys(PHASE_LABEL).filter((p) => byPhase[p]);
+  useEffect(() => {
+    api.engagements.list().then((r) => {
+      const items = r.items || [];
+      setEngagements(items);
+      if (items.length) setEngId(items[0].id);
+    }).catch(() => {});
+  }, []);
+  useEffect(() => {
+    if (!engId) return;
+    api.engagements.coverage(engId).then((r) => {
+      const c = (r.categories || []).filter((g) => g.items.length);
+      setCats(c);
+      setOpen(c.map((x) => x.cat));
+    }).catch(() => setCats([]));
+  }, [engId]);
+
+  const toggle = (cat) => setOpen((o) => o.includes(cat) ? o.filter((x) => x !== cat) : [...o, cat]);
+  const allItems = cats.flatMap((c) => c.items);
+  const done = allItems.filter((i) => i.status === 'done').length;
+  const hits = allItems.filter((i) => i.hit).length;
+  const cov = allItems.length ? Math.round(done / allItems.length * 100) : 0;
 
   return (
     <div className="page">
-      <div className="card">
-        <div className="card__head"><span className="card__title">Methodology catalog</span><span className="card__meta">OWASP WSTG &middot; MITRE ATT&amp;CK &middot; {catalog.length} tests</span></div>
-        <div className="card__body">
-          {catalog.length === 0 && <div className="empty">Loading catalog...</div>}
-          {phases.map((p) => (
-            <div key={p} style={{ marginBottom: 18 }}>
-              <div className="sbom-phase__t">{PHASE_LABEL[p]}</div>
-              <table className="tbl">
-                <thead><tr><th>Test</th><th>WSTG</th><th>ATT&amp;CK</th><th>Tool</th><th>Class</th></tr></thead>
-                <tbody>
-                  {byPhase[p].map((it) => (
-                    <tr key={it.id}>
-                      <td>{it.description}</td>
-                      <td className="mono" style={{ color: 'var(--text-faint)' }}>{it.wstg_id}</td>
-                      <td className="mono" style={{ color: 'var(--text-faint)' }}>{(it.attack_techniques || []).join(', ')}</td>
-                      <td className="mono">{it.tool}</td>
-                      <td className="mono" style={{ color: 'var(--text-secondary)' }}>{it.vuln_class}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ))}
-          <p className="intro" style={{ marginTop: 10 }}>Per-engagement coverage (which tests ran against which assets, with hits) is wired to <code>GET /api/engagements/&#123;id&#125;/coverage</code> next.</p>
+      <div className="lv-head">
+        <div className="lv-title"><h1>Methodology coverage</h1><span className="lv-title__host">OWASP WSTG &middot; MITRE ATT&amp;CK</span></div>
+        <div className="select-box"><select className="select" value={engId} onChange={(e) => setEngId(e.target.value)}>
+          {engagements.length === 0 && <option value="">no engagements</option>}
+          {engagements.map((e) => <option key={e.id} value={e.id}>{e.target_host || e.target_url}</option>)}
+        </select></div>
+      </div>
+
+      <div className="metrics">
+        <div className="metric"><div className="metric__l">Catalog items</div><div className="metric__v">{allItems.length}</div></div>
+        <div className="metric metric--ok"><div className="metric__l">Completed</div><div className="metric__v">{done}</div><div className="metric__sub">{cov}% coverage</div></div>
+        <div className="metric metric--alert"><div className="metric__l">Hits</div><div className="metric__v">{hits}</div></div>
+        <div className="metric"><div className="metric__l">Queued</div><div className="metric__v">{allItems.filter((i) => i.status === 'queued').length}</div></div>
+      </div>
+
+      <div className="meth-filters">
+        <div className="meth-seg">
+          {FILTERS.map((f) => <button key={f} className={filter === f ? 'on' : ''} onClick={() => setFilter(f)}>{f}</button>)}
         </div>
       </div>
+
+      {cats.length === 0 && <div className="card"><div className="card__body"><div className="empty">No coverage yet. Run the engagement to populate the methodology matrix.</div></div></div>}
+
+      {cats.map((c) => {
+        const items = filter === 'all' ? c.items : c.items.filter((i) => i.status === filter);
+        if (items.length === 0) return null;
+        const d = c.items.filter((i) => i.status === 'done').length;
+        const r = c.items.filter((i) => i.status === 'running').length;
+        const q = c.items.length - d - r;
+        const chits = c.items.filter((i) => i.hit).length;
+        const isOpen = open.includes(c.cat);
+        return (
+          <div key={c.cat} className="card cat">
+            <div className="cat__head" onClick={() => toggle(c.cat)}>
+              <div><div className="cat__name">{c.cat}</div><div className="cat__wstg">{c.wstg}</div></div>
+              <div className="cat__bar">
+                <span className="cat__seg cat__seg--done" style={{ width: (d / c.items.length * 100) + '%' }}></span>
+                <span className="cat__seg cat__seg--running" style={{ width: (r / c.items.length * 100) + '%' }}></span>
+                <span className="cat__seg cat__seg--queued" style={{ width: (q / c.items.length * 100) + '%' }}></span>
+              </div>
+              <div className="cat__counts">{d}/{c.items.length}{chits > 0 ? <span className="hit"> &middot; {chits} hit</span> : null}</div>
+              <span className={'cat__chev' + (isOpen ? ' open' : '')}></span>
+            </div>
+            {isOpen && (
+              <div className="items">
+                {items.map((it) => (
+                  <div key={it.id} className="item">
+                    <div><span className="item__name">{it.name}</span> <span className="item__id">{it.id}</span></div>
+                    <div className="item__attack">ATT&amp;CK {(it.attack || []).join(', ')}</div>
+                    <div className="item__asset">{it.asset}</div>
+                    <div className={'item__status st-' + it.status}>{it.hit ? <span className="st-hit">hit</span> : it.status}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }

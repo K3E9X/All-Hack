@@ -37,6 +37,7 @@ from app.api.reports import router as reports_router
 from app.api.scans import router as scans_router
 from app.api.settings import router as settings_router
 from app.api.stream import router as stream_router
+from app.api.surface import router as surface_router
 from app.config import settings
 from app.llm import LLMError, get_llm, get_router, iter_roles
 
@@ -123,3 +124,4 @@ app.include_router(stream_router)
 app.include_router(dashboard_router)
 app.include_router(settings_router)
 app.include_router(findings_router)
+app.include_router(surface_router)

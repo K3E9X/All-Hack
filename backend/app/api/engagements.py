@@ -112,6 +112,36 @@ async def create_engagement(req: CreateEngagementRequest) -> dict:
     return out
 
 
+async def _engagement_summary(engagement_id: str) -> dict:
+    """Per-engagement progress/phase/severity/radar for the list + inspector."""
+    from app import coverage_util
+    from app.methodology import CATALOG
+    from app.orchestrator.runs import RunRepository
+    from app.orchestrator.state import EngagementState
+    from app.validation import ValidatedFindingRepository
+
+    out = {"progress": 0, "phase": None,
+           "severity_counts": {"critical": 0, "high": 0, "medium": 0, "low": 0},
+           "radar": [0, 0, 0, 0, 0, 0]}
+    try:
+        run = await RunRepository().latest_for_engagement(engagement_id)
+        if run:
+            out["phase"] = run.phase
+        rows = await EngagementState(engagement_id).coverage_rows()
+        covered = coverage_util.covered_ids(rows)
+        out["radar"] = coverage_util.radar(CATALOG, covered)
+        out["progress"] = coverage_util.progress_pct(CATALOG, covered)
+        for f in await ValidatedFindingRepository().list(engagement_id):
+            if f.status == "false_positive":
+                continue
+            sev = (f.severity or "").lower()
+            if sev in out["severity_counts"]:
+                out["severity_counts"][sev] += 1
+    except Exception:  # noqa: BLE001 - summary must never break the list
+        pass
+    return out
+
+
 @router.get("")
 async def list_engagements(
     limit: int = Query(default=50, ge=1, le=500),
@@ -119,10 +149,15 @@ async def list_engagements(
 ) -> dict:
     items = await _repo.list(limit=limit, offset=offset)
     total = await _repo.count()
+    out_items = []
+    for e in items:
+        d = e.to_public()
+        d.update(await _engagement_summary(e.id))
+        out_items.append(d)
     return {
         "total": total,
         "count": len(items),
-        "items": [e.to_public() for e in items],
+        "items": out_items,
     }
 
 
