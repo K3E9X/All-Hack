@@ -9,4 +9,5 @@ asyncpg==0.30.0
 psycopg[binary]==3.2.3
 arq==0.26.3
 dnspython==2.7.0
-cryptography==41.0.7
+# mitmproxy 11.0.2 requires cryptography >=42.0,<44.1
+cryptography==43.0.1
