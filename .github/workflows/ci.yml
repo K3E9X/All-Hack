@@ -41,9 +41,7 @@ jobs:
       - name: Byte-compile
         run: python -m compileall -q app
       - name: Unit tests
-        run: |
-          python -VV
-          pytest -rA --tb=short -p no:cacheprovider
+        run: pytest -q
 
   frontend:
     name: Frontend (build)
