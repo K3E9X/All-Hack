@@ -27,7 +27,9 @@ jobs:
       # Installs requirements.txt too (via -r): a dependency conflict here
       # (e.g. an incompatible pin) fails CI before it ever reaches a build.
       - name: Install dependencies
-        run: pip install -r requirements-dev.txt
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
       - name: Byte-compile
         run: python -m compileall -q app
       - name: Unit tests
