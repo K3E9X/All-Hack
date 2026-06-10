@@ -1,5 +1,7 @@
 # allhack
 
+[![CI](https://github.com/K3E9X/All-Hack/actions/workflows/ci.yml/badge.svg)](https://github.com/K3E9X/All-Hack/actions/workflows/ci.yml)
+
 An autonomous web-application penetration tester you self-host. You authorize
 a target, the agent walks an OWASP-WSTG x MITRE-ATT&CK methodology end to end
 (recon -> mapping -> vulnerability analysis -> exploitation), every finding is
@@ -242,6 +244,11 @@ cd backend
 pip install -r requirements-dev.txt
 pytest
 ```
+
+CI (GitHub Actions, `.github/workflows/ci.yml`) runs the backend dependency
+install + byte-compile + `pytest` and the frontend `npm ci` + build on every
+push and pull request, so a dependency conflict or a broken build is caught
+before it ships.
 
 ## Architecture notes
 
