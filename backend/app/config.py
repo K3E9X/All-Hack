@@ -66,4 +66,9 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
-settings.data_dir.mkdir(parents=True, exist_ok=True)
+# Best-effort: never crash app import if the data dir isn't creatable (e.g.
+# a read-only mount, or a non-root CI runner where "/data" can't be made).
+try:
+    settings.data_dir.mkdir(parents=True, exist_ok=True)
+except OSError:
+    pass
