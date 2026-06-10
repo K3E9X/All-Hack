@@ -10,6 +10,11 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+# Run the JS-based actions (checkout/setup-python/setup-node) on Node 24 so the
+# Node 20 deprecation warning goes away. Official opt-in per GitHub's changelog.
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 jobs:
   backend:
     name: Backend (compile + tests)
