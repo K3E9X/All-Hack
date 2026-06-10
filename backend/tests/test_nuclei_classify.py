@@ -27,7 +27,7 @@ def test_classify_tags(tags, expected):
 
 
 def test_unmatched_falls_back_to_multiple():
-    assert _classify("cve,tech,misc", "generic-template") == "multiple"
+    assert _classify("tech,misc,info", "generic-template") == "multiple"
     assert _classify(None, "") == "multiple"
 
 

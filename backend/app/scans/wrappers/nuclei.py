@@ -8,8 +8,16 @@ import json
 import os
 from typing import List, Sequence
 
+from app.cve_refs import exploit_refs as _exploit_refs
+from app.cve_refs import first_cve, normalize_cve, refs_text as _refs_text
 from app.scans.models import Finding
 from app.scans.wrappers.base import BaseWrapper, ToolResult
+
+
+def _first_cve(cls_cve, tags, template_id) -> str | None:
+    """CVE id from the template classification, then the template id, then tags."""
+    return (first_cve(cls_cve) or normalize_cve(template_id or "")
+            or first_cve(tags if isinstance(tags, (list, tuple)) else (tags or "")))
 
 
 class NucleiWrapper(BaseWrapper):
@@ -59,24 +67,43 @@ class NucleiWrapper(BaseWrapper):
             matched_url = obj.get("matched-at") or obj.get("matched") or target
             tags = info.get("tags")
 
+            # Known-CVE enrichment: a nuclei CVE template is a vetted public PoC.
+            # Pull the CVE id + CVSS and attach links to deeper public exploits.
+            cls = info.get("classification") or {}
+            cve_id = _first_cve(cls.get("cve-id"), tags, template_id)
+            cvss = cls.get("cvss-score")
+            vclass = _classify(tags, template_id)
+            if cve_id and vclass == "multiple":
+                vclass = "cve"
+
+            evidence = _evidence(obj)
+            if cve_id:
+                refs = _refs_text(cve_id)
+                if refs:
+                    evidence = (evidence + "\n\n" + refs).strip()
+
+            metadata = {
+                "template_id": template_id,
+                "tags": tags,
+                "reference": info.get("reference"),
+                "classification": cls,
+                "curl_command": obj.get("curl-command"),
+                "vuln_class": vclass,
+            }
+            if cve_id:
+                metadata["cve_id"] = cve_id
+                metadata["cvss"] = cvss
+                metadata["exploit_refs"] = _exploit_refs(cve_id)
+
             findings.append(
                 Finding(
                     severity=severity,
-                    title=info.get("name") or template_id or "nuclei finding",
+                    title=(f"{cve_id}: {info.get('name')}" if cve_id else
+                           (info.get("name") or template_id or "nuclei finding")),
                     description=info.get("description") or "",
                     target=matched_url,
-                    evidence=_evidence(obj),
-                    metadata={
-                        "template_id": template_id,
-                        "tags": tags,
-                        "reference": info.get("reference"),
-                        "classification": info.get("classification"),
-                        "curl_command": obj.get("curl-command"),
-                        # Classify each finding from its template tags so SSRF /
-                        # SSTI / LFI / XXE / ... are reported as themselves rather
-                        # than lumped under the generic "multiple".
-                        "vuln_class": _classify(tags, template_id),
-                    },
+                    evidence=evidence,
+                    metadata=metadata,
                 )
             )
         return ToolResult(findings=findings)
@@ -100,6 +127,7 @@ _TAG_CLASS = [
     (("exposure", "exposures", "disclosure", "backup", "config"), "exposed_resource"),
     (("ssl", "tls"), "weak_tls"),
     (("wordpress", "wp-plugin", "joomla", "drupal"), "cms_vulnerability"),
+    (("cve", "cves", "edb"), "cve"),  # fallback: known CVE with no finer class
 ]
 
 

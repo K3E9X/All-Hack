@@ -107,6 +107,13 @@ MAPPING: Dict[str, Dict[str, Any]] = {
         "remediation": "Update the CMS core, plugins and themes; remove unused "
                        "extensions; restrict user enumeration.",
     },
+    "cve": {
+        "category": "config",
+        "wstg": "WSTG-CONF-01", "attack": ["T1190"], "cwe": "CWE-1395",
+        "remediation": "Patch or upgrade the affected component to a fixed "
+                       "version; apply the vendor advisory and a WAF virtual "
+                       "patch as defence in depth.",
+    },
     "subdomain_takeover": {
         "category": "config",
         "wstg": "WSTG-CONF-10", "attack": ["T1584.001"], "cwe": "CWE-350",
