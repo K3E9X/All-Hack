@@ -1,0 +1,15 @@
+# Minimal dependency set to IMPORT and RUN the unit tests in CI.
+# The unit tests are pure logic; they do NOT need the full web/proxy stack
+# (fastapi, uvicorn, mitmproxy, psycopg), so we keep CI fast and reliable.
+# The full production requirements are still resolution-checked in CI
+# (pip install --dry-run -r requirements.txt) to catch version conflicts.
+asyncpg==0.30.0
+httpx==0.28.0
+pydantic==2.10.2
+pydantic-settings==2.6.1
+python-dotenv==1.0.1
+dnspython==2.7.0
+arq==0.26.3
+cryptography==43.0.1
+pytest==9.0.3
+pytest-asyncio==1.4.0

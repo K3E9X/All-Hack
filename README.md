@@ -245,10 +245,10 @@ pip install -r requirements-dev.txt
 pytest
 ```
 
-CI (GitHub Actions, `.github/workflows/ci.yml`) runs the backend dependency
-install + byte-compile + `pytest` and the frontend `npm ci` + build on every
-push and pull request, so a dependency conflict or a broken build is caught
-before it ships.
+CI (GitHub Actions, `.github/workflows/ci.yml`) resolves the full production
+requirements (catching dependency conflicts), installs a minimal test set,
+byte-compiles, runs `pytest`, and builds the frontend on every push and pull
+request - so a dependency conflict or a broken build is caught before it ships.
 
 ## Architecture notes
 
