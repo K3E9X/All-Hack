@@ -145,6 +145,11 @@ visible in the Jobs tab.
   Atlassian, GitLab, Jenkins, Tomcat, Struts, ...) the agent runs the matching
   nuclei CVE templates (vetted public PoCs, out-of-band confirmed). Gated by the
   same `allow_active_exploit` opt-in.
+- **Targeted CVE checks** - a curated set of high-value, actively-exploited CVEs
+  (Apache 2.4.49/50 path traversal, Citrix, F5 BIG-IP, Pulse Secure, FortiOS file
+  read) confirmed with a single read-only in-scope GET and a high-confidence file
+  signature - near-zero false positives, no OOB infra. On a hit the CVE is
+  reported with a redacted proof snippet.
 - **Public-exploit aggregation (all sources)** - for every detected CVE the
   agent gathers the public PoCs that exist across sources - Exploit-DB (offline
   via `searchsploit`), Metasploit, GitHub, NVD, Vulners, Packet Storm - and
