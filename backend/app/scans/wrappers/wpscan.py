@@ -30,7 +30,10 @@ class WpscanWrapper(BaseWrapper):
             "--no-banner",
             "--random-user-agent",
             "--disable-tls-checks",
-            "--enumerate", "vp,vt,u",  # vulnerable plugins, themes, users
+            # vulnerable plugins/themes, timthumbs, config backups, DB exports,
+            # users, media - the full high-value enumeration set.
+            "--enumerate", "vp,vt,tt,cb,dbe,u,m",
+            "--plugins-detection", "mixed",
         ]
         token = os.environ.get("WPSCAN_API_TOKEN")
         if token:
@@ -106,6 +109,35 @@ class WpscanWrapper(BaseWrapper):
                     target=target,
                     evidence=f"login={login}",
                     metadata={"login": login, "id": user.get("id")},
+                )
+            )
+
+        # Exposed config backups (wp-config.php~ / .bak): frequently leak DB
+        # credentials and secret keys -> treat as high-value exposures.
+        for url in (data.get("config_backups") or {}):
+            findings.append(
+                Finding(
+                    severity="high",
+                    title="WordPress config backup exposed",
+                    description="A wp-config backup is publicly readable and may leak "
+                                "database credentials and secret keys.",
+                    target=url,
+                    evidence=f"config backup: {url}",
+                    metadata={"vuln_class": "exposed_resource", "url": url},
+                )
+            )
+
+        # Exposed database exports (.sql dumps): direct data breach.
+        for url in (data.get("db_exports") or {}):
+            findings.append(
+                Finding(
+                    severity="high",
+                    title="WordPress database export exposed",
+                    description="A database export (SQL dump) is publicly readable, "
+                                "exposing application data directly.",
+                    target=url,
+                    evidence=f"db export: {url}",
+                    metadata={"vuln_class": "exposed_resource", "url": url},
                 )
             )
 
