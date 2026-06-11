@@ -182,10 +182,12 @@ async def run_engagement_loop(run_id: str) -> dict:
             # approval checkpoint, which is the other gate).
             if engagement.allow_active_exploit:
                 try:
-                    from app.exploit import prove_impact, run_known_exploits
+                    from app.exploit import (prove_impact, run_auth_spray,
+                                             run_known_exploits)
                     # Known-CVE exploitation: run the public PoC templates for the
                     # fingerprinted stack (OOB-confirmed) before proof-of-impact.
                     await run_known_exploits(engagement.id)
+                    await run_auth_spray(engagement.id)
                     await prove_impact(engagement.id)
                 except Exception:  # noqa: BLE001 - never fail the run on proof
                     logger.exception("[%s] active-exploit phase error", run.id)

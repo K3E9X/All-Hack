@@ -36,7 +36,8 @@ _TOOL_CONFIRMED = {"sqlmap", "commix", "dalfox"}
 # Traffic-driven analyzers that precompute their own status/confidence/PoC in
 # finding.metadata (see app/analysis/*). We trust that verdict verbatim.
 _ANALYSIS_TOOLS = {"logic", "js-recon", "jwt", "access-control", "cors",
-                   "params", "graphql", "exploit", "public-exploits", "cve-checks"}
+                   "params", "graphql", "exploit", "public-exploits", "cve-checks",
+                   "auth-brute"}
 
 # path-signature pairs: if the finding target ends with <path>, fetching it
 # should contain <signature> to confirm the exposure.
