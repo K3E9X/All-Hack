@@ -62,6 +62,18 @@ class Runner:
                     options = waf_args(tool) + options
             except Exception:  # noqa: BLE001 - never block a scan on WAF wiring
                 logger.exception("waf adaptation failed for %s", tool)
+
+        # Blind-XSS OOB: fire dalfox blind payloads at a configured interactsh
+        # server (confirmed server-side).
+        try:
+            import os
+            from app.scans.waf import blind_args
+            oob = os.environ.get("INTERACTSH_SERVER", "").strip()
+            extra = blind_args(tool, oob)
+            if extra:
+                options = extra + options
+        except Exception:  # noqa: BLE001
+            logger.exception("oob wiring failed for %s", tool)
         job = Job(
             id=new_job_id(),
             tool=tool,

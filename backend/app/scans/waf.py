@@ -30,3 +30,13 @@ def is_waf_tech(techs: Sequence[str]) -> bool:
 def waf_args(tool: str) -> List[str]:
     """Evasion/throttle options for a tool when a WAF is present (else empty)."""
     return list(_WAF_ARGS.get(tool, []))
+
+
+def blind_args(tool: str, oob_server: str) -> List[str]:
+    """Out-of-band blind-XSS options when an interactsh/OOB server is configured.
+    dalfox fires blind payloads at the callback (confirmed server-side)."""
+    if not oob_server:
+        return []
+    if tool == "dalfox":
+        return ["--blind", oob_server]
+    return []

@@ -70,7 +70,8 @@ CATALOG: List[CatalogItem] = [
         vuln_class="recon",
         phase=PHASE_RECON,
         tool="subfinder",
-        description="Enumerate subdomains of the target apex domain.",
+        description="Enumerate subdomains of the target apex domain (all sources).",
+        default_options=["-all"],
         applies_when={"is_host": True},
     ),
     CatalogItem(
@@ -111,7 +112,8 @@ CATALOG: List[CatalogItem] = [
         vuln_class="recon",
         phase=PHASE_RECON,
         tool="httpx",
-        description="Probe HTTP(S), capture status, title and tech fingerprint.",
+        description="Probe HTTP(S): status, title, tech, favicon hash, JARM, ASN.",
+        default_options=["-favicon", "-jarm", "-asn"],
         applies_when={"always": True},
     ),
     CatalogItem(
@@ -153,7 +155,8 @@ CATALOG: List[CatalogItem] = [
         vuln_class="recon",
         phase=PHASE_MAPPING,
         tool="katana",
-        description="Crawl the app to map endpoints, forms and parameters.",
+        description="Crawl endpoints/forms/params, parsing JavaScript and known files.",
+        default_options=["-jc", "-known-files", "all"],
         applies_when={"always": True},
     ),
     CatalogItem(

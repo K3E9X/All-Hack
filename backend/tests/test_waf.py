@@ -31,3 +31,10 @@ def test_waf_args_returns_a_copy():
     a = waf_args("sqlmap")
     a.append("x")
     assert "x" not in waf_args("sqlmap")
+
+
+def test_blind_args_dalfox_only_with_oob():
+    from app.scans.waf import blind_args
+    assert blind_args("dalfox", "https://oob.example") == ["--blind", "https://oob.example"]
+    assert blind_args("dalfox", "") == []
+    assert blind_args("sqlmap", "https://oob.example") == []
