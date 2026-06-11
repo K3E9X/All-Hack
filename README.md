@@ -143,9 +143,15 @@ visible in the Jobs tab.
 
 - **Known-CVE exploitation** - from the fingerprinted stack (WordPress,
   Atlassian, GitLab, Jenkins, Tomcat, Struts, ...) the agent runs the matching
-  nuclei CVE templates (vetted public PoCs, out-of-band confirmed) and reports
-  each CVE with its CVSS and links to public exploits (NVD, Exploit-DB, GitHub,
-  Metasploit). Gated by the same `allow_active_exploit` opt-in.
+  nuclei CVE templates (vetted public PoCs, out-of-band confirmed). Gated by the
+  same `allow_active_exploit` opt-in.
+- **Public-exploit aggregation (all sources)** - for every detected CVE the
+  agent gathers the public PoCs that exist across sources - Exploit-DB (offline
+  via `searchsploit`), Metasploit, GitHub, NVD, Vulners, Packet Storm - and
+  shows them per finding with a runnable tier: `auto` (vetted, run in-scope:
+  nuclei / Metasploit check), `sandbox` (raw scripts fetched and staged for an
+  approved run in the isolated sandbox), `reference` (links). Raw public code is
+  never auto-run - it is reviewed/run only via the approved sandbox.
 
 Confirmed findings are then linked into **kill-chains** automatically:
 leaked-secret → server compromise, broken-access-control → bulk data exposure,

@@ -58,6 +58,10 @@ RUN set -eux; \
     git clone --depth 1 https://github.com/urbanadventurer/WhatWeb.git /opt/whatweb || true; \
     if [ -f /opt/whatweb/whatweb ]; then \
         ln -sf /opt/whatweb/whatweb /usr/local/bin/whatweb; \
+    fi; \
+    git clone --depth 1 https://gitlab.com/exploit-database/exploitdb.git /opt/exploitdb || true; \
+    if [ -f /opt/exploitdb/searchsploit ]; then \
+        ln -sf /opt/exploitdb/searchsploit /usr/local/bin/searchsploit; \
     fi
 
 # wafw00f (pip) - WAF fingerprinting.
