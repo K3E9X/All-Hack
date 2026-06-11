@@ -141,6 +141,12 @@ checkpoint), in-scope only, and strictly non-destructive: no writes, deletes,
 persistence or lateral movement. The exact command and its raw output are
 visible in the Jobs tab.
 
+- **Known-CVE exploitation** - from the fingerprinted stack (WordPress,
+  Atlassian, GitLab, Jenkins, Tomcat, Struts, ...) the agent runs the matching
+  nuclei CVE templates (vetted public PoCs, out-of-band confirmed) and reports
+  each CVE with its CVSS and links to public exploits (NVD, Exploit-DB, GitHub,
+  Metasploit). Gated by the same `allow_active_exploit` opt-in.
+
 Confirmed findings are then linked into **kill-chains** automatically:
 leaked-secret → server compromise, broken-access-control → bulk data exposure,
 weak-JWT → account takeover, SSRF → cloud credential theft, subdomain takeover
