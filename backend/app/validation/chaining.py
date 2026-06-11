@@ -143,6 +143,87 @@ def _deterministic_chains(findings: List[ValidatedFinding]) -> List[Dict[str, An
                 ],
             ))
 
+    # Pattern: full kill-path -> RCE + post-exploit data access + root (the
+    # "root + data accessible" terminal state). Fires only when all three are
+    # independently proven (code-exec, sensitive-data read, local privesc).
+    if cmdi:
+        privesc_all = has("privilege_escalation")
+        data_access = has("secret_exposure")
+        if privesc_all and data_access:
+            chains.append(_chain(
+                title="Full compromise: RCE to root with data access",
+                severity="critical",
+                summary="Code execution, post-exploitation read of sensitive data, and "
+                        "a local privilege-escalation vector together demonstrate complete "
+                        "compromise: root on the host with its data readable.",
+                steps=[
+                    {"finding_id": cmdi[0].id, "action": "Gain code execution",
+                     "reason": cmdi[0].title},
+                    {"finding_id": data_access[0].id,
+                     "action": "Read sensitive data as the web user",
+                     "reason": data_access[0].title},
+                    {"finding_id": privesc_all[0].id, "action": "Escalate to root locally",
+                     "reason": privesc_all[0].title},
+                    {"action": "Root on host with full data access",
+                     "reason": "End-to-end compromise demonstrated"},
+                ],
+            ))
+
+    # Pattern: confirmed CVE (file read / traversal) -> secrets -> deeper access,
+    # or -> code execution when an injectable primitive co-exists.
+    cve = has("cve")
+    if cve:
+        steps = [{"finding_id": cve[0].id, "action": "Exploit the confirmed CVE",
+                  "reason": cve[0].title}]
+        rce = cmdi or has("sql_injection")
+        if rce:
+            steps.append({"finding_id": rce[0].id,
+                          "action": "Pivot to code execution on the host",
+                          "reason": "The disclosed files/version unlock an exploitable primitive"})
+            steps.append({"action": "Read local secrets and control the server",
+                          "reason": "File read plus code execution compromises the host"})
+            chains.append(_chain(
+                title="Known CVE to host compromise",
+                severity="critical",
+                summary="A confirmed, actively-exploited CVE combined with a code-exec "
+                        "primitive compromises the host.",
+                steps=steps,
+            ))
+        else:
+            steps.append({"action": "Recover credentials/secrets from the readable files",
+                          "reason": "Traversal / file-read CVEs expose /etc/passwd, config and keys"})
+            steps.append({"action": "Reuse recovered secrets for authenticated/admin access",
+                          "reason": "Leaked credentials unlock privileged functionality"})
+            chains.append(_chain(
+                title="Known CVE (file read) to credential compromise",
+                severity="high",
+                summary="A confirmed file-read / path-traversal CVE exposes system and "
+                        "config files that frequently embed credentials.",
+                steps=steps,
+            ))
+
+    # Pattern: default/weak credentials -> authenticated foothold -> escalation.
+    weakauth = has("auth")
+    if weakauth:
+        steps = [
+            {"finding_id": weakauth[0].id, "action": "Log in with default/weak credentials",
+             "reason": weakauth[0].title},
+            {"action": "Operate as that account with a valid session",
+             "reason": "Accepted credentials grant authenticated access"},
+        ]
+        priv = has("privilege_escalation", "broken_access_control", "idor")
+        if priv:
+            steps.append({"finding_id": priv[0].id,
+                          "action": "Escalate to other users / admin scope",
+                          "reason": priv[0].title})
+        chains.append(_chain(
+            title="Default credentials to account takeover",
+            severity="critical" if priv else "high",
+            summary="A login endpoint accepts default/weak credentials, granting an "
+                    "authenticated foothold that can be escalated.",
+            steps=steps,
+        ))
+
     # Pattern: leaked secret -> server/account compromise (secret -> RCE/access).
     secret = has("secret_exposure")
     if secret:

@@ -62,5 +62,36 @@ def test_graphql_needs_access_control_to_chain():
     assert "GraphQL introspection to authorization abuse" in _titles(both)
 
 
+def test_cve_file_read_chains_to_credential_compromise():
+    chains = _deterministic_chains([vf("cve", title="CVE-2021-43798: Grafana file read")])
+    assert "Known CVE (file read) to credential compromise" in _titles(chains)
+
+
+def test_cve_plus_rce_chains_to_host_compromise():
+    chains = _deterministic_chains([vf("cve"), vf("command_injection")])
+    titles = _titles(chains)
+    assert "Known CVE to host compromise" in titles
+    assert "Known CVE (file read) to credential compromise" not in titles
+
+
+def test_default_creds_chain_and_escalation():
+    base = _deterministic_chains([vf("auth", title="Default creds admin:admin")])
+    dc = [c for c in base if c["title"] == "Default credentials to account takeover"]
+    assert dc and dc[0]["severity"] == "high"
+    with_priv = _deterministic_chains([vf("auth"), vf("broken_access_control")])
+    dc2 = [c for c in with_priv if c["title"] == "Default credentials to account takeover"]
+    assert dc2 and dc2[0]["severity"] == "critical"
+
+
+def test_full_compromise_root_with_data_access():
+    none = _deterministic_chains([vf("command_injection"), vf("privilege_escalation")])
+    assert "Full compromise: RCE to root with data access" not in _titles(none)
+    full = _deterministic_chains([
+        vf("command_injection"), vf("privilege_escalation"), vf("secret_exposure"),
+    ])
+    fc = [c for c in full if c["title"] == "Full compromise: RCE to root with data access"]
+    assert fc and fc[0]["severity"] == "critical"
+
+
 def test_no_findings_no_chains():
     assert _deterministic_chains([]) == []
