@@ -12,6 +12,8 @@ body { background: var(--bg); color: var(--text-primary); font: var(--font-body)
 
 /* ---------- top nav (plain wordmark, underlined active) ---------- */
 .topnav { position: sticky; top: 0; z-index: 20; height: 50px; display: flex; align-items: center; justify-content: space-between; padding: 0 24px; background: var(--bg); border-bottom: 1px solid var(--border); }
+.topnav__brand { display: inline-flex; align-items: center; gap: 8px; text-decoration: none; color: var(--text-primary); }
+.topnav__mark { display: block; width: 22px; height: 22px; }
 .topnav__wm { font-weight: 700; font-size: 14px; letter-spacing: .02em; }
 .topnav__links { display: flex; gap: 22px; }
 .topnav__link { font: var(--font-ui); color: var(--text-secondary); cursor: pointer; border: none; background: none; padding: 4px 0; border-bottom: 1px solid transparent; }

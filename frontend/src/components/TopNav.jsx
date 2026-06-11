@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { api } from '../lib/api.js';
+import logoMark from '../assets/logo-mark.svg';
 
 // Canonical nav order (HANDOFF section 1). Text-only, no icons.
 const LINKS = [
@@ -33,7 +34,10 @@ export default function TopNav() {
 
   return (
     <nav className="topnav">
-      <span className="topnav__wm">allhack</span>
+      <NavLink to="/" className="topnav__brand" aria-label="allhack home">
+        <img className="topnav__mark" src={logoMark} alt="" width="22" height="22" />
+        <span className="topnav__wm">allhack</span>
+      </NavLink>
       <div className="topnav__links">
         {LINKS.map((l) => {
           const to = l.label === 'Live' ? liveTo : l.to;
