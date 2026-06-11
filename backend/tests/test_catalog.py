@@ -32,6 +32,15 @@ def test_exploitation_phase_covers_injection_family():
         assert cls in exp, f"exploitation phase missing {cls}"
 
 
+def test_nmap_is_scheduled_now():
+    # nmap was unused (not in any catalog item) - it must now drive a recon
+    # service scan and an NSE vuln pass.
+    assert "RECON-NMAP-SERVICES" in CATALOG_BY_ID
+    assert "VULN-NMAP-NSE" in CATALOG_BY_ID
+    assert CATALOG_BY_ID["VULN-NMAP-NSE"].tool == "nmap"
+    assert any("--script" in o for o in CATALOG_BY_ID["VULN-NMAP-NSE"].default_options)
+
+
 def test_dedicated_exploit_items_exist():
     for iid in ("EXP-SSRF", "EXP-SSTI", "EXP-LFI", "EXP-XXE", "EXP-REDIRECT",
                 "EXP-CRLF"):

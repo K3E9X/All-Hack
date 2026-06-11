@@ -94,6 +94,17 @@ CATALOG: List[CatalogItem] = [
         applies_when={"is_host": True},
     ),
     CatalogItem(
+        id="RECON-NMAP-SERVICES",
+        wstg_id="WSTG-INFO-02",
+        attack_techniques=["T1046"],
+        vuln_class="recon",
+        phase=PHASE_RECON,
+        tool="nmap",
+        description="Service/version detection + default scripts on common ports.",
+        default_options=["-sC", "--top-ports", "1000"],
+        applies_when={"is_host": True},
+    ),
+    CatalogItem(
         id="RECON-HTTP-PROBE",
         wstg_id="WSTG-INFO-02",
         attack_techniques=["T1595"],
@@ -152,7 +163,11 @@ CATALOG: List[CatalogItem] = [
         vuln_class="content_discovery",
         phase=PHASE_MAPPING,
         tool="ffuf",
-        description="Brute-force common paths/files (admin, backups, .git, .env).",
+        description="Brute-force paths/files with recursion + backup extensions "
+                    "(admin, backups, .git, .env, .bak/.old/.zip/.sql).",
+        default_options=["-recursion", "-recursion-depth", "2",
+                         "-e", ".bak,.old,.zip,.tar.gz,.sql,.json,.config,~",
+                         "-ac"],
         applies_when={"always": True},
     ),
     CatalogItem(
@@ -179,6 +194,18 @@ CATALOG: List[CatalogItem] = [
         description="Template scan: CVEs, exposures, misconfig, default creds.",
         severity_default="medium",
         applies_when={"always": True},
+    ),
+    CatalogItem(
+        id="VULN-NMAP-NSE",
+        wstg_id="WSTG-INFO-02",
+        attack_techniques=["T1046", "T1190"],
+        vuln_class="cve",
+        phase=PHASE_VULN,
+        tool="nmap",
+        description="NSE vulnerability scripts (vuln category) on exposed services.",
+        severity_default="high",
+        default_options=["-sV", "--script", "vuln", "--top-ports", "200"],
+        applies_when={"is_host": True},
     ),
     CatalogItem(
         id="VULN-SERVER-MISCONFIG",
@@ -261,9 +288,10 @@ CATALOG: List[CatalogItem] = [
         vuln_class="sql_injection",
         phase=PHASE_EXPLOIT,
         tool="sqlmap",
-        description="Test injectable parameters and forms for SQL injection.",
+        description="Test injectable parameters and forms for SQL injection "
+                    "(forms, threaded; batch/level/risk/random-agent from the wrapper).",
         severity_default="high",
-        default_options=["--batch", "--level=2", "--risk=2", "--forms"],
+        default_options=["--forms", "--threads=4"],
         applies_when={"requires_params": True},
     ),
     CatalogItem(
