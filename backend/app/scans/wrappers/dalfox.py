@@ -22,7 +22,8 @@ class DalfoxWrapper(BaseWrapper):
             "--format", "json",
             "--silence",
             "--no-color",
-            "--skip-mining-dom",
+            "--mining-dom",          # discover injectable params from the DOM
+            "--mining-dict",         # + dictionary-based param mining
         ]
         cmd.extend(options)
         return cmd

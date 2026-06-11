@@ -24,8 +24,10 @@ class GauWrapper(BaseWrapper):
 
     def build_command(self, target: str, options: Sequence[str]) -> List[str]:
         host = _target_to_host(target)
-        # gau takes the domain as a positional arg.
-        cmd = [self.binary, host, "--threads", "5"]
+        # gau takes the domain as a positional arg. Include subdomains and pull
+        # from every provider for the widest historical surface.
+        cmd = [self.binary, host, "--threads", "5", "--subs",
+               "--providers", "wayback,commoncrawl,otx,urlscan"]
         cmd.extend(options)
         return cmd
 

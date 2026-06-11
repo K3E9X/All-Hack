@@ -28,6 +28,7 @@ class DnsxWrapper(BaseWrapper):
             "-json",
             "-silent",
             "-a", "-aaaa", "-cname",
+            "-mx", "-ns", "-txt", "-soa", "-ptr",
             "-resp",
         ]
         cmd.extend(options)
@@ -47,14 +48,18 @@ class DnsxWrapper(BaseWrapper):
             a = obj.get("a") or []
             aaaa = obj.get("aaaa") or []
             cname = obj.get("cname") or []
+            mx = obj.get("mx") or []
+            ns = obj.get("ns") or []
+            txt = obj.get("txt") or []
+            soa = obj.get("soa") or []
+            ptr = obj.get("ptr") or []
 
             records = []
-            if a:
-                records.append("A: " + ", ".join(a))
-            if aaaa:
-                records.append("AAAA: " + ", ".join(aaaa))
-            if cname:
-                records.append("CNAME: " + ", ".join(cname))
+            for label, vals in (("A", a), ("AAAA", aaaa), ("CNAME", cname),
+                                ("MX", mx), ("NS", ns), ("TXT", txt),
+                                ("SOA", [str(s) for s in soa]), ("PTR", ptr)):
+                if vals:
+                    records.append(f"{label}: " + ", ".join(str(v) for v in vals))
             if not records:
                 continue
 
@@ -65,7 +70,8 @@ class DnsxWrapper(BaseWrapper):
                     description="; ".join(records),
                     target=host,
                     evidence="; ".join(records),
-                    metadata={"a": a, "aaaa": aaaa, "cname": cname, "tool": "dnsx"},
+                    metadata={"a": a, "aaaa": aaaa, "cname": cname, "mx": mx,
+                              "ns": ns, "txt": txt, "tool": "dnsx"},
                 )
             )
         return ToolResult(findings=findings)
