@@ -74,3 +74,29 @@ def test_enum_command_is_readonly():
 
 def test_empty_output():
     assert analyze_postexploit("", allow_secrets=False) == []
+
+
+def test_privesc_proof_command_builds_benign_id_attempts():
+    from app.exploit.postenum import privesc_proof_command, split_sections
+    cmd = privesc_proof_command(split_sections(SAMPLE))
+    # SAMPLE has NOPASSWD sudo + SUID find/vim -> expect sudo -n id and find -exec id
+    assert "===PRIVESC===" in cmd
+    assert "sudo -n id" in cmd
+    assert "-exec id" in cmd
+    # strictly benign: only proves with id, never writes/persists
+    # (2>/dev/null stderr redirect is fine; flag real writes/persistence)
+    for bad in ("rm -", "chmod ", "chown ", "> /", ">>", "wget", "curl",
+                "useradd", "crontab", "ssh-keygen"):
+        assert bad not in cmd
+
+
+def test_privesc_proof_command_empty_when_no_vector():
+    from app.exploit.postenum import privesc_proof_command
+    assert privesc_proof_command({"PRIV": "uid=1000(app)", "SUID": "/usr/bin/passwd"}) == ""
+
+
+def test_privesc_proven_detects_root():
+    from app.exploit.postenum import privesc_proven
+    assert privesc_proven("===PRIVESC===\nuid=0(root) gid=0(root) groups=0(root)")
+    assert not privesc_proven("===PRIVESC===\nuid=1000(app)")
+    assert not privesc_proven("uid=0(root)")  # must be after the marker
