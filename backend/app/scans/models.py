@@ -104,4 +104,11 @@ def findings_from_json(raw: Optional[str]) -> List[Finding]:
         items = json.loads(raw)
     except json.JSONDecodeError:
         return []
-    return [Finding(**item) for item in items if isinstance(item, dict)]
+    # Filter to known dataclass fields so a stored finding with an extra/legacy
+    # key (e.g. a future schema field) can't raise TypeError and abort loading
+    # the whole job.
+    fields = Finding.__dataclass_fields__
+    return [
+        Finding(**{k: v for k, v in item.items() if k in fields})
+        for item in items if isinstance(item, dict)
+    ]

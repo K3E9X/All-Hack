@@ -81,8 +81,11 @@ async def analyze_jwt(engagement_id: str) -> Dict[str, int]:
             findings.extend(_assess(token, head, payload or {}, f.url))
 
         # Forge-and-replay: prove a weak request JWT is actually forgeable by
-        # minting a token and replaying it read-only against the same endpoint.
-        if replayed < 25:
+        # minting a token and replaying it against the same endpoint. Minting a
+        # token and sending it is an active authentication-bypass attempt, so it
+        # is gated on allow_active_exploit; the offline _assess weakness
+        # detection above always runs.
+        if eng.allow_active_exploit and replayed < 25:
             bearer = _request_bearer(full)
             if bearer:
                 fr = await _forge_replay(safe, f.url, bearer,

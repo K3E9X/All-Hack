@@ -82,10 +82,12 @@ class Planner:
                 wants_host = bool(item.applies_when.get("is_host"))
                 if wants_host and asset.kind != "host":
                     continue
-                if not wants_host and asset.kind == "host" and not item.applies_when.get("always"):
-                    # non-host items generally run on endpoints; allow 'always'
-                    # items on the host's base URL too (handled below).
-                    pass
+                if not wants_host and asset.kind == "host":
+                    # Non-host items run on endpoint assets (the base URL covers
+                    # the host). Running them on a bare hostname would feed a
+                    # scheme-less target to URL tools and duplicate coverage with
+                    # the base-URL endpoint - skip.
+                    continue
                 if not applies(item, ctx):
                     continue
                 if await self.state.is_covered(item.id, asset.value):

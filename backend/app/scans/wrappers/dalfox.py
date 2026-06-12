@@ -20,7 +20,6 @@ class DalfoxWrapper(BaseWrapper):
             self.binary,
             "url", target,
             "--format", "json",
-            "--silence",
             "--no-color",
             "--mining-dom",          # discover injectable params from the DOM
             "--mining-dict",         # + dictionary-based param mining

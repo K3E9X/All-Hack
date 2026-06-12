@@ -4,6 +4,16 @@ import { api } from '../lib/api.js';
 const SEV_ORDER = { critical: 0, high: 1, medium: 2, low: 3, info: 4 };
 function Sev({ s }) { return <span className={'sev sev--' + s}>{s}</span>; }
 
+// The LLM explanation summarizes attacker-influenced scan output / target
+// responses, so it must be HTML-escaped before we apply the tiny **bold**/\n
+// formatting. Escape FIRST, then introduce only the markup we control.
+function renderExplain(md) {
+  const esc = String(md)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  return esc.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br/>');
+}
+
 export default function Scans() {
   const [tools, setTools] = useState([]);
   const [engagements, setEngagements] = useState([]);
@@ -184,7 +194,7 @@ export default function Scans() {
               <span className="explain__title">LLM explanation</span>
               <button className="btn btn--muted" onClick={doExplain} disabled={explain.loading}>{explain.loading ? 'Generating...' : 'Explain findings'}</button>
             </div>
-            {explain.md && <div className="explain__md" dangerouslySetInnerHTML={{ __html: String(explain.md).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br/>') }}></div>}
+            {explain.md && <div className="explain__md" dangerouslySetInnerHTML={{ __html: renderExplain(explain.md) }}></div>}
           </div>
         </div>
       )}

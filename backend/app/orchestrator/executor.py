@@ -29,6 +29,14 @@ class Executor:
     def __init__(self, state: EngagementState) -> None:
         self.state = state
         self.runner = get_runner()
+        self._eng = None
+
+    async def _engagement(self):
+        """The engagement (cached) - used for scope checks at ingest time."""
+        if self._eng is None:
+            from app.engagements.storage import EngagementRepository
+            self._eng = await EngagementRepository().get(self.state.engagement_id)
+        return self._eng
 
     async def launch(self, task: Task) -> Optional[Job]:
         """Submit a task as a job and mark coverage 'running'. Returns the job
@@ -118,10 +126,12 @@ class Executor:
                 await self.state.add_asset("endpoint", url, source=tool)
                 new_asset = ("endpoint", url)
         elif tool == "subfinder":
-            host = finding.target
-            if host:
-                # New subdomains become host assets (scope gate still applies
-                # when an actual scan is submitted against them).
+            host = (finding.target or "").lower()
+            # Only in-scope subdomains become assets. Out-of-scope hosts would
+            # otherwise generate candidate tasks every iteration that the runner
+            # scope-gate then rejects - wasted planning cycles and coverage rows.
+            eng = await self._engagement()
+            if host and (eng is None or eng.host_in_scope(host)):
                 await self.state.add_asset("host", host, source="subfinder")
                 new_asset = ("host", host)
 

@@ -9,7 +9,7 @@ from __future__ import annotations
 from typing import Dict, List
 
 # Tools that accept repeated `-H "Name: value"`.
-_DASH_H = {"nuclei", "ffuf", "dalfox", "katana", "httpx", "sqlmap"}
+_DASH_H = {"nuclei", "ffuf", "dalfox", "katana", "httpx"}
 
 
 def auth_args(tool: str, headers: List[Dict[str, str]]) -> List[str]:
@@ -23,6 +23,18 @@ def auth_args(tool: str, headers: List[Dict[str, str]]) -> List[str]:
         args: List[str] = []
         for n, v in pairs:
             args += ["-H", f"{n}: {v}"]
+        return args
+
+    if tool == "sqlmap":
+        # sqlmap wants the session as --cookie; other headers via repeated -H.
+        # Using -H for the Cookie leaves sqlmap effectively unauthenticated.
+        cookie = next((v for n, v in pairs if n.lower() == "cookie"), None)
+        args = []
+        if cookie:
+            args += ["--cookie", cookie]
+        for n, v in pairs:
+            if n.lower() != "cookie":
+                args += ["-H", f"{n}: {v}"]
         return args
 
     if tool == "commix":

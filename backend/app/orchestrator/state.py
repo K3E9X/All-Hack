@@ -105,7 +105,8 @@ class EngagementState:
         *,
         source: Optional[str] = None,
     ) -> None:
-        has_params = "?" in value and "=" in value
+        from urllib.parse import parse_qs
+        has_params = bool(parse_qs(urlparse(value).query))
         is_https = value.startswith("https://")
         if kind == "host" and "://" in value:
             value = urlparse(value).hostname or value

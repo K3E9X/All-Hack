@@ -10,6 +10,7 @@ from __future__ import annotations
 import logging
 import time
 from typing import List, Optional
+from urllib.parse import urlparse
 
 from app.scans.models import Job, JobStatus
 from app.scans.storage import JobRepository, new_job_id
@@ -38,15 +39,40 @@ class Runner:
 
         options = list(options or [])
 
-        # Authenticated scanning: inject the engagement's primary-identity
-        # headers as tool-specific flags so the scanner tests behind the login.
         if engagement_id:
-            try:
-                from app.engagements.storage import EngagementRepository
-                from app.scans.auth import auth_args
+            # ----- authorization gate (EVERY autonomous/exploit submission) -----
+            # The REST endpoint checks this, but the orchestrator and the exploit
+            # modules call submit() directly. Enforcing it here closes the hole:
+            # the engagement must be authorized and the target host in scope.
+            # Discovered subdomains (subfinder/gau) are never auto-trusted.
+            from app.engagements.models import EngagementStatus
+            from app.engagements.storage import EngagementRepository
 
-                eng = await EngagementRepository().get(engagement_id)
-                if eng and eng.primary_auth:
+            eng = await EngagementRepository().get(engagement_id)
+            if eng is None:
+                raise RuntimeError(f"engagement {engagement_id} not found")
+            if eng.status != EngagementStatus.AUTHORIZED:
+                raise RuntimeError(
+                    f"engagement {engagement_id} is '{eng.status.value}', not authorized"
+                )
+            host = _host_of(target)
+            if not eng.host_in_scope(host):
+                try:
+                    from app.audit import audit
+                    await audit("scan.blocked_out_of_scope", engagement_id=engagement_id,
+                                tool=tool, target=target, target_host=host,
+                                scope=eng.scope_hosts)
+                except Exception:  # noqa: BLE001
+                    pass
+                raise RuntimeError(
+                    f"target host '{host}' is not in engagement scope {eng.scope_hosts}"
+                )
+
+            # Authenticated scanning: inject the engagement's primary-identity
+            # headers as tool-specific flags so the scanner tests behind the login.
+            try:
+                from app.scans.auth import auth_args
+                if eng.primary_auth:
                     options = auth_args(tool, eng.primary_auth) + options
             except Exception:  # noqa: BLE001 - never block a scan on auth wiring
                 logger.exception("auth injection failed for %s", tool)
@@ -103,6 +129,12 @@ class Runner:
         except Exception:  # noqa: BLE001
             logger.exception("cancel failed for %s", job_id)
             return False
+
+
+def _host_of(target: str) -> str:
+    if "://" in target:
+        return (urlparse(target).hostname or "").lower()
+    return target.split("/", 1)[0].split(":", 1)[0].lower()
 
 
 _runner: Optional[Runner] = None

@@ -68,7 +68,11 @@ class FindingValidator:
         if tool in _ANALYSIS_TOOLS:
             md = finding.metadata or {}
             status_str = str(md.get("status", "likely"))
-            conf = float(md.get("confidence", 0.55))
+            try:
+                conf = float(md.get("confidence", 0.55))
+            except (TypeError, ValueError):
+                conf = 0.55
+            conf = max(0.0, min(1.0, conf))  # never trust an out-of-range value
             try:
                 status = ValidationStatus(status_str)
             except ValueError:

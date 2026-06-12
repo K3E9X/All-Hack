@@ -32,12 +32,15 @@ __all__ = ["analyze_logic", "analyze_js", "analyze_jwt",
            "analyze_graphql", "analyze_public_exploits", "run_analysis"]
 
 
-async def run_analysis(engagement_id: str) -> Dict[str, Dict]:
+async def run_analysis(engagement_id: str, *, allow_active: bool = True) -> Dict[str, Dict]:
     """Run every traffic-driven analyzer. Each is isolated so a failure in one
-    (e.g. malformed flow) doesn't abort the rest."""
+    (e.g. malformed flow) doesn't abort the rest.
+
+    `allow_active` lets the caller suppress the analyzers that send crafted
+    exploit payloads (cve_checks) when exploitation was denied/stopped - they
+    also self-gate on allow_active_exploit, this is the per-run override."""
     from app.exploit import run_cve_checks  # targeted CVE checks (safe-PoC GETs)
-    out: Dict[str, Dict] = {}
-    for name, fn in (
+    steps = [
         ("js_recon", analyze_js),            # first: may seed new endpoints
         ("params", analyze_params),          # also seeds parameterised endpoints
         ("logic", analyze_logic),
@@ -45,9 +48,12 @@ async def run_analysis(engagement_id: str) -> Dict[str, Dict]:
         ("access_control", analyze_access_control),
         ("cors", analyze_cors),
         ("graphql", analyze_graphql),
-        ("cve_checks", run_cve_checks),                 # confirm high-value CVEs
-        ("public_exploits", analyze_public_exploits),   # last: enriches CVE findings
-    ):
+    ]
+    if allow_active:
+        steps.append(("cve_checks", run_cve_checks))    # confirm high-value CVEs
+    steps.append(("public_exploits", analyze_public_exploits))  # enriches CVE findings
+    out: Dict[str, Dict] = {}
+    for name, fn in steps:
         try:
             out[name] = await fn(engagement_id)
         except Exception:  # noqa: BLE001

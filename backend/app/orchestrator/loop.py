@@ -230,12 +230,16 @@ async def run_engagement_loop(run_id: str) -> dict:
             # Traffic-driven analysis (logic/IDOR/CSRF/BFLA, JS secrets+endpoints,
             # JWT, access-control, CORS, params, GraphQL) over captured traffic.
             from app.analysis import run_analysis
-            await run_analysis(engagement.id)
+            _active_ok = run.stop_reason not in {"exploit_denied", "stopped", "cancelled"}
+            await run_analysis(engagement.id, allow_active=_active_ok)
             # Proof-of-impact: prove confirmed injections (RCE/SQLi) with a
             # benign read-only command. Double opt-in: requires
             # allow_active_exploit (the exploitation phase already passed its
             # approval checkpoint, which is the other gate).
-            if engagement.allow_active_exploit:
+            # ...but never run active exploitation if the operator denied the
+            # exploitation checkpoint or stopped/cancelled the run.
+            _suppressed = {"exploit_denied", "stopped", "cancelled"}
+            if engagement.allow_active_exploit and run.stop_reason not in _suppressed:
                 try:
                     from app.exploit import (prove_impact, run_auth_spray,
                                              run_known_exploits)
