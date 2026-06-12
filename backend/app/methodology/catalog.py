@@ -282,7 +282,7 @@ CATALOG: List[CatalogItem] = [
                     "open redirect, SQLi, XSS, command injection.",
         severity_default="high",
         default_options=["-dast"],
-        applies_when={"requires_params": True},
+        applies_when={"is_endpoint": True},
     ),
     CatalogItem(
         id="EXP-SQLI",
@@ -295,7 +295,7 @@ CATALOG: List[CatalogItem] = [
                     "(forms, threaded; batch/level/risk/random-agent from the wrapper).",
         severity_default="high",
         default_options=["--forms", "--threads=4"],
-        applies_when={"requires_params": True},
+        applies_when={"is_endpoint": True},
     ),
     CatalogItem(
         id="EXP-XSS",
@@ -307,7 +307,7 @@ CATALOG: List[CatalogItem] = [
         description="Test reflected/DOM XSS on parameters (deep DOM analysis).",
         severity_default="medium",
         default_options=["--deep-domxss"],
-        applies_when={"requires_params": True},
+        applies_when={"is_endpoint": True},
     ),
     CatalogItem(
         id="EXP-CMDI",
@@ -423,6 +423,11 @@ def applies(item: CatalogItem, context: Dict[str, Any]) -> bool:
     if cond.get("is_https") and not context.get("is_https"):
         return False
     if cond.get("requires_params") and not context.get("requires_params"):
+        return False
+    # is_endpoint: applies to any endpoint asset (not a bare host), whether or
+    # not it carries query params - for tools that discover params/forms
+    # themselves (sqlmap --forms, nuclei -dast, dalfox mining).
+    if cond.get("is_endpoint") and context.get("is_host"):
         return False
     tech_any = cond.get("tech_any")
     if tech_any:

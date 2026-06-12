@@ -15,6 +15,13 @@ from app.config import settings
 
 _arq_pool: Optional[ArqRedis] = None
 
+# Dedicated queue for the long-lived orchestrator loop so it never competes with
+# scan subprocess jobs for worker slots. The loop occupies a slot for the whole
+# run while it awaits the scan sub-jobs it launches; on a shared pool, several
+# runs would starve every scan and deadlock. The orchestrator worker reads this
+# queue; the scans worker reads the default queue.
+ORCHESTRATOR_QUEUE = "arq:queue:orchestrator"
+
 
 def redis_settings() -> RedisSettings:
     return RedisSettings.from_dsn(settings.redis_url)

@@ -392,10 +392,13 @@ async def _wait_for_jobs(
                 finished.append(job)
                 pending.discard(jid)
 
-    # Pull whatever is left (e.g. cap reached) so we still ingest partials.
+    # Pull whatever reached a terminal state but we missed; do NOT include jobs
+    # still QUEUED/RUNNING (ingesting those would mark them 'error' = covered,
+    # so their real test never runs and never retries). Their coverage stays
+    # 'running' from launch; a later run can pick them up.
     for jid in pending:
         job = await jobs_repo.get(jid)
-        if job is not None:
+        if job is not None and job.status.value in _TERMINAL:
             finished.append(job)
     return finished
 

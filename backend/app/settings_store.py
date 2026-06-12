@@ -57,19 +57,52 @@ _fernet_cache = None
 _fernet_ok: Optional[bool] = None
 
 
+# True when the at-rest key could not be persisted anywhere durable: stored
+# secrets will NOT survive a restart. Surfaced via get_public() so the UI warns.
+KEY_IS_EPHEMERAL = False
+
+
+def _key_candidates():
+    from pathlib import Path
+    yield app_settings.data_dir / ".settings.key"
+    yield Path.home() / ".allhack" / ".settings.key"
+
+
 def _secret_material() -> str:
+    global KEY_IS_EPHEMERAL
     key = os.environ.get("ALLHACK_SECRET_KEY", "").strip()
     if key:
         return key
-    key_path = app_settings.data_dir / ".settings.key"
-    if key_path.exists():
-        return key_path.read_text().strip()
+
+    candidates = list(_key_candidates())
+    for p in candidates:
+        try:
+            if p.exists():
+                return p.read_text().strip()
+        except OSError:
+            continue
+
+    # None on disk: mint one and persist it to the first writable location.
     new = base64.urlsafe_b64encode(os.urandom(32)).decode()
-    try:
-        key_path.write_text(new)
-        os.chmod(key_path, 0o600)
-    except Exception:  # noqa: BLE001
-        logger.warning("could not persist settings key to %s", key_path)
+    for p in candidates:
+        try:
+            p.parent.mkdir(parents=True, exist_ok=True)
+            p.write_text(new)
+            os.chmod(p, 0o600)
+            logger.info("generated at-rest settings key at %s", p)
+            return new
+        except OSError:
+            continue
+
+    # Could not persist anywhere: the key is ephemeral and secrets saved now are
+    # lost on restart. Fail LOUD (operator must set ALLHACK_SECRET_KEY).
+    KEY_IS_EPHEMERAL = True
+    logger.critical(
+        "CRITICAL: could not persist an at-rest encryption key (tried %s). "
+        "Stored provider keys will NOT survive a restart. Set the ALLHACK_SECRET_KEY "
+        "environment variable to a fixed value to fix this permanently.",
+        ", ".join(str(p) for p in candidates),
+    )
     return new
 
 
@@ -172,6 +205,11 @@ async def get_public() -> Dict[str, Any]:
     data["provider_keys"] = {
         p: ("set" if row["secrets"].get(p) else "unset") for p in PROVIDERS
     }
+    # Touch the key path once so KEY_IS_EPHEMERAL is computed, then warn the UI.
+    _xor_key()
+    if KEY_IS_EPHEMERAL:
+        data["key_warning"] = ("No durable encryption key: stored provider keys "
+                               "will be lost on restart. Set ALLHACK_SECRET_KEY.")
     return data
 
 

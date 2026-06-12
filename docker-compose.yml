@@ -95,6 +95,30 @@ services:
     entrypoint: []
     command: ["arq", "app.workers.WorkerSettings"]
 
+  # Dedicated worker for the autonomous orchestrator loops, on its own queue so
+  # a long-lived run never starves the scan worker's pool (avoids deadlock).
+  orchestrator:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: allhack-orchestrator
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      - DATA_DIR=/data
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-allhack}:${POSTGRES_PASSWORD:-allhack}@postgres:5432/${POSTGRES_DB:-allhack}
+      - REDIS_URL=redis://redis:6379/0
+    volumes:
+      - ./data:/data
+    entrypoint: []
+    command: ["arq", "app.workers.OrchestratorWorkerSettings"]
+
   frontend:
     build:
       context: ./frontend

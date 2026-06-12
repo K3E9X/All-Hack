@@ -19,6 +19,7 @@ from arq import cron  # noqa: F401  (kept for future scheduled tasks)
 
 from app import db
 from app.queue import close_arq_pool, get_arq_pool  # noqa: F401
+from app.queue import ORCHESTRATOR_QUEUE
 from app.queue import redis_settings as _redis_settings
 import app.audit  # noqa: F401  - register schema
 import app.engagements.storage  # noqa: F401  - register schema
@@ -212,20 +213,39 @@ async def shutdown(ctx: Dict[str, Any]) -> None:
 
 
 class WorkerSettings:
-    """Used by: arq app.workers.WorkerSettings"""
-    functions = [run_scan, run_engagement]
+    """Scans worker. Used by: arq app.workers.WorkerSettings
+
+    Reads the DEFAULT queue and runs ONLY scan jobs, so the full pool is
+    available to tool subprocesses. The orchestrator loop runs on a separate
+    worker/queue (OrchestratorWorkerSettings) and never steals a slot here."""
+    functions = [run_scan]
     redis_settings = _redis_settings()
     on_startup = startup
     on_shutdown = shutdown
-    # Must be > 1: the long-lived run_engagement task occupies one slot while
-    # the scan sub-jobs it launches need other slots to actually execute.
     max_jobs = 8
     # arq retries failed jobs by default; we never want that for pentest
     # commands (a flaky network would re-run sqlmap five times). Disable.
     max_tries = 1
-    # The orchestrator loop can run for a long time; raise the per-task ceiling.
     job_timeout = 3 * 60 * 60
     # Required for ArqRedis.abort_job() to actually cancel a running task
-    # (the Stop button on scans and engagement runs). Without this, abort
-    # requests are silently ignored.
+    # (the Stop button on scans). Without this, abort requests are ignored.
+    allow_abort_jobs = True
+
+
+class OrchestratorWorkerSettings:
+    """Orchestrator worker. Used by: arq app.workers.OrchestratorWorkerSettings
+
+    Reads the dedicated ORCHESTRATOR_QUEUE and runs ONLY the long-lived
+    plan->execute->ingest loops. Separated from scans so a loop awaiting its
+    sub-jobs can never starve the scan pool (the old shared-pool deadlock)."""
+    functions = [run_engagement]
+    queue_name = ORCHESTRATOR_QUEUE
+    redis_settings = _redis_settings()
+    on_startup = startup
+    on_shutdown = shutdown
+    # Concurrent engagement runs. Each loop is mostly awaiting, so this can be
+    # modest; scans execute on the other worker regardless.
+    max_jobs = 6
+    max_tries = 1
+    job_timeout = 3 * 60 * 60
     allow_abort_jobs = True

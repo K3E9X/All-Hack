@@ -62,7 +62,9 @@ async def start_run(engagement_id: str) -> dict:
     await _runs.create(run)
 
     pool = await get_arq_pool()
-    await pool.enqueue_job("run_engagement", run.id, _job_id=run.id)
+    from app.queue import ORCHESTRATOR_QUEUE
+    await pool.enqueue_job("run_engagement", run.id, _job_id=run.id,
+                           _queue_name=ORCHESTRATOR_QUEUE)
     await audit("engagement.run_queued", engagement_id=engagement_id, run_id=run.id)
     return {"run": run.to_public()}
 

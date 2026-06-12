@@ -54,3 +54,25 @@ def test_every_exploit_class_is_mapped_to_a_real_category():
         if item.vuln_class == "multiple":
             continue
         assert category_for_class(item.vuln_class) != "other", item.id
+
+
+def test_exploitation_fires_on_paramless_endpoint():
+    """Regression: EXP-SQLI/DAST/XSS must run on the base endpoint even with no
+    query params (the tools discover params/forms themselves), otherwise a run
+    with no proxy traffic never reaches exploitation."""
+    from app.methodology.catalog import applies, CATALOG_BY_ID
+    endpoint_no_params = {"is_host": False, "is_https": True,
+                          "requires_params": False, "tech": []}
+    host_ctx = {"is_host": True, "is_https": True, "requires_params": False, "tech": []}
+    for item_id in ("EXP-DAST", "EXP-SQLI", "EXP-XSS"):
+        item = CATALOG_BY_ID[item_id]
+        assert applies(item, endpoint_no_params), f"{item_id} should fire on a paramless endpoint"
+        assert not applies(item, host_ctx), f"{item_id} should not target a bare host"
+
+
+def test_param_only_injection_items_still_require_params():
+    from app.methodology.catalog import applies, CATALOG_BY_ID
+    no_params = {"is_host": False, "is_https": True, "requires_params": False, "tech": []}
+    for item_id in ("EXP-SSRF", "EXP-SSTI"):
+        if item_id in CATALOG_BY_ID:
+            assert not applies(CATALOG_BY_ID[item_id], no_params)
