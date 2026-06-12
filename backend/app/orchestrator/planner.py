@@ -145,6 +145,9 @@ class Planner:
         except LLMError as exc:
             logger.warning("planner LLM unavailable, keeping deterministic order: %s", exc)
             return batch
+        except Exception as exc:  # noqa: BLE001 - never let reordering break planning
+            logger.warning("planner LLM error, keeping deterministic order: %s", exc)
+            return batch
 
         ordered = _parse_ordered_keys(reply)
         if not ordered:

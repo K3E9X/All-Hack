@@ -53,6 +53,7 @@ body { background: var(--bg); color: var(--text-primary); font: var(--font-body)
 .run-meta { display: flex; align-items: center; gap: 8px; margin-top: 12px; font-family: var(--font-mono); font-size: 12px; color: var(--text-secondary); flex-wrap: wrap; }
 .run-meta .live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--term-ok); }
 .run-meta b { color: var(--text-primary); font-weight: 500; }
+.run-meta .run-reason { color: var(--accent); }
 .run-meta .sep { color: var(--border-strong); }
 .run-status--running { color: var(--term-ok); }
 

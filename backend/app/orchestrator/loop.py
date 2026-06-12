@@ -40,6 +40,20 @@ ITERATION_WAIT_CAP = 45 * 60               # max wait for one batch to finish
 
 _TERMINAL = {JobStatus.SUCCEEDED.value, JobStatus.FAILED.value, JobStatus.CANCELLED.value}
 
+# Human-readable explanation of why a run ended, surfaced in the live feed and
+# the UI so the operator never has to guess (addresses "the handoff is fuzzy").
+_REASON_LABELS = {
+    "coverage_saturated": "all applicable tests have run",
+    "time_budget": "time budget reached",
+    "job_budget": "job budget reached",
+    "no_tools": "no launchable tasks (required tools unavailable)",
+    "max_iterations": "iteration cap reached",
+    "stopped": "stopped by operator",
+    "exploit_denied": "exploitation not approved",
+    "cancelled": "run cancelled",
+    "error": "stopped after repeated errors",
+}
+
 
 async def run_engagement_loop(run_id: str) -> dict:
     runs = RunRepository()
@@ -92,90 +106,119 @@ async def run_engagement_loop(run_id: str) -> dict:
 
     current_phase: Optional[str] = None
     no_launch_streak = 0
+    error_streak = 0
     try:
         for iteration in range(MAX_ITERATIONS):
             if await runs.stop_requested(run.id):
                 run.status = "stopped"
+                run.stop_reason = "stopped"
                 await runs.update(run)
                 break
             if time.time() > deadline:
                 logger.info("[%s] time budget reached", run.id)
+                run.stop_reason = "time_budget"
                 break
             if run.jobs_launched >= max_jobs:
                 logger.info("[%s] job budget reached (%d)", run.id, max_jobs)
+                run.stop_reason = "job_budget"
                 break
 
-            batch = await planner.plan(max_tasks=BATCH_SIZE)
-            if not batch:
-                logger.info("[%s] coverage saturated after %d iterations", run.id, iteration)
-                break
-
-            run.iterations = iteration + 1
-            run.phase = batch[0].phase
-            await runs.update(run)
-            if batch[0].phase != current_phase:
-                current_phase = batch[0].phase
-                await events.emit(engagement.id, events.PHASE_CHANGED,
-                                  f"Phase: {current_phase}", run_id=run.id, phase=current_phase)
-
-            # Human checkpoint before exploitation (spec §11 approval).
-            if need_approval and batch[0].phase == PHASE_EXPLOIT:
-                approved = await _await_exploit_approval(
-                    approvals, runs, engagement.id, run.id, batch
-                )
-                if not approved:
-                    # Stop requested or denied: end the active testing loop.
-                    run.status = "stopped"
-                    await runs.update(run)
+            # One iteration of plan -> launch -> wait -> ingest. A transient
+            # error in any single iteration (malformed finding, DB hiccup,
+            # planner quirk) must NOT abort the whole run: log it, and only
+            # give up after several consecutive failures.
+            try:
+                batch = await planner.plan(max_tasks=BATCH_SIZE)
+                if not batch:
+                    logger.info("[%s] coverage saturated after %d iterations", run.id, iteration)
+                    run.stop_reason = "coverage_saturated"
                     break
 
-            # Launch the batch (respecting the remaining job budget).
-            launched_ids: List[str] = []
-            for task in batch:
-                if run.jobs_launched >= max_jobs:
-                    break
-                job = await executor.launch(task)
-                if job is not None:
-                    launched_ids.append(job.id)
-                    run.jobs_launched += 1
-                    await events.emit(
-                        engagement.id, events.TASK_LAUNCHED,
-                        f"{task.tool} -> {task.asset_value}",
-                        run_id=run.id, tool=task.tool, target=task.asset_value,
-                        catalog_item=task.catalog_item_id,
+                run.iterations = iteration + 1
+                run.phase = batch[0].phase
+                await runs.update(run)
+                if batch[0].phase != current_phase:
+                    current_phase = batch[0].phase
+                    await events.emit(engagement.id, events.PHASE_CHANGED,
+                                      f"Phase: {current_phase}", run_id=run.id, phase=current_phase)
+
+                # Human checkpoint before exploitation (spec §11 approval).
+                if need_approval and batch[0].phase == PHASE_EXPLOIT:
+                    approved = await _await_exploit_approval(
+                        approvals, runs, engagement.id, run.id, batch
                     )
-            await runs.update(run)
+                    if not approved:
+                        # Stop requested or denied: end the active testing loop.
+                        run.status = "stopped"
+                        run.stop_reason = "exploit_denied"
+                        await runs.update(run)
+                        break
 
-            if not launched_ids:
-                # Everything in the batch was skipped (tool missing). launch()
-                # already marked them covered, so the next plan() advances; but
-                # guard against a pathological all-tools-missing run spinning
-                # (and burning a planner LLM call) every iteration.
-                no_launch_streak += 1
-                if no_launch_streak >= 3:
-                    logger.info("[%s] no launchable tasks for %d iterations; stopping",
-                                run.id, no_launch_streak)
-                    await events.emit(engagement.id, events.RUN_STARTED,
-                                      "No launchable tasks (required tools unavailable)",
-                                      run_id=run.id, level=events.LEVEL_VERBOSE)
+                # Launch the batch (respecting the remaining job budget).
+                launched_ids: List[str] = []
+                for task in batch:
+                    if run.jobs_launched >= max_jobs:
+                        break
+                    job = await executor.launch(task)
+                    if job is not None:
+                        launched_ids.append(job.id)
+                        run.jobs_launched += 1
+                        await events.emit(
+                            engagement.id, events.TASK_LAUNCHED,
+                            f"{task.tool} -> {task.asset_value}",
+                            run_id=run.id, tool=task.tool, target=task.asset_value,
+                            catalog_item=task.catalog_item_id,
+                        )
+                await runs.update(run)
+                error_streak = 0
+
+                if not launched_ids:
+                    # Everything in the batch was skipped (tool missing). launch()
+                    # already marked them covered, so the next plan() advances; but
+                    # guard against a pathological all-tools-missing run spinning
+                    # (and burning a planner LLM call) every iteration.
+                    no_launch_streak += 1
+                    if no_launch_streak >= 3:
+                        logger.info("[%s] no launchable tasks for %d iterations; stopping",
+                                    run.id, no_launch_streak)
+                        run.stop_reason = "no_tools"
+                        await events.emit(engagement.id, events.PHASE_CHANGED,
+                                          "No launchable tasks (required tools unavailable)",
+                                          run_id=run.id, level=events.LEVEL_VERBOSE)
+                        break
+                    continue
+                no_launch_streak = 0
+
+                # Wait for this batch to finish, then ingest.
+                finished = await _wait_for_jobs(jobs_repo, launched_ids, runs, run.id)
+                new_findings = 0
+                for job in finished:
+                    try:
+                        await executor.ingest(job)
+                    except Exception:  # noqa: BLE001 - one bad job never aborts the run
+                        logger.exception("[%s] ingest failed for job %s", run.id, job.id)
+                        continue
+                    new_findings += len(job.findings)
+                await events.emit(
+                    engagement.id, events.BATCH_DONE,
+                    f"Batch done: {len(finished)} jobs, {new_findings} findings",
+                    run_id=run.id, jobs=len(finished), findings=new_findings,
+                )
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:  # noqa: BLE001 - resilient per-iteration
+                error_streak += 1
+                logger.exception("[%s] iteration %d error (streak %d): %s",
+                                 run.id, iteration, error_streak, exc)
+                run.error = f"{type(exc).__name__}: {exc}"
+                if error_streak >= 3:
+                    run.stop_reason = "error"
                     break
                 continue
-            no_launch_streak = 0
-
-            # Wait for this batch to finish, then ingest.
-            finished = await _wait_for_jobs(jobs_repo, launched_ids, runs, run.id)
-            new_findings = 0
-            for job in finished:
-                await executor.ingest(job)
-                new_findings += len(job.findings)
-            await events.emit(
-                engagement.id, events.BATCH_DONE,
-                f"Batch done: {len(finished)} jobs, {new_findings} findings",
-                run_id=run.id, jobs=len(finished), findings=new_findings,
-            )
 
         else:
             logger.info("[%s] hit MAX_ITERATIONS", run.id)
+            run.stop_reason = run.stop_reason or "max_iterations"
 
         # Validation phase: confirm findings with safe PoC, then build chains.
         # Always run it (even on stop) so partial results are still validated.
@@ -224,25 +267,32 @@ async def run_engagement_loop(run_id: str) -> dict:
             run.status = "completed"
     except asyncio.CancelledError:
         run.status = "stopped"
+        run.stop_reason = run.stop_reason or "cancelled"
         await _finalize(runs, run)
         await audit("engagement.run_cancelled", engagement_id=engagement.id, run_id=run.id)
         raise
     except Exception as exc:  # noqa: BLE001
         logger.exception("[%s] orchestrator loop crashed", run.id)
+        run.stop_reason = "error"
         await _fail(runs, run, f"{type(exc).__name__}: {exc}")
         return run.to_public()
 
+    run.stop_reason = run.stop_reason or "coverage_saturated"
     await _finalize(runs, run)
     await audit(
         "engagement.run_finished",
         engagement_id=engagement.id,
         run_id=run.id,
         status=run.status,
+        stop_reason=run.stop_reason,
         jobs=run.jobs_launched,
         coverage=await state.coverage_summary(),
     )
+    reason_label = _REASON_LABELS.get(run.stop_reason, run.stop_reason or "")
     await events.emit(engagement.id, events.RUN_FINISHED,
-                      f"Run {run.status}", run_id=run.id, status=run.status,
+                      f"Run {run.status} - {reason_label} "
+                      f"({run.jobs_launched} jobs, {run.iterations} iterations)",
+                      run_id=run.id, status=run.status, stop_reason=run.stop_reason,
                       jobs=run.jobs_launched)
     return run.to_public()
 

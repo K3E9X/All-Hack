@@ -28,6 +28,10 @@ CREATE TABLE IF NOT EXISTS runs (
 );
 CREATE INDEX IF NOT EXISTS idx_runs_engagement ON runs(engagement_id);
 CREATE INDEX IF NOT EXISTS idx_runs_created    ON runs(created_at DESC);
+
+-- Why the run ended (saturated | time_budget | job_budget | no_tools |
+-- max_iterations | stopped | exploit_denied | error). Added post-v1.
+ALTER TABLE runs ADD COLUMN IF NOT EXISTS stop_reason TEXT;
 """
 
 db.register_schema(SCHEMA_SQL)
@@ -50,6 +54,7 @@ class Run:
     finished_at: Optional[float] = None
     created_at: float = 0.0
     error: Optional[str] = None
+    stop_reason: Optional[str] = None
 
     def to_public(self) -> Dict[str, Any]:
         return {
@@ -64,6 +69,7 @@ class Run:
             "finished_at": self.finished_at,
             "created_at": self.created_at,
             "error": self.error,
+            "stop_reason": self.stop_reason,
         }
 
 
@@ -86,11 +92,13 @@ class RunRepository:
             await conn.execute(
                 """
                 UPDATE runs SET status=$1, phase=$2, iterations=$3, jobs_launched=$4,
-                    stop_requested=$5, started_at=$6, finished_at=$7, error=$8
-                WHERE id=$9
+                    stop_requested=$5, started_at=$6, finished_at=$7, error=$8,
+                    stop_reason=$9
+                WHERE id=$10
                 """,
                 run.status, run.phase, run.iterations, run.jobs_launched,
-                run.stop_requested, run.started_at, run.finished_at, run.error, run.id,
+                run.stop_requested, run.started_at, run.finished_at, run.error,
+                run.stop_reason, run.id,
             )
 
     async def get(self, run_id: str) -> Optional[Run]:
@@ -136,4 +144,5 @@ def _row(row) -> Run:
         finished_at=row["finished_at"],
         created_at=row["created_at"],
         error=row["error"],
+        stop_reason=row["stop_reason"] if "stop_reason" in row else None,
     )

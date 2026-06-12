@@ -4,6 +4,12 @@ import { api } from '../lib/api.js';
 
 const PHASES = ['recon', 'mapping', 'vuln_analysis', 'exploitation', 'validation'];
 const PHASE_LABEL = { recon: 'Recon', mapping: 'Mapping', vuln_analysis: 'Vuln analysis', exploitation: 'Exploitation', validation: 'Validation' };
+const REASON_LABEL = {
+  coverage_saturated: 'all applicable tests ran', time_budget: 'time budget reached',
+  job_budget: 'job budget reached', no_tools: 'required tools unavailable',
+  max_iterations: 'iteration cap reached', stopped: 'stopped by operator',
+  exploit_denied: 'exploitation not approved', cancelled: 'cancelled', error: 'stopped after errors',
+};
 const SEV_ORDER = { critical: 0, high: 1, medium: 2, low: 3, info: 4 };
 const CATS = [
   { key: 'all', label: 'All' }, { key: 'recon', label: 'Recon' }, { key: 'enumeration', label: 'Enumeration' },
@@ -146,6 +152,9 @@ export default function LiveView() {
       <div className="run-meta">
         {active && <span className="live-dot pulse"></span>}
         Run: <b className={active ? 'run-status--running' : ''}>{run0.status || 'not started'}</b>
+        {!active && run0.stop_reason && (
+          <><span>&middot;</span><span className="run-reason">{REASON_LABEL[run0.stop_reason] || run0.stop_reason}</span></>
+        )}
         <span>&middot;</span><span>iteration <b>{run0.iterations || 0}</b></span>
         <span>&middot;</span><span><b>{run0.jobs_launched || 0}</b> jobs launched</span>
         <span>&middot;</span><span><b>{vsum.confirmed || 0}</b> confirmed</span>
