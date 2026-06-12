@@ -57,6 +57,23 @@ CREATE INDEX IF NOT EXISTS idx_cov_engagement ON coverage(engagement_id);
 
 db.register_schema(SCHEMA_SQL)
 
+# A coverage row counts as "covered" (don't re-plan it) once we have ATTEMPTED
+# it - including terminal failures. This is critical: the planner advances one
+# phase at a time, so if 'skipped' (tool missing) or 'error' (tool exited non-
+# zero - common for scanners that return non-zero when they find nothing) did
+# NOT count as covered, a single stuck recon task would stay an "uncovered"
+# candidate forever, pinning earliest_phase=recon and starving mapping / vuln /
+# exploitation. One attempt per (item, asset) per run; re-run the engagement to
+# retry. Every status the executor writes therefore means "attempted".
+COVERED_STATUSES = frozenset({"pending", "running", "done", "skipped", "error"})
+
+
+def status_is_covered(status: Optional[str]) -> bool:
+    """Whether a coverage status means the (item, asset) was already attempted
+    and must not be re-planned this run."""
+    return status in COVERED_STATUSES
+
+
 
 @dataclass
 class Asset:
@@ -170,8 +187,9 @@ class EngagementState:
                 "SELECT status FROM coverage WHERE engagement_id=$1 AND catalog_item_id=$2 AND asset_value=$3",
                 self.engagement_id, catalog_item_id, asset_value,
             )
-        # 'pending'/'running'/'done' all count as covered (already scheduled).
-        return row is not None and row["status"] in ("pending", "running", "done")
+        # Any attempted status counts as covered (see COVERED_STATUSES) so a
+        # skipped/errored task can't pin the planner on an early phase.
+        return row is not None and status_is_covered(row["status"])
 
     async def coverage_rows(self) -> List[Dict[str, Any]]:
         async with db.acquire() as conn:

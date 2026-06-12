@@ -91,6 +91,7 @@ async def run_engagement_loop(run_id: str) -> dict:
                           run_id=run.id, level=events.LEVEL_VERBOSE)
 
     current_phase: Optional[str] = None
+    no_launch_streak = 0
     try:
         for iteration in range(MAX_ITERATIONS):
             if await runs.stop_requested(run.id):
@@ -146,9 +147,20 @@ async def run_engagement_loop(run_id: str) -> dict:
             await runs.update(run)
 
             if not launched_ids:
-                # Everything in the batch was skipped (tool missing); avoid a
-                # busy loop by marking and moving on.
+                # Everything in the batch was skipped (tool missing). launch()
+                # already marked them covered, so the next plan() advances; but
+                # guard against a pathological all-tools-missing run spinning
+                # (and burning a planner LLM call) every iteration.
+                no_launch_streak += 1
+                if no_launch_streak >= 3:
+                    logger.info("[%s] no launchable tasks for %d iterations; stopping",
+                                run.id, no_launch_streak)
+                    await events.emit(engagement.id, events.RUN_STARTED,
+                                      "No launchable tasks (required tools unavailable)",
+                                      run_id=run.id, level=events.LEVEL_VERBOSE)
+                    break
                 continue
+            no_launch_streak = 0
 
             # Wait for this batch to finish, then ingest.
             finished = await _wait_for_jobs(jobs_repo, launched_ids, runs, run.id)
