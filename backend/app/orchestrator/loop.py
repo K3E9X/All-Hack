@@ -251,6 +251,13 @@ async def run_engagement_loop(run_id: str) -> dict:
                 except Exception:  # noqa: BLE001 - never fail the run on proof
                     logger.exception("[%s] active-exploit phase error", run.id)
             stats = await validate_engagement(engagement.id)
+            # Intelligence #3: LLM judge pass to kill false positives / confirm
+            # with grounded evidence (best-effort; no-op without an LLM).
+            try:
+                from app.validation.llm_judge import judge_engagement
+                await judge_engagement(engagement.id)
+            except Exception:  # noqa: BLE001 - judging never fails the run
+                logger.exception("[%s] llm-judge error", run.id)
             chains = await build_chains(engagement.id)
             await audit(
                 "engagement.validated",

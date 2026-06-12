@@ -117,8 +117,9 @@ class Planner:
                 "vuln_class": CATALOG_BY_ID[t.catalog_item_id].vuln_class,
                 "severity": CATALOG_BY_ID[t.catalog_item_id].severity_default,
             }
-            for t in batch
+            for t in batch if t.catalog_item_id in CATALOG_BY_ID
         }
+        asset_values = sorted({t.asset_value for t in batch})
         payload = {
             "technologies": tech,
             "candidate_tasks": [
@@ -127,13 +128,18 @@ class Planner:
                 for t in batch
             ],
             "catalog": catalog_brief,
+            "assets": asset_values,
+            "phase": batch[0].phase,
         }
         system = (
-            "You are the planner of a web-app pentest. You are given candidate "
-            "tasks for the current phase. Reorder them by likely impact and drop "
-            "clearly redundant ones. You MUST only use the provided task keys; "
-            "never invent tasks. Reply with JSON only: "
-            '{"ordered_keys": ["key1","key2",...], "rationale": "short"}'
+            "You are the planner of a web-app pentest. Given candidate tasks for "
+            "the current phase, (1) reorder them by likely impact and drop clearly "
+            "redundant ones, and (2) when the technologies suggest specific known "
+            "vulnerabilities, propose targeted nuclei tag-hunts. Use ONLY the "
+            "provided task keys and asset values; never invent tasks, tools or "
+            "targets. Reply JSON only: {\"ordered_keys\":[...],\"extra_hunts\":"
+            "[{\"asset\":\"<one of assets>\",\"tags\":[\"jira\",\"cve\"]}],"
+            "\"rationale\":\"short\"}. extra_hunts may be empty."
         )
         try:
             reply = await client.chat(
@@ -142,7 +148,7 @@ class Planner:
                     {"role": "user", "content": json.dumps(payload)},
                 ],
                 temperature=0.1,
-                max_tokens=800,
+                max_tokens=900,
             )
         except LLMError as exc:
             logger.warning("planner LLM unavailable, keeping deterministic order: %s", exc)
@@ -151,9 +157,10 @@ class Planner:
             logger.warning("planner LLM error, keeping deterministic order: %s", exc)
             return batch
 
-        ordered = _parse_ordered_keys(reply)
-        if not ordered:
-            return batch
+        from app.llm.grounding import extract_json
+        from app.orchestrator.hypothesis import build_hunt_tasks
+        parsed = extract_json(reply)
+        ordered = _ordered_keys_from(parsed)
 
         # Rebuild using only known keys, preserving the model's order, then
         # append any keys it dropped (we never silently lose coverage work).
@@ -167,7 +174,18 @@ class Planner:
         for t in batch:
             if t.key not in seen:
                 result.append(t)
-        return result
+
+        # Targeted nuclei hunts proposed from the fingerprints (grounded: real
+        # assets only, sanitized tags). Prepend - they are high-value moves.
+        hunts = build_hunt_tasks(parsed, asset_values, batch[0].phase, task_cls=Task)
+        fresh: List[Task] = []
+        for h in hunts:
+            if any(h.key == t.key for t in result):
+                continue
+            if await self.state.is_covered(h.catalog_item_id, h.asset_value):
+                continue
+            fresh.append(h)
+        return fresh + result
 
 
 def _task_sort_key(t: Task):
@@ -175,6 +193,14 @@ def _task_sort_key(t: Task):
     item = CATALOG_BY_ID.get(t.catalog_item_id)
     sev = _SEVERITY_RANK.get(item.severity_default if item else "info", 4)
     return (phase_idx, sev, t.catalog_item_id, t.asset_value)
+
+
+def _ordered_keys_from(parsed) -> List[str]:
+    """Extract ordered_keys from already-decoded planner JSON."""
+    if not isinstance(parsed, dict):
+        return []
+    keys = parsed.get("ordered_keys")
+    return [str(k) for k in keys] if isinstance(keys, list) else []
 
 
 def _parse_ordered_keys(reply: str) -> List[str]:

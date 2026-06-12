@@ -86,6 +86,17 @@ class Runner:
                 techs = await EngagementState(engagement_id).technologies()
                 if is_waf_tech(techs):
                     options = waf_args(tool) + options
+                    # Intelligence #4: adapt the tamper set to the SPECIFIC WAF
+                    # (LLM picks from an allowlist). Replaces the static tamper.
+                    if eng.allow_active_exploit:
+                        from app.scans.payload_adapt import (adaptive_tampers,
+                                                             strip_tamper)
+                        waf_name = next(
+                            (str(t).split("waf:", 1)[1] for t in techs
+                             if str(t).lower().startswith("waf:")), "")
+                        adaptive = await adaptive_tampers(tool, waf_name)
+                        if adaptive:
+                            options = adaptive + strip_tamper(options)
             except Exception:  # noqa: BLE001 - never block a scan on WAF wiring
                 logger.exception("waf adaptation failed for %s", tool)
 

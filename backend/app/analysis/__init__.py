@@ -40,6 +40,7 @@ async def run_analysis(engagement_id: str, *, allow_active: bool = True) -> Dict
     exploit payloads (cve_checks) when exploitation was denied/stopped - they
     also self-gate on allow_active_exploit, this is the per-run override."""
     from app.exploit import run_cve_checks  # targeted CVE checks (safe-PoC GETs)
+    from app.analysis.llm_recon import analyze_llm_recon  # LLM response analyst
     steps = [
         ("js_recon", analyze_js),            # first: may seed new endpoints
         ("params", analyze_params),          # also seeds parameterised endpoints
@@ -48,6 +49,7 @@ async def run_analysis(engagement_id: str, *, allow_active: bool = True) -> Dict
         ("access_control", analyze_access_control),
         ("cors", analyze_cors),
         ("graphql", analyze_graphql),
+        ("llm_recon", analyze_llm_recon),    # LLM eye on captured traffic (grounded)
     ]
     if allow_active:
         steps.append(("cve_checks", run_cve_checks))    # confirm high-value CVEs

@@ -98,6 +98,16 @@ class ValidatedFindingRepository:
                 "UPDATE validated_findings SET chain_id=$1 WHERE id=$2", chain_id, vf_id
             )
 
+    async def update_verdict(self, vf_id: str, *, status: str, confidence: float,
+                             method: str) -> None:
+        """Adjust a finding's verdict (used by the LLM judge pass)."""
+        async with db.acquire() as conn:
+            await conn.execute(
+                "UPDATE validated_findings SET status=$1, confidence=$2, method=$3 "
+                "WHERE id=$4",
+                status, confidence, method, vf_id,
+            )
+
     async def summary(self, engagement_id: str) -> Dict[str, int]:
         async with db.acquire() as conn:
             rows = await conn.fetch(
