@@ -98,6 +98,27 @@ class ValidatedFindingRepository:
                 "UPDATE validated_findings SET chain_id=$1 WHERE id=$2", chain_id, vf_id
             )
 
+    async def set_metadata(self, vf_id: str, patch: Dict[str, Any]) -> None:
+        """Merge keys into a finding's metadata, preserving what is there.
+
+        Read-modify-write rather than a jsonb merge because metadata_json is a
+        TEXT column; the judge is the only writer and runs one finding at a
+        time, so there is no concurrent update to lose.
+        """
+        async with db.acquire() as conn:
+            row = await conn.fetchrow(
+                "SELECT metadata_json FROM validated_findings WHERE id=$1", vf_id)
+            if row is None:
+                return
+            meta = json.loads(row["metadata_json"] or "{}")
+            if not isinstance(meta, dict):
+                meta = {}
+            meta.update(patch)
+            await conn.execute(
+                "UPDATE validated_findings SET metadata_json=$1 WHERE id=$2",
+                json.dumps(meta), vf_id,
+            )
+
     async def update_verdict(self, vf_id: str, *, status: str, confidence: float,
                              method: str) -> None:
         """Adjust a finding's verdict (used by the LLM judge pass)."""
