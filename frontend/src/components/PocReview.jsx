@@ -1,0 +1,220 @@
+import { useEffect, useState } from 'react';
+import { api } from '../lib/api.js';
+
+/**
+ * Review third-party PoCs fetched from GitHub before any of them runs.
+ *
+ * The screen is built around one assumption: the operator has to actually read
+ * the code. So the code is the largest element, the inspection sits above it
+ * pointing at line numbers, and Approve only exists once a file is open - it is
+ * not reachable from the list. Approving straight off a verdict badge would
+ * make the whole staging pipeline decorative.
+ *
+ * Run is disabled whenever the runner reports its egress was never pinned. The
+ * backend refuses that case too; showing it here means the operator learns why
+ * the button is dead instead of getting a 503 after clicking.
+ */
+
+const SEV_ORDER = { critical: 0, high: 1, medium: 2, info: 3 };
+
+function Verdict({ verdict }) {
+  const label = { hostile: 'hostile', suspicious: 'suspicious', review: 'needs review' }[verdict]
+    || verdict || 'unknown';
+  return <span className={'poc-verdict poc-verdict--' + (verdict || 'review')}>{label}</span>;
+}
+
+export default function PocReview({ engagementId }) {
+  const [items, setItems] = useState([]);
+  const [open, setOpen] = useState(null);       // full staged PoC incl. code
+  const [runner, setRunner] = useState(null);
+  const [repoUrl, setRepoUrl] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+  const [result, setResult] = useState(null);
+
+  const load = async () => {
+    if (!engagementId) return;
+    try { setItems((await api.poc.list(engagementId)).items || []); } catch { /* empty */ }
+  };
+
+  useEffect(() => { load(); setOpen(null); setResult(null); }, [engagementId]);
+  useEffect(() => { api.poc.runnerHealth().then(setRunner).catch(() => setRunner(null)); }, []);
+
+  async function stage() {
+    setBusy(true); setError(null);
+    try {
+      await api.poc.stage({ engagement_id: engagementId, repo_url: repoUrl });
+      setRepoUrl('');
+      await load();
+    } catch (e) { setError(e.message); } finally { setBusy(false); }
+  }
+
+  async function openPoc(id) {
+    setError(null); setResult(null);
+    try { setOpen(await api.poc.get(id)); } catch (e) { setError(e.message); }
+  }
+
+  // Spelled out rather than dispatched through api.poc[action]: dynamic
+  // lookups hide these calls from any static sweep of what the UI actually uses.
+  const approve = () => decide(() => api.poc.approve(open.id));
+  const reject = () => decide(() => api.poc.reject(open.id));
+
+  async function decide(call) {
+    setBusy(true); setError(null);
+    try {
+      await call();
+      await load();
+      setOpen(await api.poc.get(open.id));
+    } catch (e) { setError(e.message); } finally { setBusy(false); }
+  }
+
+  async function runPoc() {
+    setBusy(true); setError(null); setResult(null);
+    try {
+      const r = await api.poc.run(open.id);
+      setResult(r.result);
+      await load();
+      setOpen(await api.poc.get(open.id));
+    } catch (e) { setError(e.message); } finally { setBusy(false); }
+  }
+
+  const signals = (open?.inspection?.signals || [])
+    .slice().sort((a, b) => (SEV_ORDER[a.severity] ?? 9) - (SEV_ORDER[b.severity] ?? 9));
+  const egressLocked = runner?.egress_locked;
+
+  return (
+    <>
+      <div className="card">
+        <div className="card__head">
+          <span className="card__title">Public PoCs</span>
+          <span className="card__meta">
+            {runner?.status === 'ok'
+              ? (egressLocked ? 'runner ready · egress pinned' : 'runner up · EGRESS NOT PINNED')
+              : 'runner unavailable'}
+          </span>
+        </div>
+        <div className="card__body">
+          {runner?.status === 'ok' && !egressLocked && (
+            <p className="ping-result ping-result--err">
+              The sandbox started without an egress policy. Running untrusted code now
+              would give it unrestricted outbound access — the backend refuses to send it work.
+            </p>
+          )}
+
+          <p className="intro">
+            Fetch a PoC published for a CVE, read it, then decide. Nothing runs until you
+            approve it, and what you approve runs in the isolated container — not here.
+          </p>
+
+          <div className="key-row">
+            <input className="input" placeholder="https://github.com/owner/CVE-2024-1234"
+                   value={repoUrl} onChange={(e) => setRepoUrl(e.target.value)} />
+            <button className="btn btn--solid" onClick={stage}
+                    disabled={!repoUrl || !engagementId || busy}>Stage</button>
+          </div>
+          {error && <p className="ping-result ping-result--err">{error}</p>}
+
+          {items.length === 0 && <div className="empty">Nothing staged for this engagement.</div>}
+          {items.length > 0 && (
+            <table className="tbl poc-tbl">
+              <thead>
+                <tr><th>Repository</th><th>File</th><th>Inspection</th><th>Status</th></tr>
+              </thead>
+              <tbody>
+                {items.map((p) => (
+                  <tr key={p.id} className={open?.id === p.id ? 'on' : ''}
+                      onClick={() => openPoc(p.id)}>
+                    <td className="mono">{p.repo}</td>
+                    <td className="mono">{p.path}</td>
+                    <td><Verdict verdict={p.inspection?.verdict} /></td>
+                    <td><span className={'st poc-st--' + p.status}>{p.status}</span></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+
+      {open && (
+        <div className="card">
+          <div className="card__head">
+            <span className="card__title">{open.repo} / {open.path}</span>
+            <Verdict verdict={open.inspection?.verdict} />
+          </div>
+          <div className="card__body">
+            <p className="poc-summary">{open.inspection?.summary}</p>
+
+            {signals.length > 0 && (
+              <div className="poc-signals">
+                {signals.map((s, i) => (
+                  <div key={i} className={'poc-signal poc-signal--' + s.severity}>
+                    <span className="poc-signal__sev">{s.severity}</span>
+                    <span className="poc-signal__loc">{s.line_no ? `L${s.line_no}` : '—'}</span>
+                    <span className="poc-signal__detail">{s.detail}</span>
+                    <code className="poc-signal__line">{s.line}</code>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="poc-code-head">
+              Source — read this before approving
+            </div>
+            <pre className="poc-code">
+              {(open.code || '').split('\n').map((line, i) => (
+                <div key={i} className="poc-code__row">
+                  <span className="poc-code__n">{i + 1}</span>
+                  <span className="poc-code__t">{line}</span>
+                </div>
+              ))}
+            </pre>
+
+            <div className="form-actions">
+              {open.status === 'staged' && (
+                <>
+                  <button className="btn btn--solid" onClick={approve} disabled={busy}>
+                    Approve
+                  </button>
+                  <button className="btn btn--danger" onClick={reject} disabled={busy}>
+                    Reject
+                  </button>
+                </>
+              )}
+              {open.status === 'approved' && (
+                <>
+                  <button className="btn btn--solid" onClick={runPoc}
+                          disabled={busy || !egressLocked}>
+                    Run in sandbox
+                  </button>
+                  <button className="btn btn--danger" onClick={reject} disabled={busy}>
+                    Reject
+                  </button>
+                </>
+              )}
+              {open.status === 'rejected' && <span className="poc-note">Rejected — terminal.</span>}
+              {open.status === 'executed' && (
+                <span className="poc-note">Executed — re-running needs a fresh decision.</span>
+              )}
+              {open.decided_by && (
+                <span className="poc-note">decided by {open.decided_by}</span>
+              )}
+            </div>
+
+            {result && (
+              <div className="poc-result">
+                <div className="poc-code-head">
+                  Sandbox output — exit {result.exit_code ?? 'n/a'}
+                  {result.timed_out ? ' · timed out' : ''} · {result.duration_s}s
+                  · scope {(result.scope_hosts || []).join(', ')}
+                </div>
+                <pre className="poc-code">{result.stdout || '(no stdout)'}</pre>
+                {result.stderr && <pre className="poc-code poc-code--err">{result.stderr}</pre>}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </>
+  );
+}

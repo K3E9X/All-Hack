@@ -128,6 +128,32 @@ export const api = {
     }),
   },
 
+  poc: {
+    runnerHealth: () => request('/api/poc/runner/health'),
+    list: (engagementId) => request(`/api/poc/engagements/${engagementId}`),
+    get: (pocId) => request(`/api/poc/${pocId}`),
+    stage: (payload) => request('/api/poc/stage', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }),
+    approve: (pocId) => request(`/api/poc/${pocId}/approve`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ decided_by: 'operator' }),
+    }),
+    reject: (pocId) => request(`/api/poc/${pocId}/reject`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ decided_by: 'operator' }),
+    }),
+    run: (pocId, timeout = 60) => request(`/api/poc/${pocId}/run`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ timeout }),
+    }),
+  },
+
   network: {
     status: () => request('/api/network/status'),
     check: () => request('/api/network/check', { method: 'POST' }),

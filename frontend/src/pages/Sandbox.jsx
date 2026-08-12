@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api.js';
+import PocReview from '../components/PocReview.jsx';
 
 // PoC sandbox. The isolated, scope-enforced, read-only runner
 // (POST /api/sandbox/run) is wired in the sandbox milestone. The console here
@@ -34,6 +35,8 @@ export default function Sandbox() {
 
   return (
     <div className="page">
+      <PocReview engagementId={form.engagement_id} />
+
       <div className="card">
         <div className="card__head"><span className="card__title">PoC sandbox</span><span className="card__meta">isolated &middot; scope-enforced &middot; read-only</span></div>
         <div className="card__body">

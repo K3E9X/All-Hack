@@ -44,3 +44,52 @@
 .out-empty { color: var(--text-faint); font-family: var(--font-mono); font-size: 13px; padding: 60px 16px; text-align: center; }
 
 @media (max-width: 900px) { .sbx-layout { grid-template-columns: 1fr; } }
+
+/* ---- Public PoC review -------------------------------------------------- */
+/* The code is the largest element on purpose: the operator has to read it,
+   and a compact preview would invite approving on the verdict alone. */
+
+.poc-verdict { font-size: 11px; text-transform: uppercase; letter-spacing: .04em;
+  padding: 2px 6px; border-radius: var(--radius-sm); border: 1px solid; }
+.poc-verdict--hostile { color: var(--sev-critical); border-color: rgba(239,68,68,.5);
+  background: rgba(239,68,68,.08); }
+.poc-verdict--suspicious { color: var(--sev-medium); border-color: rgba(234,179,8,.45);
+  background: rgba(234,179,8,.06); }
+.poc-verdict--review { color: var(--text-secondary); border-color: var(--border); }
+
+.poc-tbl tr { cursor: pointer; }
+.poc-tbl tr.on { background: var(--hover); }
+.poc-st--staged { color: var(--text-secondary); }
+.poc-st--approved { color: var(--term-ok); }
+.poc-st--rejected { color: var(--sev-critical); }
+.poc-st--executed { color: var(--sev-low); }
+
+.poc-summary { font-size: 12px; color: var(--text-secondary); margin: 4px 0 10px; }
+
+.poc-signals { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
+.poc-signal { display: grid; grid-template-columns: 68px 44px 1fr; gap: 8px;
+  align-items: baseline; padding: 6px 8px; border-radius: var(--radius-sm);
+  border: 1px solid var(--border); background: var(--neutral-950); font-size: 12px; }
+.poc-signal--critical { border-color: rgba(239,68,68,.4); }
+.poc-signal--high { border-color: rgba(249,115,22,.35); }
+.poc-signal__sev { font-size: 10px; text-transform: uppercase; letter-spacing: .04em; }
+.poc-signal--critical .poc-signal__sev { color: var(--sev-critical); }
+.poc-signal--high .poc-signal__sev { color: var(--sev-high); }
+.poc-signal--medium .poc-signal__sev { color: var(--sev-medium); }
+.poc-signal__loc { font-family: var(--font-mono); color: var(--text-faint); }
+.poc-signal__detail { color: var(--text-primary); }
+.poc-signal__line { grid-column: 3; font-family: var(--font-mono); font-size: 11px;
+  color: var(--text-faint); overflow-x: auto; white-space: pre; display: block; }
+
+.poc-code-head { font-size: 11px; text-transform: uppercase; letter-spacing: .04em;
+  color: var(--text-secondary); margin: 10px 0 4px; }
+.poc-code { max-height: 460px; overflow: auto; background: var(--neutral-950);
+  border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 8px;
+  font-family: var(--font-mono); font-size: 12px; line-height: 1.5; }
+.poc-code--err { color: var(--term-vuln); margin-top: 6px; }
+.poc-code__row { display: flex; gap: 10px; }
+.poc-code__n { color: var(--text-faint); text-align: right; min-width: 32px;
+  user-select: none; }
+.poc-code__t { white-space: pre; }
+.poc-note { font-size: 12px; color: var(--text-secondary); align-self: center; }
+.poc-result { margin-top: 12px; }
