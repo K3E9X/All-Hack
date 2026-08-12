@@ -17,6 +17,14 @@ from app.scans.wrappers import available_wrappers
 
 router = APIRouter(tags=["dashboard"])
 
+
+def _positive_float(value: Any) -> float:
+    """Coerce an operator-supplied number, never raising. 0 means no limit."""
+    try:
+        return max(0.0, float(value))
+    except (TypeError, ValueError):
+        return 0.0
+
 # Map each real wrapper to a methodology phase for the SBOM grouping.
 _PHASE_BY_TOOL = {
     "subfinder": "Reconnaissance", "naabu": "Reconnaissance", "httpx": "Reconnaissance",
@@ -96,7 +104,11 @@ async def dashboard() -> Dict[str, Any]:
         budget_cfg = (await settings_store.get_public()).get("budget") or {}
     except Exception:  # noqa: BLE001 - the dashboard must never fail on settings
         budget_cfg = {}
-    monthly_limit = float(budget_cfg.get("monthly_usd") or 0)
+    # The settings API takes budget as a free-form dict, so this value is
+    # whatever a client sent. A non-numeric one used to raise here, outside the
+    # guard above, and 500 the whole dashboard. Negatives are clamped too: a
+    # limit below zero is always "exceeded", which would pin the alert on.
+    monthly_limit = _positive_float(budget_cfg.get("monthly_usd"))
 
     from app.config import settings as app_settings
     budget = {

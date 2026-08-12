@@ -131,3 +131,35 @@ def test_retry_does_not_duplicate_an_existing_option():
     advice = RetryAdvice("timeout", True, ["-timeout=30"], "slow")
     out = retry_options(["-timeout=30"], advice)
     assert out.count("-timeout=30") == 1
+
+
+# ---- Retry budget ----
+
+async def test_retries_are_capped_per_run():
+    """Retries are submitted from ingest, outside the loop's per-batch budget
+    check, so they need their own ceiling - otherwise a run full of empty jobs
+    could roughly double the request count against the target."""
+    from app.orchestrator.executor import MAX_RETRIES_PER_RUN, Executor
+    from app.orchestrator.state import EngagementState
+
+    ex = Executor(EngagementState("eng-1"))
+    assert ex.retries_launched == 0
+    ex.retries_launched = MAX_RETRIES_PER_RUN
+
+    class _Job:
+        tool, exit_code, findings, args = "nuclei", 1, [], []
+        id, target, catalog_item_id, stderr, stdout = "j", "t", None, b"", b""
+
+    called = []
+
+    async def _boom(*a, **k):
+        called.append(1)
+        raise AssertionError("advisor must not run once the cap is hit")
+
+    import app.scans.retry_advisor as ra
+    original, ra.advise = ra.advise, _boom
+    try:
+        await ex._triage_underperforming(_Job())
+    finally:
+        ra.advise = original
+    assert not called

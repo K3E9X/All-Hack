@@ -35,11 +35,18 @@ def _tail(blob: bytes) -> str:
 logger = logging.getLogger("syphax.orchestrator.executor")
 
 
+# Retries are submitted from ingest, which is outside the loop's per-batch
+# budget check, so they need their own ceiling. Without one a run with many
+# empty jobs could roughly double its request count against the target.
+MAX_RETRIES_PER_RUN = 10
+
+
 class Executor:
     def __init__(self, state: EngagementState) -> None:
         self.state = state
         self.runner = get_runner()
         self._eng = None
+        self.retries_launched = 0
 
     async def _engagement(self):
         """The engagement (cached) - used for scope checks at ingest time."""
@@ -117,6 +124,8 @@ class Executor:
                                              should_triage)
 
         try:
+            if self.retries_launched >= MAX_RETRIES_PER_RUN:
+                return
             if not should_triage(job.tool, job.exit_code, len(job.findings), job.args):
                 return
 
@@ -140,6 +149,7 @@ class Executor:
                 return
 
             new_options = retry_options(job.args, advice)
+            self.retries_launched += 1
             retried = await self.runner.submit(
                 tool=job.tool,
                 target=job.target,

@@ -115,8 +115,8 @@ export default function Home() {
       {budget?.over && (
         <div className="card budget-alert">
           <div className="card__body">
-            <strong>LLM budget exceeded</strong> — ${budget.month_spend_usd.toFixed(2)} spent
-            this month against a ${budget.monthly_limit_usd.toFixed(2)} limit ({budget.pct}%).
+            <strong>LLM budget exceeded</strong> — ${(budget.month_spend_usd || 0).toFixed(2)} spent
+            this month against a ${(budget.monthly_limit_usd || 0).toFixed(2)} limit ({budget.pct || 0}%).
             Raise or clear the limit in Settings.
           </div>
         </div>
@@ -124,7 +124,7 @@ export default function Home() {
       {budget && !budget.priced && (usage.total_tokens > 0) && (
         <div className="card budget-alert budget-alert--warn">
           <div className="card__body">
-            <strong>Spend is not being measured</strong> — {(usage.total_tokens / 1e6).toFixed(2)}M
+            <strong>Spend is not being measured</strong> — {((usage.total_tokens || 0) / 1e6).toFixed(2)}M
             tokens used but LLM_PRICING is unset, so every model is costed at $0.
             Set it in .env to get a real figure.
           </div>
