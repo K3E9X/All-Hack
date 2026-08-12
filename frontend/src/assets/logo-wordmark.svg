@@ -3,6 +3,6 @@
   <rect x="1" y="1" width="46" height="46" rx="11" fill="none" stroke="#22d3ee" stroke-opacity="0.35" stroke-width="1.2"></rect>
   <polyline points="15 16 24 24 15 32" fill="none" stroke="#22d3ee" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></polyline>
   <rect x="27" y="29.4" width="10" height="3.6" rx="1.8" fill="#22d3ee"></rect>
-  <text x="62" y="31" font-family="'JetBrains Mono', ui-monospace, monospace" font-size="21" font-weight="700" fill="#e5e5e5" letter-spacing="-0.2">Syphax</text>
+  <text x="62" y="31" font-family="'JetBrains Mono', ui-monospace, monospace" font-size="21" font-weight="700" fill="#e5e5e5" letter-spacing="-0.2">syphax</text>
   <rect x="186" y="17" width="11" height="15" rx="1.5" fill="#22d3ee" fill-opacity="0.85"></rect>
 </svg>

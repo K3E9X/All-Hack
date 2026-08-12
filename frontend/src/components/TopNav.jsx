@@ -36,7 +36,7 @@ export default function TopNav() {
     <nav className="topnav">
       <NavLink to="/" className="topnav__brand" aria-label="Syphax home">
         <img className="topnav__mark" src={logoMark} alt="" width="22" height="22" />
-        <span className="topnav__wm">Syphax</span>
+        <span className="topnav__wm">syphax</span>
       </NavLink>
       <div className="topnav__links">
         {LINKS.map((l) => {
