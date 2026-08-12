@@ -2,366 +2,165 @@
 
 [![CI](https://github.com/K3E9X/Syphax/actions/workflows/ci.yml/badge.svg)](https://github.com/K3E9X/Syphax/actions/workflows/ci.yml)
 
-An autonomous web-application penetration tester you self-host. You authorize
-a target, the agent walks an OWASP-WSTG x MITRE-ATT&CK methodology end to end
-(recon -> mapping -> vulnerability analysis -> exploitation), every finding is
-confirmed with a **safe** proof-of-exploit, findings are linked into
-kill-chains, you watch it live, and you ship a client report.
+An autonomous web-application penetration tester you self-host. You authorize a
+target, the agent walks an OWASP-WSTG × MITRE-ATT&CK methodology end to end,
+every finding is confirmed with a **safe** proof-of-exploit, findings are linked
+into kill-chains, and you ship a client report.
 
-It orchestrates mature CLI tools (nuclei, sqlmap, ffuf, dalfox, nmap, ...) -
-it does not reinvent scanners - and uses an LLM to plan, reorder and explain.
-Models are per-role and swappable: by default **Z.ai (GLM)** for the
-planner/executor/validator, with **Moonshot (Kimi)** as a drop-in alternative
-and **OpenRouter** as an optional free fallback. The whole loop also runs
-**with no LLM** at all: the methodology engine is deterministic; the model
-only adds judgement on top.
+It orchestrates mature CLI tools — nuclei, sqlmap, ffuf, dalfox, nmap and a
+dozen more — rather than reinventing scanners, and uses an LLM to plan, reorder
+and judge. **The whole loop also runs with no LLM at all**: the methodology
+engine is deterministic; the model only adds judgement on top.
 
 > For authorized testing only. Use it on systems you own or have written
 > permission to test.
 
+---
+
 ## Quick start
 
-Requirements: Docker with the Compose plugin. Supported hosts:
+**Requirements:** Docker with the Compose plugin. Nothing else — no Python, no
+Node, no tools to install on the host.
 
-- **Linux** (Ubuntu/Debian): `docker-ce` + `docker-compose-plugin`.
-- **macOS** (Intel or Apple Silicon): Docker Desktop or OrbStack.
-- **Windows**: via **WSL2** - see below.
+| Host | Notes |
+| --- | --- |
+| Linux | `docker-ce` + `docker-compose-plugin` |
+| macOS (Intel or Apple Silicon) | Docker Desktop or OrbStack |
+| Windows | Inside **WSL2** — clone into the WSL filesystem, not `/mnt/c` |
 
-Images are multi-arch (`linux/amd64` and `linux/arm64`). Every Python pin
-publishes an aarch64 wheel, so Apple Silicon installs without a compiler, and
-the nightly builds both architectures to keep it that way.
+Images are multi-arch (`amd64` + `arm64`); every Python pin ships an aarch64
+wheel, so Apple Silicon needs no compiler.
 
-### Platform notes
+```bash
+git clone https://github.com/K3E9X/Syphax && cd Syphax
 
-Everything runs in containers, so the tool behaves the same everywhere. Three
-things do differ, and all three are about talking to the host's network stack:
-
-| | Linux | macOS (Docker Desktop / OrbStack) | Windows (WSL2) |
-| --- | --- | --- | --- |
-| Scans, proxy mode, sandbox runner | yes | yes | yes |
-| VPN from the UI (`wg-quick` in the container) | yes | usually — userspace WireGuard via `/dev/net/tun` | usually — same |
-| VPN on the host instead | yes | yes | yes |
-
-The container ships `wireguard-tools` and `openvpn` and is given
-`/dev/net/tun`, which is what the userspace implementation needs when the host
-does not expose the kernel module — the normal situation on Docker Desktop. If
-`POST /api/network/vpn/connect` fails on your machine, bring the tunnel up on
-the host instead and leave the tool in `off` mode: the kill switch compares
-exit IPs, so it protects the scan whoever owns the tunnel.
-
-#### ProtonVPN
-
-A paid or free Proton account both work — you need a **WireGuard** config, not
-the desktop app:
-
-1. account.protonvpn.com -> **Downloads** -> **WireGuard configuration**
-2. Name the key, pick a server, download the `.conf`
-3. `mkdir -p data/vpn` and drop it there — `./data` is already bind-mounted
-   into the backend as `/data`, and is gitignored so the key never gets committed
-4. `.env`: `VPN_CONFIG_PATH=/data/vpn/<file>.conf`, then Connect from the Home
-   card — or set `REQUIRE_VPN=true` first so no scan can start without it
-
-Two things in a stock Proton config break inside a container, and the tool
-rewrites a corrected copy rather than making you hand-edit the provider's file:
-
-- `DNS = 10.2.0.1` would replace Docker's resolver, and the backend would stop
-  resolving `postgres` — an outage that looks like a database problem, not a VPN
-  one. The line is dropped; traffic still exits through the tunnel.
-- The filename becomes the interface name, and `ch-fr-01.protonvpn.udp` is over
-  the kernel's 15-character limit and contains dots. wg-quick rejects it with
-  "invalid interface name", which reads like a malformed config. The copy is
-  named `wg0.conf`.
-
-Your original file is never modified. After connecting, hit **Check IP** — the
-two IPs on the card must differ, and the Proton exit should show a Proton
-netblock. `NAT-PMP (port forwarding)` and `NetShield` do not matter here;
-NetShield's DNS filtering is irrelevant once the DNS line is dropped.
-
-`wipe.sh` is a bash script. On Windows run it from the WSL shell, like the rest.
-
-Shell scripts are pinned to LF by `.gitattributes`. If you clone with Git for
-Windows and `core.autocrlf=true`, a CRLF shebang would make Docker report
-`exec /usr/local/bin/entrypoint.sh: no such file or directory` for a file that
-plainly exists.
-
-### Windows (WSL2)
-
-The tool is Linux/Docker only, so on Windows run it inside WSL2:
-
-1. Install WSL2 with a distro: `wsl --install` (PowerShell, admin), reboot.
-2. Either install Docker Desktop and enable **Settings -> Resources -> WSL
-   integration** for your distro, or install `docker-ce` directly inside the
-   WSL distro.
-3. Open the WSL shell (Ubuntu), `git clone` the repo **inside** the WSL
-   filesystem (e.g. `~/syphax`, not `/mnt/c/...` - native FS is much faster),
-   then run `./install.sh` / `./start.sh` exactly as on Linux.
-4. Browse to http://localhost:3000 from Windows - WSL2 forwards localhost.
-
-```
-./install.sh          # checks Docker, seeds .env, runs `docker compose build`
-# edit .env -> set your Z.ai (GLM) or Kimi API key(s); optional, loop runs without
-./start.sh            # docker compose up -d   (also: stop | restart | --logs)
+cp .env.example .env       # then edit it — see below
+./install.sh               # checks Docker, then `docker compose build`
+./start.sh                 # `docker compose up -d`  (also: stop | restart | --logs)
 ```
 
-`install.sh` is just a guarded wrapper around `docker compose build`; `start.sh`
-around `docker compose up`. You can run those directly if you prefer.
+`install.sh` and `start.sh` are thin guarded wrappers; `docker compose build`
+and `docker compose up -d` work just as well.
 
-| Service    | URL                          |
-| ---------- | ---------------------------- |
-| UI         | http://localhost:3000        |
-| API        | http://localhost:8000        |
-| API docs   | http://localhost:8000/docs   |
-| MITM proxy | http://localhost:8080        |
+| Service | URL |
+| --- | --- |
+| UI | http://localhost:3000 |
+| API | http://localhost:8000 |
+| API docs | http://localhost:8000/docs |
+| MITM proxy | http://localhost:8080 |
 
-The operator console (dark "terminal" theme) has eleven screens: Home (status +
-toolchain SBOM), Engagements (with a per-area test radar), Live view (consoles,
-assets, coverage, jobs, findings, kill-chains), Scans, Findings (deduped,
-cross-engagement, triage + HackerOne export), Surface (hosts/ports/endpoints),
-Methodology (WSTG x ATT&CK coverage matrix), Sandbox (safe in-scope PoC replay),
-Proxy, Reports (md/pdf/json/sarif), and Settings (model router + masked keys,
-persisted server-side with keys encrypted at rest).
+### What to put in `.env`
 
-## Run an engagement
+It runs with the file untouched. Three things are worth setting:
 
-1. **Engagements** -> enter a target you own, tick the authorization box,
-   create. Attestation authorizes it immediately; the scope list bounds what
-   gets touched.
-2. Open its **live view** -> **Run**. Watch recon -> mapping -> vuln ->
-   exploitation -> validation stream in the agent console; if you enabled
-   "require approval before exploitation", approve the checkpoint.
-3. Download the **report** (`.md` or printable HTML) once findings are
-   validated and chains are built.
+```bash
+# 1. LLM — optional. Without a key the deterministic engine still runs.
+#    The default splits the roles: reasoning where the decisions are made,
+#    speed where the volume is.
+PLANNER_BASE_URL=https://api.moonshot.ai/v1     # Kimi K3
+PLANNER_API_KEY=sk-...
+EXECUTOR_BASE_URL=https://api.z.ai/api/paas/v4  # GLM 5.2
+EXECUTOR_API_KEY=...
+VALIDATOR_BASE_URL=https://api.z.ai/api/paas/v4
+VALIDATOR_API_KEY=...
 
-You can also drive tools manually: browse the target through the MITM proxy
-(install its CA from the Proxy page), inspect captured requests, and launch
-individual scans from the Scans page.
+# 2. Cost. WITHOUT THIS the dashboard shows real tokens against $0.00 spend,
+#    because a model that is not listed is costed at zero.
+LLM_PRICING=kimi-k3=3.0/15.0,glm-5.2=1.4/4.4
 
-### Authenticated, traffic-driven testing
+# 3. Where your traffic exits. Empty = your own IP.
+REQUIRE_VPN=false          # true refuses to scan unless the exit IP changed
+SCAN_PROXY=                # socks5://127.0.0.1:9050 for Tor — no privileges
+VPN_CONFIG_PATH=           # /data/vpn/wg0.conf for WireGuard/OpenVPN
+```
 
-For real coverage, run it authenticated:
+Leave every LLM key blank and it falls back to OpenRouter's free models.
 
-- **Authenticated scan** - paste the primary identity's headers (Cookie /
-  Authorization) in the engagement form. They're injected into every scanner
-  (nuclei/sqlmap/ffuf/dalfox/katana/...) so it tests *behind the login*.
-- **Real surface from the proxy** - browse the app through the MITM proxy
-  while logged in; the autonomous run seeds those captured (parameterized)
-  requests as scan targets, so sqlmap/dalfox/nuclei-dast hit the endpoints
-  you actually exercised.
-- **Grey-box IDOR/BOLA/BFLA** - add a *second* (low-privilege) identity's
-  headers; the analysis replays captured requests as the other user to prove
-  broken object-level authorization and privilege escalation (BFLA).
-- **Out-of-band (blind) confirmation** - nuclei confirms blind SSRF/XXE/RCE
-  via interactsh. By default it uses ProjectDiscovery's free public servers
-  (no infra); set `INTERACTSH_SERVER` in `.env` to self-host.
+### First engagement
 
-The **deep analysis** pass (autorun in the validation phase, or on demand via
-*Deep analysis* on the live view) mines everything captured through the proxy:
+1. **Engagements** → enter the target, tick the authorization attestation,
+   create. Scope is enforced on every request; out-of-scope hosts are refused
+   and audited.
+2. **Live** → *Run*. Recon, mapping, vulnerability analysis and exploitation
+   advance one phase at a time, streamed to the console as they happen.
+3. **Findings** / **Reports** → confirmed findings, kill-chains, and an export
+   (Markdown, PDF, JSON, SARIF).
 
-- **Secret & endpoint mining** - scans every captured text response (JS
-  bundles, HTML, JSON, source maps) for secrets (cloud keys, tokens, private
-  keys, JWTs) and pulls hidden API endpoints out of client code; discovered
-  endpoints are seeded as new scan targets.
-- **JWT analysis** - flags `alg=none`, cracks weak/known HMAC secrets offline,
-  spots `kid`/`jku` injection surface, missing `exp`, and authz claims.
-- **Access control in depth** - replays authenticated GETs anonymously to find
-  missing-auth/broken-access-control, and flags method-tampering and
-  mass-assignment candidates for manual review (writes are never executed).
+Exploitation is gated twice: `allow_active_exploit` on the engagement, and an
+approval checkpoint in the live view.
 
-Findings are partitioned into homogeneous categories (recon, enumeration,
-access control, injection, auth & secrets, server & config) in both the live
-view and the report.
+Day-to-day usage, authenticated testing, proof of impact, VPN setup (ProtonVPN
+included) and wiping state: **[docs/OPERATING.md](docs/OPERATING.md)**.
 
-### Proof of impact (opt-in)
+---
 
-Detection isn't proof. With **"Prove impact"** enabled on the engagement, after
-a tool *confirms* an injection the agent demonstrates real impact by running a
-**benign, read-only** command through it:
+## Architecture
 
-- **RCE / command injection** - re-runs commix with `--os-cmd` executing a
-  read-only post-exploitation enumeration in one shot (privilege context,
-  host/container detection, listening services & routes, scheduled tasks, SUID
-  binaries, users). The output proves execution and maps the blast radius. It
-  also **detects (never exploits) local privilege-escalation vectors** -
-  passwordless `sudo` and GTFOBins-known SUID binaries - which feed an
-  RCE → root kill-chain.
-- **SQLi** - re-runs sqlmap in read-only context mode (`--current-user`,
-  `--is-dba`, `--banner`, ...); OS command execution through the DB is a
-  separate sub-opt-in.
-- **Data-breach proof** (separate sub-opt-in) - retrieves a small, **bounded
-  sample (≤3 rows)** of likely-sensitive tables via a confirmed SQLi to prove a
-  real data exposure - far from a mass exfiltration.
+```
+      Frontend (React, nginx)                    :3000
+              │  REST + WebSocket
+      API (FastAPI)                              :8000
+       │        │              │
+  Engagements  Orchestrator   Proxy capture      :8080
+  + authz gate  (the brain)   (mitmproxy → Postgres)
+                    │
+      Planner ──> Executor ──> Validator
+      (catalog)   (arq worker)  (safe-PoC)
+                    │
+      Postgres  +  Redis (arq queue)
+                    │
+      Tool arsenal (worker image)
 
-It is **double-gated** (the opt-in flag *and* the exploitation approval
-checkpoint), in-scope only, and strictly non-destructive: no writes, deletes,
-persistence or lateral movement. The exact command and its raw output are
-visible in the Jobs tab.
+      sandbox-runner  ── isolated network, no secrets, pinned egress
+```
 
-- **Known-CVE exploitation** - from the fingerprinted stack (WordPress,
-  Atlassian, GitLab, Jenkins, Tomcat, Struts, ...) the agent runs the matching
-  nuclei CVE templates (vetted public PoCs, out-of-band confirmed). Gated by the
-  same `allow_active_exploit` opt-in.
-- **Targeted CVE checks** - a curated set of high-value, actively-exploited CVEs
-  (Apache 2.4.49/50 path traversal, Citrix, F5 BIG-IP, Pulse Secure, FortiOS file
-  read) confirmed with a single read-only in-scope GET and a high-confidence file
-  signature - near-zero false positives, no OOB infra. On a hit the CVE is
-  reported with a redacted proof snippet.
-- **Public-exploit aggregation (all sources)** - for every detected CVE the
-  agent gathers the public PoCs that exist across sources - Exploit-DB (offline
-  via `searchsploit`), Metasploit, GitHub, NVD, Vulners, Packet Storm - and
-  shows them per finding with a runnable tier: `auto` (vetted, run in-scope:
-  nuclei / Metasploit check), `sandbox` (raw scripts fetched and staged for an
-  approved run in the isolated sandbox), `reference` (links). Raw public code is
-  never auto-run - it is reviewed/run only via the approved sandbox.
+Five app containers — `backend`, `worker`, `orchestrator`, `frontend`,
+`sandbox-runner` — plus Postgres and Redis. The orchestrator has its own queue
+so a long autonomous run never starves the scan worker.
 
-Confirmed findings are then linked into **kill-chains** automatically:
-leaked-secret → server compromise, broken-access-control → bulk data exposure,
-weak-JWT → account takeover, SSRF → cloud credential theft, subdomain takeover
-→ session theft, GraphQL introspection → authorization abuse (plus an optional
-LLM pass for additional chains).
+`sandbox-runner` sits on a separate Docker network with no route to Postgres,
+Redis or the backend's secrets. It is where untrusted third-party PoCs run,
+after a human has read them.
 
 ## How it works
 
-```
-            Frontend (React, nginx)
-                   |  REST + WebSocket
-            API (FastAPI)
-         /         |          \
- Engagements   Orchestrator   Proxy capture
- + authz gate   (the brain)    (mitmproxy -> Postgres)
-                   |
-        Planner -> Executor -> Validator
-        (methodology   (arq worker     (safe-PoC
-         catalog)       runs tools)     confirmation)
-                   |
-        Postgres  +  Redis (arq queue)
-                   |
-        Tool arsenal (in the worker image)
-```
-
-- **Authorization gate** — every scan is tied to an authorized engagement
-  whose scope allow-list covers the host; out-of-scope requests are refused
-  and audited. Attestation is enough for your own domains; DNS-TXT /
-  `.well-known` ownership proof is available as a fallback.
+- **Authorization gate** — every scan is tied to an authorized engagement whose
+  scope covers the host. Enforced in `Runner.submit()`, the single chokepoint
+  every caller passes through, so the autonomous and manual paths are covered
+  by the same check.
 - **Methodology engine** — a declarative catalog maps each OWASP WSTG test to
-  its MITRE ATT&CK technique(s) and the tool that runs it, gated by what's
-  been discovered (`GET /api/methodology/catalog`).
+  its MITRE ATT&CK technique and the tool that runs it, gated by what has been
+  discovered so far.
 - **Agent loop** — the planner builds the next batch from the catalog filtered
-  by live state (assets, fingerprints, coverage), advancing one phase at a
-  time; the executor runs each task through the queue and folds results back
-  into state, expanding the surface as it learns. An LLM optionally reorders
-  the batch (never invents tasks).
-- **Validation** — sqlmap/commix/dalfox are tool-confirmed; exposed resources
-  (`.git`/`.env`/...) and reflected XSS are re-checked with a single in-scope,
-  read-only request and a benign marker. Status is confirmed / likely /
-  unconfirmed / false_positive with a tracked FP rate. No destructive payloads.
-- **Kill-chains** — confirmed/likely findings are linked into multi-step attack
-  paths (deterministic rules + optional LLM).
+  by live state; the executor runs each task through the queue and folds the
+  results back in, expanding the surface as it learns. The LLM may reorder a
+  batch and propose targeted hunts — it never invents a target.
+- **Correlation** — when vulnerability analysis starts, the planner gets the
+  whole picture at once (assets, fingerprints, WAF, findings so far, captured
+  traffic) and joins signals no single tool sees together.
+- **Validation** — tool-confirmed where possible, otherwise re-checked with one
+  in-scope read-only request and a benign marker. An LLM judge kills false
+  positives and proposes a replayable proof. Status is confirmed / likely /
+  unconfirmed / false_positive.
+- **Kill-chains** — confirmed findings are linked into multi-step attack paths.
 - **Live view** — the loop emits typed events to Postgres; a WebSocket tails
-  them so the operator console, phase timeline and findings update in real time.
+  them, so the console, phase timeline and findings update in real time.
 
-## Tools (bundled in the worker image)
-
-Recon: `nmap`, `naabu`, `subfinder`, `dnsx`, `httpx`, `katana`, `gau`.
-Fingerprint / WAF: `whatweb`, `httpx`, `wafw00f`.
-Content discovery: `ffuf`.
-Vuln / CMS / server: `nuclei`, `nikto`, `wpscan`.
-Injection: `sqlmap` (SQLi), `commix` (command).
-XSS: `dalfox`. TLS: `testssl.sh`. Capture: `mitmproxy`.
-
-`GET /api/scans/tools` reports each tool's category and whether its binary is
-present. WordPress CVE correlation needs `WPSCAN_API_TOKEN` (free, optional).
-
-## Configuration (`.env`)
-
-| Variable                       | Purpose                                            |
-| ------------------------------ | -------------------------------------------------- |
-| `PLANNER/EXECUTOR/VALIDATOR_BASE_URL` `_API_KEY` `_MODEL` | Per-role LLM. Default `.env` puts the **planner on Kimi K3** (`https://api.moonshot.ai/v1`, `kimi-k3`) and the **executor + validator on Z.ai GLM** (`glm-5.2`); set the keys to activate. |
-| `LLM_PRICING`                  | `model=IN/OUT` USD per 1M tokens. **Without it the dashboard shows real token counts against $0.00 spend** — every unlisted model costs 0. |
-| `USER_AGENT_MODE`              | `rotate` (default) impersonates a different real browser per job, headers included. `fixed` pins `USER_AGENT`. |
-| `REQUIRE_VPN` / `SCAN_PROXY` / `VPN_CONFIG_PATH` | Route scan traffic through a proxy or tunnel, and refuse to scan when the exit IP still matches your real one. |
-| `RESET_ON_START`               | Wipe scan artefacts on every boot (default `true`). See **Full wipe** below for what it does *not* cover. |
-| `OPENROUTER_API_KEY` / `_MODEL` / `_FALLBACK_MODELS` | **Optional** free fallback aggregator, used only for roles whose own key is blank. |
-| `POSTGRES_*`                   | Database credentials (defaults work out of the box). |
-| `WPSCAN_API_TOKEN`             | Optional WordPress CVE lookups.                    |
-
-Set a Z.ai (or Kimi) key on each role for the real thing; leave keys blank and
-it falls back to OpenRouter's free models, so the stack works with a single key
-or none.
-
-### Full wipe
-
-`RESET_ON_START=true` clears scan artefacts (jobs, findings, flows, events,
-runs, LLM usage) and the queued jobs in Redis every time the backend starts.
-Engagement scope and the audit log survive on purpose — one is what makes a
-scan legal, the other is the record of what ran.
-
-Three things live outside that and explain why a "from scratch" restart can
-still feel like it remembers:
-
-| What | Survives `down` | Survives `down -v` |
-| ---- | --------------- | ------------------ |
-| `postgres-data` (named volume) | yes | no |
-| `redis-data` (named volume)    | yes | no |
-| `./data` (**bind mount**: mitmproxy CA, settings key) | yes | **yes** |
-
-The bind mount is the surprising one. To remove everything:
-
-```bash
-./wipe.sh              # asks first
-./wipe.sh --yes        # no prompt
-./wipe.sh --keep-ca    # keep the mitmproxy CA so clients stay trusted
-```
-
-Dropping the CA means every client you configured must trust the new one, and
-stored provider API keys become undecryptable — `--keep-ca` avoids both.
-
-## Layout
-
-```
-backend/         FastAPI app + arq worker (one image, two roles)
-  app/
-    api/         REST + WebSocket routers
-    engagements/ authorization gate + scope
-    methodology/ WSTG x ATT&CK test catalog
-    orchestrator/ planner, executor, run loop, state, approvals
-    scans/       wrappers + queue runner + job storage
-    validation/  safe-PoC validators + kill-chaining
-    reporting/   client report (Markdown / HTML)
-    proxy/       mitmproxy addon + flow storage
-    events.py    live event stream
-    db.py        Postgres pool
-  Dockerfile     multi-arch, bundles all CLI tools
-frontend/        React + plain CSS, served by nginx
-docker-compose.yml   postgres, redis, backend, worker, frontend
-install.sh / start.sh
-```
+Nothing a model produces reaches a target unfiltered: proposals are matched
+against assets that already exist, tool flags against per-tool allowlists, and
+proofs against a read-only policy.
 
 ## Tests
 
-Backend unit tests cover the pure logic (authorization/scope gate, finding
-classification, the JS/JWT/CORS/IDOR analyzers, the category taxonomy) without
-touching Postgres/Redis:
-
-```
-cd backend
-pip install -r requirements-dev.txt
-pytest
+```bash
+cd backend && pytest -q          # no network, no database needed
+cd frontend && npm run build
 ```
 
-CI (GitHub Actions, `.github/workflows/ci.yml`) resolves the full production
-requirements (catching dependency conflicts), installs a minimal test set,
-byte-compiles, runs `pytest`, and builds the frontend on every push and pull
-request - so a dependency conflict or a broken build is caught before it ships.
-
-## Architecture notes
-
-- Single Postgres holds everything (engagements, jobs, findings, proxy flows,
-  events, audit log); Redis is the arq job queue.
-- The backend never spawns tools; it enqueues and a separate **worker**
-  container runs them. The autonomous run is itself a long-lived worker task
-  that launches scan sub-tasks concurrently.
-- The MITM addon writes flows via sync psycopg; everything else uses asyncpg.
+CI runs on every push. A nightly additionally builds every image for `amd64`
+and `arm64`, re-runs the suite against the latest dependency releases, and
+checks that each test module still imports with only the CI dependency set.
 
 ## License
 
-MIT
+MIT.
