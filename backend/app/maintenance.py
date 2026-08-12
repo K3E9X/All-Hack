@@ -66,3 +66,31 @@ async def reset_transient_data() -> List[str]:
 
     logger.info("fresh start: cleared %d tables (%s)", len(cleared), ", ".join(cleared))
     return cleared
+
+
+async def reset_job_queue() -> int:
+    """Drop queued/deferred arq jobs.
+
+    Redis runs with appendonly on and its own named volume, so the queue
+    outlives the containers. Without this, a restart resurrects jobs whose rows
+    reset_transient_data() just deleted: the worker picks them up, fails to find
+    the job record, and the run looks haunted. Returns the number of keys removed.
+    """
+    try:
+        from arq.connections import RedisSettings, create_pool
+
+        redis = await create_pool(RedisSettings.from_dsn(settings.redis_url))
+        try:
+            keys = []
+            # arq namespaces everything it owns under these prefixes.
+            for pattern in ("arq:queue*", "arq:job:*", "arq:result:*", "arq:in-progress:*"):
+                keys.extend(await redis.keys(pattern))
+            if keys:
+                await redis.delete(*keys)
+            logger.info("fresh start: dropped %d queued job keys", len(keys))
+            return len(keys)
+        finally:
+            await redis.aclose()
+    except Exception as exc:  # noqa: BLE001 - never block boot on the queue
+        logger.warning("could not clear the job queue: %s", exc)
+        return 0

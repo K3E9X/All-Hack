@@ -51,8 +51,11 @@ async def lifespan(app: FastAPI):  # noqa: ARG001
     # Fresh start: drop the previous run's scan artefacts before anything else
     # reads them. Runs after init_db so the tables are guaranteed to exist.
     if settings.reset_on_start:
-        from app.maintenance import reset_transient_data
+        from app.maintenance import reset_job_queue, reset_transient_data
         await reset_transient_data()
+        # Redis outlives the containers too; a queued job whose row we just
+        # deleted would otherwise be picked up by the worker after the restart.
+        await reset_job_queue()
     from app import settings_store
     await settings_store.apply_saved_on_startup()
     # Record the real exit IP now, while nothing is tunnelled, so the kill

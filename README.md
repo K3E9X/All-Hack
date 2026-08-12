@@ -220,7 +220,11 @@ present. WordPress CVE correlation needs `WPSCAN_API_TOKEN` (free, optional).
 
 | Variable                       | Purpose                                            |
 | ------------------------------ | -------------------------------------------------- |
-| `PLANNER/EXECUTOR/VALIDATOR_BASE_URL` `_API_KEY` `_MODEL` | Per-role LLM. Default `.env` points all three at **Z.ai GLM** (`glm-4.6`); set the key to activate. Swap to **Kimi** (`https://api.moonshot.cn/v1`, `kimi-k2-0905-preview`) per role. |
+| `PLANNER/EXECUTOR/VALIDATOR_BASE_URL` `_API_KEY` `_MODEL` | Per-role LLM. Default `.env` puts the **planner on Kimi K3** (`https://api.moonshot.ai/v1`, `kimi-k3`) and the **executor + validator on Z.ai GLM** (`glm-5.2`); set the keys to activate. |
+| `LLM_PRICING`                  | `model=IN/OUT` USD per 1M tokens. **Without it the dashboard shows real token counts against $0.00 spend** — every unlisted model costs 0. |
+| `USER_AGENT_MODE`              | `rotate` (default) impersonates a different real browser per job, headers included. `fixed` pins `USER_AGENT`. |
+| `REQUIRE_VPN` / `SCAN_PROXY` / `VPN_CONFIG_PATH` | Route scan traffic through a proxy or tunnel, and refuse to scan when the exit IP still matches your real one. |
+| `RESET_ON_START`               | Wipe scan artefacts on every boot (default `true`). See **Full wipe** below for what it does *not* cover. |
 | `OPENROUTER_API_KEY` / `_MODEL` / `_FALLBACK_MODELS` | **Optional** free fallback aggregator, used only for roles whose own key is blank. |
 | `POSTGRES_*`                   | Database credentials (defaults work out of the box). |
 | `WPSCAN_API_TOKEN`             | Optional WordPress CVE lookups.                    |
@@ -228,6 +232,33 @@ present. WordPress CVE correlation needs `WPSCAN_API_TOKEN` (free, optional).
 Set a Z.ai (or Kimi) key on each role for the real thing; leave keys blank and
 it falls back to OpenRouter's free models, so the stack works with a single key
 or none.
+
+### Full wipe
+
+`RESET_ON_START=true` clears scan artefacts (jobs, findings, flows, events,
+runs, LLM usage) and the queued jobs in Redis every time the backend starts.
+Engagement scope and the audit log survive on purpose — one is what makes a
+scan legal, the other is the record of what ran.
+
+Three things live outside that and explain why a "from scratch" restart can
+still feel like it remembers:
+
+| What | Survives `down` | Survives `down -v` |
+| ---- | --------------- | ------------------ |
+| `postgres-data` (named volume) | yes | no |
+| `redis-data` (named volume)    | yes | no |
+| `./data` (**bind mount**: mitmproxy CA, settings key) | yes | **yes** |
+
+The bind mount is the surprising one. To remove everything:
+
+```bash
+./wipe.sh              # asks first
+./wipe.sh --yes        # no prompt
+./wipe.sh --keep-ca    # keep the mitmproxy CA so clients stay trusted
+```
+
+Dropping the CA means every client you configured must trust the new one, and
+stored provider API keys become undecryptable — `--keep-ca` avoids both.
 
 ## Layout
 

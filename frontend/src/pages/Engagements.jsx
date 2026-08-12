@@ -197,7 +197,21 @@ export default function Engagements() {
                 <dt>Authorized via</dt><dd>{selected.verification_method || '-'}</dd>
                 <dt>Phase</dt><dd>{selected.phase || '-'}</dd>
                 <dt>Progress</dt><dd><div className="eng-progress"><div className="eng-progress__bar"><div className="eng-progress__fill" style={{ width: (selected.progress || 0) + '%' }}></div></div><span className="eng-progress__n">{selected.progress || 0}%</span></div></dd>
-                <dt>Findings</dt><dd><SevMini sev={sevOf(selected)} /></dd>
+                <dt>Findings</dt>
+                <dd>
+                  <SevMini sev={sevOf(selected)} />
+                  {selected.pending_findings > 0 && (
+                    <span className="eng-pending"> +{selected.pending_findings} awaiting review</span>
+                  )}
+                </dd>
+                <dt>LLM cost</dt>
+                <dd className="mono">
+                  ${((selected.llm_usage || {}).cost_usd || 0).toFixed(2)}
+                  <span className="eng-usage-sub">
+                    {' '}&middot; {(((selected.llm_usage || {}).total_tokens || 0) / 1000).toFixed(0)}k tokens
+                    {' '}&middot; {(selected.llm_usage || {}).calls || 0} calls
+                  </span>
+                </dd>
               </dl>
               <div className="radar-wrap">
                 <Radar values={radarOf(selected)} />

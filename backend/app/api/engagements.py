@@ -121,7 +121,10 @@ async def _engagement_summary(engagement_id: str) -> dict:
     from app.validation import ValidatedFindingRepository
 
     out = {"progress": 0, "phase": None,
+           # confirmed only, same definition as /api/dashboard
            "severity_counts": {"critical": 0, "high": 0, "medium": 0, "low": 0},
+           # likely + unconfirmed: real work awaiting a human, not yet a finding
+           "pending_findings": 0,
            "radar": [0, 0, 0, 0, 0, 0],
            # What this engagement cost in LLM calls. Already available inside
            # the live view; surfaced on the list so engagements are comparable.
@@ -139,12 +142,19 @@ async def _engagement_summary(engagement_id: str) -> dict:
         covered = coverage_util.covered_ids(rows)
         out["radar"] = coverage_util.radar(CATALOG, covered)
         out["progress"] = coverage_util.progress_pct(CATALOG, covered)
+        # Severity counts must mean the same thing here as on the dashboard,
+        # which counts status == 'confirmed'. Counting everything-but-false-
+        # positive made the list show a higher number than Home for the same
+        # engagement. Unconfirmed work is reported separately rather than
+        # folded in or hidden.
         for f in await ValidatedFindingRepository().list(engagement_id):
-            if f.status == "false_positive":
-                continue
+            status = (f.status or "").lower()
             sev = (f.severity or "").lower()
-            if sev in out["severity_counts"]:
-                out["severity_counts"][sev] += 1
+            if status == "confirmed":
+                if sev in out["severity_counts"]:
+                    out["severity_counts"][sev] += 1
+            elif status in ("likely", "unconfirmed"):
+                out["pending_findings"] += 1
     except Exception:  # noqa: BLE001 - summary must never break the list
         pass
     return out

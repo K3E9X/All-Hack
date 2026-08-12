@@ -82,3 +82,8 @@
   .inspector .kv { grid-template-columns: 1fr; gap: 2px 0; }
   .inspector .kv dt { margin-top: 8px; }
 }
+
+/* Confirmed findings and work still awaiting review are different things;
+   the severity chips only count confirmed, so the pending tail says so. */
+.eng-pending { color: var(--sev-medium); font-size: 11px; margin-left: 6px; }
+.eng-usage-sub { color: var(--text-faint); font-size: 11px; }
