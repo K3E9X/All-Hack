@@ -22,6 +22,16 @@ from app.scans import Job, get_runner
 from app.orchestrator.planner import Task
 from app.orchestrator.state import EngagementState
 
+# Tool output can be megabytes; the advisor only needs the end, where the
+# error actually is.
+_TAIL_BYTES = 2000
+
+
+def _tail(blob: bytes) -> str:
+    if not blob:
+        return ""
+    return blob[-_TAIL_BYTES:].decode("utf-8", errors="replace")
+
 logger = logging.getLogger("syphax.orchestrator.executor")
 
 
@@ -82,6 +92,11 @@ class Executor:
             findings=len(job.findings),
         )
 
+        # A job that failed or came back empty used to disappear silently:
+        # coverage moved on and the run lost that test. Triage it and, when a
+        # gentler retry would plausibly change the outcome, run it once.
+        await self._triage_underperforming(job)
+
         for f in job.findings:
             await self._ingest_finding(job, f)
             # Verbose: one line per finding as it is ingested.
@@ -91,6 +106,54 @@ class Executor:
                 level=events.LEVEL_VERBOSE,
                 severity=f.severity, tool=job.tool, target=f.target,
             )
+
+    async def _triage_underperforming(self, job: Job) -> None:
+        """Diagnose a failed/empty job and retry once if that would help.
+
+        Best-effort throughout: triage is an optimisation, and a broken advisor
+        must never cost a run its results.
+        """
+        from app.scans.retry_advisor import (advise, retry_options,
+                                             should_triage)
+
+        try:
+            if not should_triage(job.tool, job.exit_code, len(job.findings), job.args):
+                return
+
+            advice = await advise(
+                job.tool,
+                exit_code=job.exit_code,
+                stderr_tail=_tail(job.stderr),
+                stdout_tail=_tail(job.stdout),
+                options=job.args,
+            )
+            if advice is None:
+                return
+
+            await events.emit(
+                self.state.engagement_id, events.JOB_DONE,
+                f"{job.tool} on {job.target}: {advice.diagnosis} - {advice.reason}",
+                level=events.LEVEL_VERBOSE,
+                tool=job.tool, target=job.target, diagnosis=advice.diagnosis,
+            )
+            if not advice.retry:
+                return
+
+            new_options = retry_options(job.args, advice)
+            retried = await self.runner.submit(
+                tool=job.tool,
+                target=job.target,
+                options=new_options,
+                engagement_id=self.state.engagement_id,
+                catalog_item_id=job.catalog_item_id,
+            )
+            await events.emit(
+                self.state.engagement_id, events.TASK_LAUNCHED,
+                f"retry: {job.tool} -> {job.target} ({advice.diagnosis}) {advice.options}",
+                tool=job.tool, target=job.target, job_id=retried.id,
+            )
+        except Exception:  # noqa: BLE001 - never let triage break ingest
+            logger.exception("triage failed for job %s", job.id)
 
     async def _ingest_finding(self, job: Job, finding) -> None:
         tool = job.tool
