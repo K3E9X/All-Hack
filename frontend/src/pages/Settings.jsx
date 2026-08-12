@@ -26,6 +26,8 @@ export default function Settings() {
   const safety = s.safety || {};
   const scope = s.scope || {};
   const pk = s.provider_keys || {};
+  const budget = s.budget || {};
+  const setBudget = (k, v) => setS((x) => ({ ...x, budget: { ...(x.budget || {}), [k]: v } }));
   const setRole = (role, patch) => setS((x) => ({ ...x, model_router: { ...x.model_router, [role]: { ...(x.model_router?.[role] || {}), ...patch } } }));
   const setSafety = (k, v) => setS((x) => ({ ...x, safety: { ...(x.safety || {}), [k]: v } }));
   const setScope = (k, v) => setS((x) => ({ ...x, scope: { ...(x.scope || {}), [k]: v } }));
@@ -36,7 +38,7 @@ export default function Settings() {
     try {
       const res = await api.settings.save({
         model_router: s.model_router, safety: s.safety, scope: s.scope,
-        oob_server: s.oob_server || '',
+        oob_server: s.oob_server || '', budget: s.budget,
         provider_keys: Object.keys(provider_keys).length ? provider_keys : undefined,
       });
       setS(res); setKeyInput({ zai: '', moonshot: '', openrouter: '' }); setSaved('Saved');
@@ -81,6 +83,26 @@ export default function Settings() {
             <div className="toggle-row"><span className="toggle-row__txt">Require approval before exploitation</span><Toggle on={!!safety.require_approval} onChange={(v) => setSafety('require_approval', v)} /></div>
             <div className="toggle-row"><span className="toggle-row__txt">Auto-validate findings</span><Toggle on={safety.auto_validate !== false} onChange={(v) => setSafety('auto_validate', v)} /></div>
             <div className="toggle-row"><span className="toggle-row__txt">Out-of-band (interactsh) enabled</span><Toggle on={!!safety.oob_enabled} onChange={(v) => setSafety('oob_enabled', v)} /></div>
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="card__head"><span className="card__title">LLM budget</span><span className="card__meta">0 = no limit</span></div>
+          <div className="card__body">
+            <div className="field">
+              <label className="field__label">Monthly cap (USD)</label>
+              <input className="input" type="number" min="0" step="1" value={budget.monthly_usd ?? 0}
+                     onChange={(e) => setBudget('monthly_usd', Number(e.target.value))} />
+            </div>
+            <div className="field">
+              <label className="field__label">Per-engagement cap (USD)</label>
+              <input className="input" type="number" min="0" step="1" value={budget.per_engagement_usd ?? 0}
+                     onChange={(e) => setBudget('per_engagement_usd', Number(e.target.value))} />
+            </div>
+            <p className="home-intro">
+              Needs LLM_PRICING set in .env. Without it every model is costed at $0
+              and the cap can never trigger.
+            </p>
           </div>
         </div>
 

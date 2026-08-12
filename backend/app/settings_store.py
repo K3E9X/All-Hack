@@ -47,6 +47,10 @@ DEFAULTS: Dict[str, Any] = {
                "auto_validate": True, "oob_enabled": True},
     "integrations": {"slack": "", "discord": "", "jira": "", "webhook": ""},
     "oob_server": "",
+    # LLM spend guardrail. 0 disables the alert. Only meaningful once
+    # LLM_PRICING is set, otherwise every model is billed at 0 and the
+    # threshold can never be reached.
+    "budget": {"monthly_usd": 0, "per_engagement_usd": 0},
 }
 
 # At-rest encryption. Prefer cryptography/Fernet (used in the container image);

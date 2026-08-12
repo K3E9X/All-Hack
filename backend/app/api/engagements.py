@@ -122,7 +122,15 @@ async def _engagement_summary(engagement_id: str) -> dict:
 
     out = {"progress": 0, "phase": None,
            "severity_counts": {"critical": 0, "high": 0, "medium": 0, "low": 0},
-           "radar": [0, 0, 0, 0, 0, 0]}
+           "radar": [0, 0, 0, 0, 0, 0],
+           # What this engagement cost in LLM calls. Already available inside
+           # the live view; surfaced on the list so engagements are comparable.
+           "llm_usage": {"calls": 0, "total_tokens": 0, "cost_usd": 0.0}}
+    try:
+        from app.llm import usage as llm_usage
+        out["llm_usage"] = await llm_usage.summary(engagement_id)
+    except Exception:  # noqa: BLE001 - cost is informational, never fatal
+        pass
     try:
         run = await RunRepository().latest_for_engagement(engagement_id)
         if run:

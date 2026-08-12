@@ -7,6 +7,7 @@ GET /api/tools     -> the orchestrated toolchain grouped-friendly by phase, with
 """
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import Any, Dict, List
 
 from fastapi import APIRouter
@@ -66,6 +67,13 @@ async def dashboard() -> Dict[str, Any]:
         by_model_rows = await conn.fetch(
             "SELECT model, COALESCE(SUM(prompt_tokens+completion_tokens),0) AS tok "
             "FROM llm_usage GROUP BY model ORDER BY tok DESC")
+        # Spend since the start of the current calendar month, for the budget
+        # guardrail. ts is epoch seconds, so compare against the month boundary.
+        month_start = datetime.now(timezone.utc).replace(
+            day=1, hour=0, minute=0, second=0, microsecond=0).timestamp()
+        month_cost = float(await conn.fetchval(
+            "SELECT COALESCE(SUM(cost_usd),0) FROM llm_usage WHERE ts >= $1",
+            month_start) or 0.0)
 
     sev = {s: 0 for s in ("critical", "high", "medium", "low", "info")}
     for r in sev_rows:
@@ -81,6 +89,24 @@ async def dashboard() -> Dict[str, Any]:
             "pct": round(tok / total_tokens * 100) if total_tokens else 0,
         })
 
+    # Budget guardrail. `priced` tells the UI whether a $0 figure means "cheap"
+    # or "LLM_PRICING is unset", which are very different situations.
+    try:
+        from app import settings_store
+        budget_cfg = (await settings_store.get_public()).get("budget") or {}
+    except Exception:  # noqa: BLE001 - the dashboard must never fail on settings
+        budget_cfg = {}
+    monthly_limit = float(budget_cfg.get("monthly_usd") or 0)
+
+    from app.config import settings as app_settings
+    budget = {
+        "monthly_limit_usd": monthly_limit,
+        "month_spend_usd": round(month_cost, 4),
+        "over": bool(monthly_limit and month_cost >= monthly_limit),
+        "pct": round(month_cost / monthly_limit * 100) if monthly_limit else 0,
+        "priced": bool((app_settings.llm_pricing or "").strip()),
+    }
+
     return {
         "active_engagements": active,
         "running_jobs": running,
@@ -91,4 +117,5 @@ async def dashboard() -> Dict[str, Any]:
             "cost_usd": round(float(usage["cost"]), 4),
             "by_model": by_model,
         },
+        "budget": budget,
     }

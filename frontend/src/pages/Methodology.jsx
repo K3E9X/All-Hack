@@ -9,6 +9,7 @@ export default function Methodology() {
   const [cats, setCats] = useState([]);
   const [filter, setFilter] = useState('all');
   const [open, setOpen] = useState([]);
+  const [standalone, setStandalone] = useState(false);
 
   useEffect(() => {
     api.engagements.list().then((r) => {
@@ -17,10 +18,34 @@ export default function Methodology() {
       if (items.length) setEngId(items[0].id);
     }).catch(() => {});
   }, []);
+  // With an engagement selected we show its coverage. Without one (fresh
+  // install, or before any engagement exists) fall back to the raw catalog so
+  // the methodology is still browsable instead of showing an empty page.
   useEffect(() => {
-    if (!engId) return;
-    api.engagements.coverage(engId).then((r) => {
-      const c = (r.categories || []).filter((g) => g.items.length);
+    if (engId) {
+      setStandalone(false);
+      api.engagements.coverage(engId).then((r) => {
+        const c = (r.categories || []).filter((g) => g.items.length);
+        setCats(c);
+        setOpen(c.map((x) => x.cat));
+      }).catch(() => setCats([]));
+      return;
+    }
+    setStandalone(true);
+    api.methodology.catalog().then((r) => {
+      const groups = {};
+      for (const it of r.items || []) {
+        const wstg = it.wstg_category || 'Other';
+        (groups[wstg] = groups[wstg] || { cat: it.category || wstg, wstg, items: [] }).items.push({
+          id: it.id,
+          name: it.description || it.name,
+          attack: it.attack_techniques || [],
+          asset: '-',
+          status: 'queued',
+          hit: false,
+        });
+      }
+      const c = Object.values(groups);
       setCats(c);
       setOpen(c.map((x) => x.cat));
     }).catch(() => setCats([]));
@@ -54,6 +79,12 @@ export default function Methodology() {
           {FILTERS.map((f) => <button key={f} className={filter === f ? 'on' : ''} onClick={() => setFilter(f)}>{f}</button>)}
         </div>
       </div>
+
+      {standalone && cats.length > 0 && (
+        <div className="card"><div className="card__body">
+          <div className="empty">Reference catalog &mdash; every test the engine can run. Select an engagement to see which of these were actually executed against it.</div>
+        </div></div>
+      )}
 
       {cats.length === 0 && <div className="card"><div className="card__body"><div className="empty">No coverage yet. Run the engagement to populate the methodology matrix.</div></div></div>}
 

@@ -12,6 +12,8 @@ export default function Home() {
   const [pings, setPings] = useState([]);
   const [net, setNet] = useState(null);
   const [proxyUrl, setProxyUrl] = useState('');
+  const [vpnPath, setVpnPath] = useState('');
+  const [vpnMode, setVpnMode] = useState('wireguard');
   const [netBusy, setNetBusy] = useState(false);
   const [netError, setNetError] = useState(null);
 
@@ -74,6 +76,17 @@ export default function Home() {
     setNetBusy(false);
   }
 
+  async function connectVpn() {
+    setNetBusy(true);
+    setNetError(null);
+    try {
+      setNet(await api.network.connectVpn(vpnPath, vpnMode));
+    } catch (e) {
+      setNetError(e.message);
+    }
+    setNetBusy(false);
+  }
+
   async function dropTunnel() {
     setNetBusy(true);
     setNetError(null);
@@ -95,8 +108,29 @@ export default function Home() {
   const phases = PHASE_ORDER.filter((p) => byPhase[p]);
   const okTools = tools.filter((t) => t.available).length;
 
+  const budget = dash?.budget;
+
   return (
     <div className="page">
+      {budget?.over && (
+        <div className="card budget-alert">
+          <div className="card__body">
+            <strong>LLM budget exceeded</strong> — ${budget.month_spend_usd.toFixed(2)} spent
+            this month against a ${budget.monthly_limit_usd.toFixed(2)} limit ({budget.pct}%).
+            Raise or clear the limit in Settings.
+          </div>
+        </div>
+      )}
+      {budget && !budget.priced && (usage.total_tokens > 0) && (
+        <div className="card budget-alert budget-alert--warn">
+          <div className="card__body">
+            <strong>Spend is not being measured</strong> — {(usage.total_tokens / 1e6).toFixed(2)}M
+            tokens used but LLM_PRICING is unset, so every model is costed at $0.
+            Set it in .env to get a real figure.
+          </div>
+        </div>
+      )}
+
       <div className="metrics">
         <div className="metric">
           <div className="metric__l">Active engagements</div>
@@ -116,7 +150,10 @@ export default function Home() {
         <div className="metric">
           <div className="metric__l">API spend</div>
           <div className="metric__v"><small>$</small>{(usage.cost_usd || 0).toFixed(2)}</div>
-          <div className="metric__sub">{(usage.total_tokens / 1e6).toFixed(2)}M tokens &middot; {usage.calls} calls</div>
+          <div className="metric__sub">
+            {((usage.total_tokens || 0) / 1e6).toFixed(2)}M tokens &middot; {usage.calls} calls
+            {budget?.monthly_limit_usd ? ` · ${budget.pct}% of budget` : ''}
+          </div>
         </div>
       </div>
 
@@ -188,6 +225,22 @@ export default function Home() {
                   onChange={(e) => setProxyUrl(e.target.value)}
                 />
                 <button className="btn btn--solid" onClick={applyProxy} disabled={!proxyUrl || netBusy}>Route</button>
+              </div>
+
+              <div className="key-row" style={{ marginTop: 6 }}>
+                <input
+                  className="input"
+                  placeholder="/data/vpn/wg0.conf  (blank = VPN_CONFIG_PATH)"
+                  value={vpnPath}
+                  onChange={(e) => setVpnPath(e.target.value)}
+                />
+                <div className="select-box">
+                  <select className="select" value={vpnMode} onChange={(e) => setVpnMode(e.target.value)}>
+                    <option value="wireguard">WireGuard</option>
+                    <option value="openvpn">OpenVPN</option>
+                  </select>
+                </div>
+                <button className="btn btn--solid" onClick={connectVpn} disabled={netBusy}>Connect</button>
               </div>
               <div className="form-actions" style={{ marginTop: 6 }}>
                 <button className="btn" onClick={refreshNetwork} disabled={netBusy}>{netBusy ? 'Checking...' : 'Check IP'}</button>

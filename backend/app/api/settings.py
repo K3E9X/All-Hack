@@ -24,6 +24,7 @@ class SettingsPatch(BaseModel):
     safety: Dict[str, Any] | None = None
     integrations: Dict[str, Any] | None = None
     oob_server: str | None = None
+    budget: Dict[str, Any] | None = None
 
 
 @router.put("/api/settings")
