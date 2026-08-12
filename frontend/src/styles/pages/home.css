@@ -57,3 +57,33 @@
 .budget-alert strong { color: var(--sev-critical); }
 .budget-alert--warn { border-color: rgba(234,179,8,.4); background: rgba(234,179,8,.05); }
 .budget-alert--warn strong { color: var(--sev-medium); }
+
+/* ---- Exit route identity: before / after ------------------------------- */
+/* Read left to right: the IP you really have, then the one the target sees.
+   Side by side because the comparison IS the check - a tunnel that did not
+   take looks fine until you put the two numbers next to each other. */
+.ident { display: grid; grid-template-columns: 1fr auto 1fr; gap: 10px;
+  align-items: center; padding: 10px; margin-bottom: 10px;
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: var(--neutral-950); }
+.ident__col { min-width: 0; }
+.ident__l { font-size: 10px; text-transform: uppercase; letter-spacing: .05em;
+  color: var(--text-faint); }
+.ident__v { font-size: 15px; margin: 2px 0; overflow-wrap: anywhere; }
+.ident__sub { font-size: 11px; color: var(--text-faint); }
+.ident__arrow { color: var(--text-faint); font-size: 16px; }
+.ident__arrow--ok { color: var(--term-ok); }
+.ident__note { font-size: 12px; color: var(--text-secondary); margin: 0 0 8px; }
+
+.ident__hdr-title { font-size: 10px; text-transform: uppercase; letter-spacing: .05em;
+  color: var(--text-secondary); margin: 8px 0 4px; }
+.ident__hdrs { max-height: 150px; overflow: auto; background: var(--neutral-950);
+  border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 6px 8px;
+  font-family: var(--font-mono); font-size: 11px; line-height: 1.5;
+  color: var(--text-secondary); white-space: pre-wrap; word-break: break-all;
+  margin-bottom: 8px; }
+
+@media (max-width: 640px) {
+  .ident { grid-template-columns: 1fr; }
+  .ident__arrow { transform: rotate(90deg); justify-self: center; }
+}

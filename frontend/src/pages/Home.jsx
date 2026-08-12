@@ -16,12 +16,15 @@ export default function Home() {
   const [vpnMode, setVpnMode] = useState('wireguard');
   const [netBusy, setNetBusy] = useState(false);
   const [netError, setNetError] = useState(null);
+  const [ident, setIdent] = useState(null);
+  const [guard, setGuard] = useState(null);
 
   useEffect(() => {
     api.config().then(setConfig).catch(() => {});
     api.dashboard().then(setDash).catch(() => {});
     api.tools().then((t) => setTools(Array.isArray(t) ? t : [])).catch(() => {});
     api.network.status().then(setNet).catch(() => {});
+    refreshIdentity();
   }, []);
 
   // Ping every role, not just the planner: they can sit on different
@@ -51,13 +54,40 @@ export default function Home() {
     setPinging(false);
   }
 
+  // One call chain, used both before bringing a tunnel up and after, so the
+  // two readings are directly comparable.
+  const refreshIdentity = async () => {
+    const [i, g, s] = await Promise.allSettled([
+      api.network.identity(), api.network.guard(), api.network.status(),
+    ]);
+    if (i.status === 'fulfilled') setIdent(i.value);
+    if (g.status === 'fulfilled') setGuard(g.value);
+    if (s.status === 'fulfilled') setNet(s.value);
+  };
+
   async function refreshNetwork() {
     setNetBusy(true);
     setNetError(null);
     try {
       const r = await api.network.check();
       if (!r.safe && r.reason) setNetError(r.reason);
-      setNet(await api.network.status());
+      await refreshIdentity();
+    } catch (e) {
+      setNetError(e.message);
+    }
+    setNetBusy(false);
+  }
+
+  // Startup records the real IP automatically, but an operator whose tunnel
+  // was already up when the stack started would have a "real" IP that is
+  // already the tunnel's - which silently defeats the kill switch, since that
+  // is the value it compares against.
+  async function setBaseline() {
+    setNetBusy(true);
+    setNetError(null);
+    try {
+      await api.network.setBaseline();
+      await refreshIdentity();
     } catch (e) {
       setNetError(e.message);
     }
@@ -69,6 +99,7 @@ export default function Home() {
     setNetError(null);
     try {
       setNet(await api.network.setProxy(proxyUrl));
+      await refreshIdentity();
       setProxyUrl('');
     } catch (e) {
       setNetError(e.message);
@@ -81,6 +112,7 @@ export default function Home() {
     setNetError(null);
     try {
       setNet(await api.network.connectVpn(vpnPath, vpnMode));
+      await refreshIdentity();
     } catch (e) {
       setNetError(e.message);
     }
@@ -92,6 +124,7 @@ export default function Home() {
     setNetError(null);
     try {
       setNet(await api.network.disconnect());
+      await refreshIdentity();
     } catch (e) {
       setNetError(e.message);
     }
@@ -200,22 +233,60 @@ export default function Home() {
               </span>
             </div>
             <div className="card__body">
-              <dl className="kv">
-                <dt>Exit IP</dt>
-                <dd className={'mono ' + (net?.ip_changed ? 'kv-yes' : '')}>{net?.current_ip || 'unknown'}</dd>
-                {net?.baseline_ip && (<><dt>Real IP</dt><dd className="mono">{net.baseline_ip}</dd></>)}
-                <dt>Block scans without VPN</dt>
-                <dd className={net?.require_vpn ? 'kv-yes' : ''}>{net?.require_vpn ? 'yes' : 'no'}</dd>
-                <dt>User-Agent</dt>
-                <dd className="mono">{net?.user_agent_mode || '-'}{net?.pentest_id ? ` · id ${net.pentest_id}` : ''}</dd>
-              </dl>
+              {/* Before / after, side by side. The point of the card is the
+                  comparison: check once before bringing a tunnel up, once
+                  after, and see whether anything actually changed. */}
+              <div className="ident">
+                <div className="ident__col">
+                  <div className="ident__l">Your real IP</div>
+                  <div className="ident__v mono">{ident?.real_ip || net?.baseline_ip || '—'}</div>
+                  <div className="ident__sub">recorded with no tunnel</div>
+                </div>
+                <div className={'ident__arrow' + (ident?.ip_changed ? ' ident__arrow--ok' : '')}>→</div>
+                <div className="ident__col">
+                  <div className="ident__l">Exit IP now</div>
+                  <div className={'ident__v mono' + (ident?.ip_changed ? ' kv-yes' : '')}>
+                    {ident?.exit_ip || net?.current_ip || '—'}
+                  </div>
+                  <div className="ident__sub">
+                    {ident?.mode === 'off' ? 'direct connection' : `via ${ident?.mode || net?.mode || '-'}`}
+                  </div>
+                </div>
+              </div>
 
-              {net && net.mode !== 'off' && !net.ip_changed && (
+              {ident && ident.mode !== 'off' && !ident.ip_changed && (
                 <p className="ping-result ping-result--err">
-                  Traffic is NOT going through the tunnel. Scans run from your real IP
-                  unless REQUIRE_VPN is on, in which case they are blocked.
+                  Same IP on both sides: traffic is NOT going through the tunnel. Scans run
+                  from your real IP unless REQUIRE_VPN is on, in which case they are blocked.
                 </p>
               )}
+              {ident && ident.mode === 'off' && (
+                <p className="ident__note">
+                  No tunnel configured — scans go out from your real IP.
+                </p>
+              )}
+
+              {/* What the target actually sees, generated the same way a real
+                  job generates it, so in rotate mode this is a real sample. */}
+              {ident?.headers && (
+                <>
+                  <div className="ident__hdr-title">
+                    Headers a scan would send · UA mode {ident.user_agent_mode}
+                  </div>
+                  <pre className="ident__hdrs">
+                    {Object.entries(ident.headers).map(([k, v]) => `${k}: ${v}`).join('\n')}
+                  </pre>
+                </>
+              )}
+
+              <dl className="kv">
+                <dt>Block scans without VPN</dt>
+                <dd className={net?.require_vpn ? 'kv-yes' : ''}>{net?.require_vpn ? 'yes' : 'no'}</dd>
+                <dt>Scan allowed now</dt>
+                <dd className={guard?.allowed ? 'kv-yes' : 'kv-no'}>
+                  {guard ? (guard.allowed ? 'yes' : `no — ${guard.reason}`) : '—'}
+                </dd>
+              </dl>
 
               <div className="key-row" style={{ marginTop: 8 }}>
                 <input
@@ -244,6 +315,7 @@ export default function Home() {
               </div>
               <div className="form-actions" style={{ marginTop: 6 }}>
                 <button className="btn" onClick={refreshNetwork} disabled={netBusy}>{netBusy ? 'Checking...' : 'Check IP'}</button>
+                <button className="btn" onClick={setBaseline} disabled={netBusy} title="Record the current IP as your real one. Use before connecting a tunnel.">This is my real IP</button>
                 <button className="btn" onClick={dropTunnel} disabled={netBusy}>Direct</button>
               </div>
               {netError && <p className="ping-result ping-result--err">{netError}</p>}

@@ -158,6 +158,8 @@ export const api = {
     status: () => request('/api/network/status'),
     check: () => request('/api/network/check', { method: 'POST' }),
     guard: () => request('/api/network/guard'),
+    identity: () => request('/api/network/identity'),
+    setBaseline: () => request('/api/network/baseline', { method: 'POST' }),
     setProxy: (proxyUrl) => request('/api/network/proxy', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

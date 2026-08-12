@@ -39,6 +39,55 @@ async def network_check() -> dict:
     return await manager.verify_exit_ip()
 
 
+@router.get("/identity")
+async def network_identity() -> dict:
+    """What the target sees: exit IP, and the headers a scan would send.
+
+    Answers the pre-flight question in one call - "who am I right now?" - so
+    the operator can look before bringing a tunnel up and again after, and
+    compare the two rather than trusting that the tunnel took.
+
+    The headers are generated the same way a real job generates them, so in
+    rotate mode this is a genuine sample rather than a description of one.
+    """
+    from app.scans.identity import current_profile
+
+    manager = get_network_manager()
+    profile = current_profile()
+    headers = {"User-Agent": str(profile["ua"])}
+    headers.update(profile["headers"])
+    if settings.pentest_id:
+        headers["X-Pentest-ID"] = settings.pentest_id
+
+    exit_ip = await manager.get_public_ip()
+    return {
+        "real_ip": manager.state.baseline_ip,
+        "exit_ip": exit_ip,
+        "ip_changed": bool(manager.state.baseline_ip and exit_ip
+                           and manager.state.baseline_ip != exit_ip),
+        "mode": manager.state.mode,
+        "user_agent_mode": settings.user_agent_mode,
+        "headers": headers,
+        "require_vpn": settings.require_vpn,
+    }
+
+
+@router.post("/baseline")
+async def record_baseline() -> dict:
+    """Record the current IP as the real one, bypassing any proxy.
+
+    Taken automatically at startup, but an operator who connects a tunnel on
+    the host before starting the stack would otherwise have a "real" IP that is
+    already the tunnel's - which would silently defeat the kill switch, since
+    it compares against exactly this value.
+    """
+    manager = get_network_manager()
+    ip = await manager.record_baseline()
+    if not ip:
+        raise HTTPException(status_code=503, detail="could not determine the public IP")
+    return {"real_ip": ip}
+
+
 @router.get("/guard")
 async def network_guard() -> dict:
     """Whether a scan may start under the current require_vpn policy"""
