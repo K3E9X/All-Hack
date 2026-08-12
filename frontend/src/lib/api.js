@@ -128,6 +128,23 @@ export const api = {
     }),
   },
 
+  network: {
+    status: () => request('/api/network/status'),
+    check: () => request('/api/network/check', { method: 'POST' }),
+    guard: () => request('/api/network/guard'),
+    setProxy: (proxyUrl) => request('/api/network/proxy', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ proxy_url: proxyUrl }),
+    }),
+    connectVpn: (configPath, mode) => request('/api/network/vpn/connect', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ config_path: configPath || '', mode: mode || '' }),
+    }),
+    disconnect: () => request('/api/network/vpn/disconnect', { method: 'POST' }),
+  },
+
   audit: {
     list: (params = {}) => {
       const qs = new URLSearchParams(

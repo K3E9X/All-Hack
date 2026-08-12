@@ -43,5 +43,9 @@
 .ping-result { margin-top: 14px; font-family: var(--font-mono); font-size: 12px; line-height: 1.6; padding: 10px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--neutral-950); }
 .ping-result--ok { color: var(--term-ok); border-color: rgba(74,222,128,.3); }
 .ping-result--pending { color: var(--text-secondary); }
+/* Was referenced by the ping handler but never defined, so a failed ping
+   rendered with the same neutral styling as a successful one. */
+.ping-result--err { color: var(--term-vuln); border-color: rgba(248,113,113,.35); }
+.ping-result strong { display: inline-block; min-width: 66px; color: var(--text-primary); }
 
 @media (max-width: 900px) { .metrics { grid-template-columns: repeat(2,1fr); } .dash-grid { grid-template-columns: 1fr; } .kv { grid-template-columns: 1fr; gap: 2px 0; } .kv dt { margin-top: 8px; } }
