@@ -49,6 +49,34 @@ does not expose the kernel module — the normal situation on Docker Desktop. If
 the host instead and leave the tool in `off` mode: the kill switch compares
 exit IPs, so it protects the scan whoever owns the tunnel.
 
+#### ProtonVPN
+
+A paid or free Proton account both work — you need a **WireGuard** config, not
+the desktop app:
+
+1. account.protonvpn.com -> **Downloads** -> **WireGuard configuration**
+2. Name the key, pick a server, download the `.conf`
+3. `mkdir -p data/vpn` and drop it there — `./data` is already bind-mounted
+   into the backend as `/data`, and is gitignored so the key never gets committed
+4. `.env`: `VPN_CONFIG_PATH=/data/vpn/<file>.conf`, then Connect from the Home
+   card — or set `REQUIRE_VPN=true` first so no scan can start without it
+
+Two things in a stock Proton config break inside a container, and the tool
+rewrites a corrected copy rather than making you hand-edit the provider's file:
+
+- `DNS = 10.2.0.1` would replace Docker's resolver, and the backend would stop
+  resolving `postgres` — an outage that looks like a database problem, not a VPN
+  one. The line is dropped; traffic still exits through the tunnel.
+- The filename becomes the interface name, and `ch-fr-01.protonvpn.udp` is over
+  the kernel's 15-character limit and contains dots. wg-quick rejects it with
+  "invalid interface name", which reads like a malformed config. The copy is
+  named `wg0.conf`.
+
+Your original file is never modified. After connecting, hit **Check IP** — the
+two IPs on the card must differ, and the Proton exit should show a Proton
+netblock. `NAT-PMP (port forwarding)` and `NetShield` do not matter here;
+NetShield's DNS filtering is irrelevant once the DNS line is dropped.
+
 `wipe.sh` is a bash script. On Windows run it from the WSL shell, like the rest.
 
 Shell scripts are pinned to LF by `.gitattributes`. If you clone with Git for

@@ -59,6 +59,62 @@ MODE_OPENVPN = "openvpn"
 
 _VALID_PROXY_SCHEMES = ("socks5://", "socks5h://", "socks4://", "http://", "https://")
 
+# Where prepared configs land. tmpfs in compose, so a config carrying a private
+# key never lands on a disk that outlives the container.
+PREPARED_DIR = "/tmp/syphax-wg"
+
+# wg-quick derives the interface name from the filename, and the kernel caps it.
+WG_IFACE_MAX = 15
+
+
+def prepare_wg_config(config_path: str, *, dest_dir: str = PREPARED_DIR) -> str:
+    """Rewrite a provider's WireGuard config into one a container can use.
+
+    Two things in a stock provider config break inside Docker, and both fail in
+    ways that point at the wrong culprit.
+
+    1. `DNS = 10.2.0.1`. wg-quick applies it, replacing the container's resolver
+       (127.0.0.11, Docker's embedded DNS). The backend then cannot resolve
+       `postgres` or `redis` by name, so the whole application falls over the
+       moment the tunnel comes up - and it looks like a database outage, not a
+       VPN problem. The line is dropped: name resolution stays on Docker's
+       resolver, while traffic still exits through the tunnel.
+
+    2. The filename becomes the interface name, and the kernel refuses anything
+       over 15 characters or containing a dot. ProtonVPN ships files like
+       `ch-fr-01.protonvpn.udp.conf`, which wg-quick rejects with "invalid
+       interface name" - easy to read as a malformed config. The copy is named
+       `wg0.conf`.
+
+    Returns the path to the prepared copy; the original is never modified.
+    """
+    import re as _re
+
+    with open(config_path, "r", encoding="utf-8", errors="replace") as fh:
+        lines = fh.read().splitlines()
+
+    kept, dropped = [], []
+    for line in lines:
+        if _re.match(r"^\s*DNS\s*=", line, _re.I):
+            dropped.append(line.strip())
+            continue
+        kept.append(line)
+
+    os.makedirs(dest_dir, mode=0o700, exist_ok=True)
+    dest = os.path.join(dest_dir, "wg0.conf")
+    header = [
+        "# Prepared by Syphax from " + os.path.basename(config_path),
+        "# DNS lines removed so Docker's resolver keeps working; traffic still",
+        "# exits through the tunnel. Original left untouched.",
+    ]
+    with open(dest, "w", encoding="utf-8") as fh:
+        fh.write("\n".join(header + kept) + "\n")
+    os.chmod(dest, 0o600)   # carries a private key
+
+    if dropped:
+        logger.info("prepared %s: dropped %d DNS line(s)", config_path, len(dropped))
+    return dest
+
 
 @dataclass
 class NetworkState:
@@ -208,6 +264,15 @@ class NetworkPrivacyManager:
     async def connect_vpn(self, config_path: str, mode: str = MODE_WIREGUARD) -> Dict[str, Any]:
         if not os.path.isfile(config_path):
             return {"ok": False, "error": f"config not found: {config_path}"}
+
+        # Provider configs are written for a laptop, not a container. Prepare a
+        # corrected copy rather than asking the operator to hand-edit the file
+        # their provider generated. See prepare_wg_config for what and why.
+        if mode == MODE_WIREGUARD:
+            try:
+                config_path = prepare_wg_config(config_path)
+            except Exception as exc:  # noqa: BLE001
+                return {"ok": False, "error": f"could not prepare the config: {exc}"}
 
         binary = "wg-quick" if mode == MODE_WIREGUARD else "openvpn"
         if not shutil.which(binary):
