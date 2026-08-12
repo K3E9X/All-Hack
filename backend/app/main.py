@@ -22,6 +22,7 @@ import app.orchestrator.state  # noqa: F401
 import app.orchestrator.runs  # noqa: F401
 import app.orchestrator.approvals  # noqa: F401
 import app.proxy.storage  # noqa: F401
+import app.sandbox.staging  # noqa: F401
 import app.scans.storage  # noqa: F401
 import app.validation.storage  # noqa: F401
 
@@ -33,6 +34,7 @@ from app.api.findings import router as findings_router
 from app.api.llm import router as llm_router
 from app.api.methodology import router as methodology_router
 from app.api.network import router as network_router
+from app.api.poc import router as poc_router
 from app.api.orchestrator import router as orchestrator_router
 from app.api.proxy import router as proxy_router
 from app.api.reports import router as reports_router
@@ -155,3 +157,4 @@ app.include_router(findings_router)
 app.include_router(surface_router)
 app.include_router(sandbox_router)
 app.include_router(network_router)
+app.include_router(poc_router)
