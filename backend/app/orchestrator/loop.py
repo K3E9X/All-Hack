@@ -23,7 +23,7 @@ from app.orchestrator.executor import Executor
 from app.orchestrator.planner import Planner
 from app.orchestrator.runs import Run, RunRepository
 from app.orchestrator.state import EngagementState
-from app.methodology import PHASE_EXPLOIT
+from app.methodology import PHASE_EXPLOIT, PHASE_VULN
 from app.scans.models import JobStatus
 from app.scans.storage import JobRepository
 from app.validation import build_chains, validate_engagement
@@ -141,6 +141,13 @@ async def run_engagement_loop(run_id: str) -> dict:
                     current_phase = batch[0].phase
                     await events.emit(engagement.id, events.PHASE_CHANGED,
                                       f"Phase: {current_phase}", run_id=run.id, phase=current_phase)
+
+                    # Recon and mapping are done by the time vuln analysis
+                    # starts, so this is the moment the picture is complete
+                    # enough to be worth joining - and still early enough for
+                    # the leads to change what gets scanned.
+                    if current_phase == PHASE_VULN:
+                        await _run_correlation(engagement, run, executor, runs)
 
                 # Human checkpoint before exploitation (spec §11 approval).
                 if need_approval and batch[0].phase == PHASE_EXPLOIT:
@@ -306,6 +313,92 @@ async def run_engagement_loop(run_id: str) -> dict:
                       run_id=run.id, status=run.status, stop_reason=run.stop_reason,
                       jobs=run.jobs_launched)
     return run.to_public()
+
+
+async def _run_correlation(engagement, run: Run, executor: Executor,
+                           runs: RunRepository) -> int:
+    """Join the recon signals and launch what the join suggests.
+
+    Runs once, when vuln analysis starts: recon and mapping have produced the
+    assets, fingerprints and captured traffic, and there is still a whole scan
+    left for the leads to influence.
+
+    Leads go through executor.launch() like any other task, so the engagement
+    authorization and scope gate in Runner.submit() applies unchanged - the
+    model can propose, it cannot widen the target set.
+    """
+    try:
+        from app.analysis.correlation import correlate
+        from app.orchestrator.planner import Task
+        from app.proxy.storage import FlowRepository
+        from app.scans.storage import JobRepository as _Jobs
+        from app.validation import ValidatedFindingRepository
+
+        state = executor.state
+        assets = await state.assets()
+        if not assets:
+            return 0
+
+        technologies = await state.technologies()
+        findings = await ValidatedFindingRepository().list(engagement.id)
+        try:
+            flows = await FlowRepository().list_flows(limit=200)
+        except Exception:  # noqa: BLE001 - proxy may be empty or unavailable
+            flows = []
+
+        result = await correlate(
+            assets=assets,
+            technologies=technologies,
+            findings=findings,
+            flows=flows,
+            coverage_summary=await state.coverage_summary(),
+        )
+    except Exception as exc:  # noqa: BLE001 - correlation must never break a run
+        logger.warning("[%s] correlation skipped: %s", run.id, exc)
+        return 0
+
+    leads = result.get("leads") or []
+    if result.get("summary"):
+        await events.emit(engagement.id, events.PHASE_CHANGED,
+                          f"Correlation: {result['summary']}",
+                          run_id=run.id, level=events.LEVEL_VERBOSE)
+    if not leads:
+        return 0
+
+    launched = 0
+    for lead in leads:
+        options: List[str] = []
+        if lead["tool"] == "nuclei" and lead.get("tags"):
+            options = ["-tags", ",".join(lead["tags"])]
+
+        task = Task(
+            catalog_item_id=f"CORRELATED-{lead['tool'].upper()}",
+            asset_value=lead["asset"],
+            tool=lead["tool"],
+            options=options,
+            phase=PHASE_VULN,
+        )
+        try:
+            job = await executor.launch(task)
+        except Exception:  # noqa: BLE001
+            logger.exception("[%s] correlated lead failed to launch", run.id)
+            continue
+        if job is None:
+            continue
+
+        launched += 1
+        run.jobs_launched += 1
+        await events.emit(
+            engagement.id, events.TASK_LAUNCHED,
+            f"correlated: {lead['tool']} -> {lead['asset']} ({lead['rationale']})",
+            run_id=run.id, tool=lead["tool"], target=lead["asset"],
+            catalog_item=task.catalog_item_id,
+        )
+
+    if launched:
+        await runs.update(run)
+    logger.info("[%s] correlation launched %d/%d lead(s)", run.id, launched, len(leads))
+    return launched
 
 
 async def _seed_from_proxy(state: "EngagementState", engagement) -> int:
