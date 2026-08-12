@@ -1,4 +1,4 @@
-# syphax
+# Syphax
 
 [![CI](https://github.com/K3E9X/Syphax/actions/workflows/ci.yml/badge.svg)](https://github.com/K3E9X/Syphax/actions/workflows/ci.yml)
 
