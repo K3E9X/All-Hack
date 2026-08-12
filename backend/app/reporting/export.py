@@ -56,8 +56,8 @@ def sarif(engagement, findings) -> Dict[str, Any]:
         "version": "2.1.0",
         "runs": [{
             "tool": {"driver": {
-                "name": "allhack",
-                "informationUri": "https://github.com/K3E9X/All-Hack",
+                "name": "syphax",
+                "informationUri": "https://github.com/K3E9X/Syphax",
                 "rules": list(rules.values()),
             }},
             "results": results,

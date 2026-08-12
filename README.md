@@ -1,6 +1,6 @@
-# allhack
+# syphax
 
-[![CI](https://github.com/K3E9X/All-Hack/actions/workflows/ci.yml/badge.svg)](https://github.com/K3E9X/All-Hack/actions/workflows/ci.yml)
+[![CI](https://github.com/K3E9X/Syphax/actions/workflows/ci.yml/badge.svg)](https://github.com/K3E9X/Syphax/actions/workflows/ci.yml)
 
 An autonomous web-application penetration tester you self-host. You authorize
 a target, the agent walks an OWASP-WSTG x MITRE-ATT&CK methodology end to end
@@ -38,7 +38,7 @@ The tool is Linux/Docker only, so on Windows run it inside WSL2:
    integration** for your distro, or install `docker-ce` directly inside the
    WSL distro.
 3. Open the WSL shell (Ubuntu), `git clone` the repo **inside** the WSL
-   filesystem (e.g. `~/allhack`, not `/mnt/c/...` - native FS is much faster),
+   filesystem (e.g. `~/syphax`, not `/mnt/c/...` - native FS is much faster),
    then run `./install.sh` / `./start.sh` exactly as on Linux.
 4. Browse to http://localhost:3000 from Windows - WSL2 forwards localhost.
 

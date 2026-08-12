@@ -30,7 +30,7 @@ def test_sarif_structure_and_level():
     s = sarif(_eng(), [_vf(sev="critical"), _vf("xss", "medium")])
     assert s["version"] == "2.1.0"
     run = s["runs"][0]
-    assert run["tool"]["driver"]["name"] == "allhack"
+    assert run["tool"]["driver"]["name"] == "syphax"
     assert len(run["results"]) == 2
     assert run["results"][0]["level"] == "error"     # critical
     assert run["results"][1]["level"] == "warning"   # medium

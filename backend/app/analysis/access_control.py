@@ -27,7 +27,7 @@ from app.proxy import FlowRepository
 from app.scans.models import Finding
 from app.validation.safe_poc import SafePoC, ScopeError
 
-logger = logging.getLogger("allhack.analysis.access_control")
+logger = logging.getLogger("syphax.analysis.access_control")
 
 _STATE_CHANGING = {"POST", "PUT", "PATCH", "DELETE"}
 _STATIC_EXT = (".js", ".css", ".png", ".jpg", ".jpeg", ".gif", ".svg",

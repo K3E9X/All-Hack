@@ -23,7 +23,7 @@ from app.proxy import FlowRepository
 from app.scans.models import Finding
 from app.validation.safe_poc import SafePoC, ScopeError
 
-logger = logging.getLogger("allhack.analysis.cors")
+logger = logging.getLogger("syphax.analysis.cors")
 
 MAX_ENDPOINTS = 30
 _STATIC_EXT = (".js", ".css", ".png", ".jpg", ".jpeg", ".gif", ".svg",

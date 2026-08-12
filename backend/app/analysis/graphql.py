@@ -25,7 +25,7 @@ from app.proxy import FlowRepository
 from app.scans.models import Finding
 from app.validation.safe_poc import SafePoC, ScopeError
 
-logger = logging.getLogger("allhack.analysis.graphql")
+logger = logging.getLogger("syphax.analysis.graphql")
 
 _GQL_PATHS = ("/graphql", "/graphiql", "/api/graphql", "/v1/graphql",
               "/v2/graphql", "/query", "/gql", "/graphql/console", "/api/gql")

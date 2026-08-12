@@ -14,7 +14,7 @@ from typing import Any, Dict, List, Optional
 
 from app import db
 
-logger = logging.getLogger("allhack.events")
+logger = logging.getLogger("syphax.events")
 
 SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS events (

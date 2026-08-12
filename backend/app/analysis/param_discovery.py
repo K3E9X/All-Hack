@@ -28,7 +28,7 @@ from app.proxy import FlowRepository
 from app.scans.models import Finding
 from app.validation.safe_poc import SafePoC, ScopeError
 
-logger = logging.getLogger("allhack.analysis.params")
+logger = logging.getLogger("syphax.analysis.params")
 
 MAX_ENDPOINTS = 15
 BATCH = 25

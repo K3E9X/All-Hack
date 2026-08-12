@@ -38,7 +38,7 @@ from app.scans.models import Finding, Job, JobStatus
 from app.scans.storage import JobRepository
 from app.scans.wrappers import get_wrapper
 
-logger = logging.getLogger("allhack.worker")
+logger = logging.getLogger("syphax.worker")
 
 # Same caps as the in-process Runner had.
 MAX_STREAM_BYTES = 1 * 1024 * 1024  # 1 MiB

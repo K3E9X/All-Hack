@@ -18,7 +18,7 @@ from urllib.parse import urlparse
 
 import httpx
 
-logger = logging.getLogger("allhack.validation.safe_poc")
+logger = logging.getLogger("syphax.validation.safe_poc")
 
 MAX_BODY_BYTES = 256 * 1024
 TIMEOUT = 10.0

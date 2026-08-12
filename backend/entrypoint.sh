@@ -2,7 +2,7 @@
 # Container entrypoint: run mitmdump and uvicorn side by side.
 #
 # mitmdump listens on 0.0.0.0:${MITM_PORT} and loads app/proxy/addon.py,
-# which writes each intercepted flow to /data/allhack.db.
+# which writes each intercepted flow to /data/syphax.db.
 # uvicorn serves the FastAPI app on 0.0.0.0:8000.
 #
 # Both processes share /data (mounted from the host). If either process dies
@@ -18,7 +18,7 @@ mkdir -p "${MITM_CONFDIR}"
 
 echo "[entrypoint] starting mitmdump on 0.0.0.0:${MITM_PORT}"
 echo "[entrypoint] mitm confdir: ${MITM_CONFDIR}"
-echo "[entrypoint] sqlite db:    ${DATA_DIR}/allhack.db"
+echo "[entrypoint] sqlite db:    ${DATA_DIR}/syphax.db"
 
 # PYTHONPATH lets the addon import app.proxy.storage.
 export PYTHONPATH="/app:${PYTHONPATH:-}"

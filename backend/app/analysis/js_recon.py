@@ -27,7 +27,7 @@ from app.engagements import EngagementRepository
 from app.proxy import FlowRepository
 from app.scans.models import Finding
 
-logger = logging.getLogger("allhack.analysis.js_recon")
+logger = logging.getLogger("syphax.analysis.js_recon")
 
 MAX_SCAN_FLOWS = 300
 MAX_BODY = 2 * 1024 * 1024

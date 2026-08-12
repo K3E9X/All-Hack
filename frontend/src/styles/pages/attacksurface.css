@@ -1,4 +1,4 @@
-/* All-Hack — Attack surface map. Reuses liveview.css chrome + home.css metrics. */
+/* Syphax — Attack surface map. Reuses liveview.css chrome + home.css metrics. */
 .surf-layout { display: grid; grid-template-columns: 1fr 460px; gap: 16px; align-items: start; }
 
 .host-row { display: grid; grid-template-columns: 1fr 70px 70px; gap: 12px; align-items: center; padding: 11px 14px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background .12s; }

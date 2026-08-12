@@ -1,4 +1,4 @@
-/* All-Hack — Settings. Reuses liveview.css chrome. */
+/* Syphax — Settings. Reuses liveview.css chrome. */
 .set-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
 .set-full { grid-column: 1 / -1; }
 

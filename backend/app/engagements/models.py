@@ -28,8 +28,8 @@ class EngagementStatus(str, enum.Enum):
 
 class VerificationMethod(str, enum.Enum):
     ATTESTATION = "attestation"   # operator attested they own/may test the target
-    DNS_TXT = "dns_txt"            # TXT record allhack-verify=<token> on the apex
-    WELL_KNOWN = "well_known"      # GET https://host/.well-known/allhack-<token>.txt
+    DNS_TXT = "dns_txt"            # TXT record syphax-verify=<token> on the apex
+    WELL_KNOWN = "well_known"      # GET https://host/.well-known/syphax-<token>.txt
     MANUAL = "manual"             # operator uploaded signed written authorization
 
 
@@ -183,18 +183,18 @@ class Engagement:
                 "dns_txt": {
                     "record_name": self.target_host,
                     "record_type": "TXT",
-                    "record_value": f"allhack-verify={token}",
+                    "record_value": f"syphax-verify={token}",
                     "instructions": (
                         f"Add a TXT record on {self.target_host} with value "
-                        f"'allhack-verify={token}', then verify."
+                        f"'syphax-verify={token}', then verify."
                     ),
                 },
                 "well_known": {
-                    "url": f"https://{self.target_host}/.well-known/allhack-{token}.txt",
+                    "url": f"https://{self.target_host}/.well-known/syphax-{token}.txt",
                     "file_content": token,
                     "instructions": (
                         f"Serve a file at "
-                        f"https://{self.target_host}/.well-known/allhack-{token}.txt "
+                        f"https://{self.target_host}/.well-known/syphax-{token}.txt "
                         f"containing exactly '{token}', then verify."
                     ),
                 },

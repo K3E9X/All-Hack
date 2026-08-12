@@ -1,4 +1,4 @@
-/* All-Hack — Findings (global triage). Reuses liveview.css chrome + .sev + .tbl. */
+/* Syphax — Findings (global triage). Reuses liveview.css chrome + .sev + .tbl. */
 
 /* filter bar */
 .filters { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }

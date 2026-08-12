@@ -21,7 +21,7 @@ from mitmproxy import http
 
 from app.proxy.storage import init_schema_sync, insert_flow_sync
 
-logger = logging.getLogger("allhack.proxy.addon")
+logger = logging.getLogger("syphax.proxy.addon")
 
 # Max body bytes we store. Above this we truncate (users can re-fetch from the
 # target if they need the full payload; we are a pentest bench, not an archive).

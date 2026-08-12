@@ -18,7 +18,7 @@ class Settings(BaseSettings):
         "openai/gpt-oss-120b:free,"
         "qwen/qwen3-next-80b-a3b-instruct:free"
     )
-    openrouter_app_name: str = "allhack"
+    openrouter_app_name: str = "syphax"
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
 
     # Per-role LLM router (Planner / Executor / Validator). Each role is an
@@ -47,24 +47,25 @@ class Settings(BaseSettings):
     data_dir: Path = Path("/data")
     # Postgres + Redis are mandatory from Phase 1 onward. Defaults match the
     # docker-compose service names so a `docker compose up` works out of the box.
-    database_url: str = "postgresql://allhack:allhack@postgres:5432/allhack"
+    database_url: str = "postgresql://syphax:syphax@postgres:5432/syphax"
     redis_url: str = "redis://redis:6379/0"
 
     # MITM
     mitm_port: int = 8080
 
     # ---- Scan identity ----
-    # How the tools present themselves on the wire. "fixed" sends user_agent
-    # below on every request; "rotate" picks a random real browser per job.
-    # This controls tool fingerprinting, not traceability: your source IP is
-    # still in the target's logs.
-    user_agent_mode: str = "fixed"
+    # How the tools present themselves on the wire. "rotate" impersonates a
+    # different real browser per job, headers included; "fixed" pins the
+    # user_agent below. This controls tool fingerprinting, not traceability:
+    # the source IP, request rate and payloads are still in the target's logs.
+    user_agent_mode: str = "rotate"
     user_agent: str = (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
         "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
     )
-    # When set, every request carries X-Pentest-ID so the client's blue team can
-    # tell an authorized test from a real attack. Empty when testing detection.
+    # OFF by default. When set, every request carries X-Pentest-ID so the
+    # client's SOC can tell an authorized test from a real intrusion. Leave it
+    # empty to blend in or to test their detection.
     pentest_id: str = ""
 
     # ---- Network privacy ----

@@ -46,7 +46,7 @@ async def audit(action: str, *, engagement_id: Optional[str] = None, **detail: A
     except Exception:  # noqa: BLE001
         import logging
 
-        logging.getLogger("allhack.audit").exception("audit write failed: %s", action)
+        logging.getLogger("syphax.audit").exception("audit write failed: %s", action)
 
 
 async def list_events(

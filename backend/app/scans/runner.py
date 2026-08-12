@@ -17,7 +17,7 @@ from app.scans.storage import JobRepository, new_job_id
 from app.scans.wrappers import get_wrapper
 from app.queue import get_arq_pool
 
-logger = logging.getLogger("allhack.scans.runner")
+logger = logging.getLogger("syphax.scans.runner")
 
 
 class Runner:

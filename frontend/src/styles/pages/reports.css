@@ -1,4 +1,4 @@
-/* All-Hack — Reports builder. Reuses liveview.css chrome + home.css metrics + findings sev. */
+/* Syphax — Reports builder. Reuses liveview.css chrome + home.css metrics + findings sev. */
 .rep-bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 18px; flex-wrap: wrap; }
 .rep-formats { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .seg { display: flex; border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; }

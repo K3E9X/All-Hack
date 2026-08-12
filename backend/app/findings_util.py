@@ -42,7 +42,7 @@ def h1_markdown(f, mapping: Dict[str, Any], cvss: float) -> str:
         L.append("```")
     L.append("")
     L.append("## Impact")
-    L.append(f"Confirmed by allhack ({f.tool}, status: {f.status}). " + (mapping.get("remediation") or ""))
+    L.append(f"Confirmed by syphax ({f.tool}, status: {f.status}). " + (mapping.get("remediation") or ""))
     L.append("")
     L.append("## Remediation")
     L.append(mapping.get("remediation") or "Apply standard hardening for this class.")

@@ -24,7 +24,7 @@ from app.llm.grounding import (clamp_confidence, extract_json, norm_status,
                                quote_is_grounded)
 from app.validation.storage import ValidatedFindingRepository
 
-logger = logging.getLogger("allhack.validation.llm_judge")
+logger = logging.getLogger("syphax.validation.llm_judge")
 
 MAX_JUDGE = 40
 _JUDGEABLE_STATUS = {"likely", "unconfirmed"}

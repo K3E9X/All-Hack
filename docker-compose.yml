@@ -1,4 +1,4 @@
-# docker-compose for All-Hack v2 (AutoPentester foundation).
+# docker-compose for Syphax v2 (AutoPentester foundation).
 #
 # Services:
 #   * postgres   - primary store (engagements, jobs, findings, proxy flows)
@@ -11,16 +11,16 @@
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: allhack-postgres
+    container_name: syphax-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-allhack}
-      POSTGRES_USER: ${POSTGRES_USER:-allhack}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-allhack}
+      POSTGRES_DB: ${POSTGRES_DB:-syphax}
+      POSTGRES_USER: ${POSTGRES_USER:-syphax}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-syphax}
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-allhack} -d ${POSTGRES_DB:-allhack}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-syphax} -d ${POSTGRES_DB:-syphax}"]
       interval: 5s
       timeout: 3s
       retries: 20
@@ -31,7 +31,7 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: allhack-redis
+    container_name: syphax-redis
     restart: unless-stopped
     command: ["redis-server", "--appendonly", "yes"]
     volumes:
@@ -46,7 +46,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: allhack-backend
+    container_name: syphax-backend
     restart: unless-stopped
     depends_on:
       postgres:
@@ -58,7 +58,7 @@ services:
     environment:
       - DATA_DIR=/data
       - MITM_PORT=8080
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-allhack}:${POSTGRES_PASSWORD:-allhack}@postgres:5432/${POSTGRES_DB:-allhack}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-syphax}:${POSTGRES_PASSWORD:-syphax}@postgres:5432/${POSTGRES_DB:-syphax}
       - REDIS_URL=redis://redis:6379/0
     ports:
       - "8000:8000"
@@ -73,7 +73,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: allhack-worker
+    container_name: syphax-worker
     restart: unless-stopped
     depends_on:
       postgres:
@@ -84,7 +84,7 @@ services:
       - .env
     environment:
       - DATA_DIR=/data
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-allhack}:${POSTGRES_PASSWORD:-allhack}@postgres:5432/${POSTGRES_DB:-allhack}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-syphax}:${POSTGRES_PASSWORD:-syphax}@postgres:5432/${POSTGRES_DB:-syphax}
       - REDIS_URL=redis://redis:6379/0
     volumes:
       # Same /data as the backend so the worker can read mitmproxy's CA dir
@@ -101,7 +101,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: allhack-orchestrator
+    container_name: syphax-orchestrator
     restart: unless-stopped
     depends_on:
       postgres:
@@ -112,7 +112,7 @@ services:
       - .env
     environment:
       - DATA_DIR=/data
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-allhack}:${POSTGRES_PASSWORD:-allhack}@postgres:5432/${POSTGRES_DB:-allhack}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-syphax}:${POSTGRES_PASSWORD:-syphax}@postgres:5432/${POSTGRES_DB:-syphax}
       - REDIS_URL=redis://redis:6379/0
     volumes:
       - ./data:/data
@@ -123,7 +123,7 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    container_name: allhack-frontend
+    container_name: syphax-frontend
     restart: unless-stopped
     depends_on:
       - backend

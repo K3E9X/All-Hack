@@ -1,4 +1,4 @@
-/* All-Hack — Proxy (MITM flow inspector). Reuses liveview.css chrome + home.css. */
+/* Syphax — Proxy (MITM flow inspector). Reuses liveview.css chrome + home.css. */
 .px-status { display: flex; gap: 28px; flex-wrap: wrap; }
 .px-status__item { font-family: var(--font-mono); font-size: 12px; }
 .px-status__l { color: var(--text-faint); font-size: 10px; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 5px; }

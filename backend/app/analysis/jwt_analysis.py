@@ -29,7 +29,7 @@ from app.engagements import EngagementRepository
 from app.proxy import FlowRepository
 from app.scans.models import Finding
 
-logger = logging.getLogger("allhack.analysis.jwt")
+logger = logging.getLogger("syphax.analysis.jwt")
 
 MAX_FLOWS = 1000
 MAX_BODY = 256 * 1024
@@ -131,7 +131,7 @@ async def _forge_replay(safe, url, token, *, allow_elevate):
 
     new_payload = elevate(payload) if allow_elevate else dict(payload)
     if not allow_elevate:
-        new_payload["allhack_forge"] = "1"  # benign marker -> distinct token
+        new_payload["syphax_forge"] = "1"  # benign marker -> distinct token
     forged = forge_none(new_payload) if alg in ("none", "") else forge_hs(head, new_payload, secret)
     control = token.rsplit(".", 1)[0] + ".aXhkInvalidSignature"
 

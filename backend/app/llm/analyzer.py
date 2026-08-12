@@ -28,7 +28,7 @@ from app.llm.prompts import (
     SUGGEST_ATTACKS_USER,
 )
 
-logger = logging.getLogger("allhack.llm.analyzer")
+logger = logging.getLogger("syphax.llm.analyzer")
 
 # Body preview caps sent to the model. Small on purpose: the LLM only needs
 # enough signal to spot parameter shapes, auth scheme, framework hints.

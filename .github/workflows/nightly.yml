@@ -91,10 +91,10 @@ jobs:
       # The Dockerfiles pull the scanner toolchain from upstream releases, so
       # this is the step that notices when one of them moves or disappears.
       - name: Build backend image
-        run: docker build -t allhack-backend:nightly ./backend
+        run: docker build -t syphax-backend:nightly ./backend
 
       - name: Build frontend image
-        run: docker build -t allhack-frontend:nightly ./frontend
+        run: docker build -t syphax-frontend:nightly ./frontend
 
       - name: Compose config is valid
         run: docker compose config --quiet

@@ -1,4 +1,4 @@
-"""FastAPI entrypoint for All-Hack.
+"""FastAPI entrypoint for Syphax.
 
 Storage is Postgres (asyncpg pool, shared by the API and the arq worker).
 The mitmproxy addon writes flows synchronously via psycopg using the same
@@ -66,7 +66,7 @@ async def lifespan(app: FastAPI):  # noqa: ARG001
     await db.close_pool()
 
 
-app = FastAPI(title="allhack v2", version="2.0.0", lifespan=lifespan)
+app = FastAPI(title="syphax v2", version="2.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,

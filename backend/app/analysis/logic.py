@@ -35,7 +35,7 @@ from app.proxy import FlowRepository
 from app.scans.models import Finding
 from app.validation.safe_poc import SafePoC, ScopeError
 
-logger = logging.getLogger("allhack.analysis.logic")
+logger = logging.getLogger("syphax.analysis.logic")
 
 _STATE_CHANGING = {"POST", "PUT", "PATCH", "DELETE"}
 _CSRF_HEADERS = {"x-csrf-token", "x-xsrf-token", "csrf-token", "x-csrftoken", "x-xsrf"}

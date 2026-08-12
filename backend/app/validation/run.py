@@ -19,7 +19,7 @@ from app.validation.safe_poc import SafePoC
 from app.validation.storage import ValidatedFindingRepository, new_vf_id
 from app.validation.validator import FindingValidator
 
-logger = logging.getLogger("allhack.validation.run")
+logger = logging.getLogger("syphax.validation.run")
 
 # Catalog item id -> vuln_class isn't 1:1 on findings, so we read the finding's
 # own metadata/tool. This maps tools to a coarse vuln_class when the finding

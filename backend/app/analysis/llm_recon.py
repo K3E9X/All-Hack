@@ -29,7 +29,7 @@ from app.llm.grounding import (clamp_confidence, extract_json, norm_severity,
 from app.proxy import FlowRepository
 from app.scans.models import Finding
 
-logger = logging.getLogger("allhack.analysis.llm_recon")
+logger = logging.getLogger("syphax.analysis.llm_recon")
 
 MAX_FLOWS = 12
 _STATIC_EXT = (".js", ".css", ".png", ".jpg", ".jpeg", ".gif", ".svg",

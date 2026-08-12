@@ -1,5 +1,5 @@
 /* ============================================================
-   All-Hack — Color tokens
+   Syphax — Color tokens
    Dark-first "Mr. Robot" terminal palette. Deep blacks, a single
    muted-cyan accent, and a 5-step severity scale for findings.
    Source of truth: frontend/src/index.css (:root + .dark).

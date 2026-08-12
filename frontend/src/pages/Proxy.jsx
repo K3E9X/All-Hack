@@ -75,7 +75,7 @@ export default function Proxy() {
             <div className="px-status__item"><div className="px-status__l">Status</div><div className="px-status__v"><span className="px-live">{status?.running ? 'listening' : 'unknown'}</span></div></div>
             <div className="px-status__item"><div className="px-status__l">Listen port</div><div className="px-status__v">{status?.port ?? 8080}</div></div>
             <div className="px-status__item"><div className="px-status__l">Flows captured</div><div className="px-status__v">{status?.flow_count ?? flows.length}</div></div>
-            <div className="px-status__item"><div className="px-status__l">CA certificate</div><div className="px-status__v"><a href={api.proxy.caUrl()} target="_blank" rel="noreferrer">allhack-mitmproxy-ca.pem</a></div></div>
+            <div className="px-status__item"><div className="px-status__l">CA certificate</div><div className="px-status__v"><a href={api.proxy.caUrl()} target="_blank" rel="noreferrer">syphax-mitmproxy-ca.pem</a></div></div>
           </div>
         </div>
       </div>

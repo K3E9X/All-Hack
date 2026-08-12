@@ -17,7 +17,7 @@ from typing import List
 from app.llm import ROLE_EXECUTOR, LLMError, get_router
 from app.llm.grounding import extract_json
 
-logger = logging.getLogger("allhack.scans.payload_adapt")
+logger = logging.getLogger("syphax.scans.payload_adapt")
 
 TAMPER_TOOLS = {"sqlmap", "commix"}
 

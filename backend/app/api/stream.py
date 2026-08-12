@@ -15,7 +15,7 @@ from app import events as events_log
 
 router = APIRouter(tags=["stream"])
 
-logger = logging.getLogger("allhack.stream")
+logger = logging.getLogger("syphax.stream")
 
 POLL_INTERVAL = 1.0
 

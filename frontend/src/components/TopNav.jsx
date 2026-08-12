@@ -34,9 +34,9 @@ export default function TopNav() {
 
   return (
     <nav className="topnav">
-      <NavLink to="/" className="topnav__brand" aria-label="allhack home">
+      <NavLink to="/" className="topnav__brand" aria-label="syphax home">
         <img className="topnav__mark" src={logoMark} alt="" width="22" height="22" />
-        <span className="topnav__wm">allhack</span>
+        <span className="topnav__wm">syphax</span>
       </NavLink>
       <div className="topnav__links">
         {LINKS.map((l) => {

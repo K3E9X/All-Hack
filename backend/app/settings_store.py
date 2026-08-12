@@ -5,7 +5,7 @@ safety toggles, integrations, OOB server) as JSON, plus a Fernet-encrypted blob
 of provider API keys. Keys are NEVER returned to the UI - the API exposes only
 `set` / `unset` per provider.
 
-The Fernet key comes from env ALLHACK_SECRET_KEY (urlsafe-b64, 32 bytes); if it
+The Fernet key comes from env SYPHAX_SECRET_KEY (urlsafe-b64, 32 bytes); if it
 is unset we generate one and persist it to {data_dir}/.settings.key (0600) so
 restarts can still decrypt.
 """
@@ -22,7 +22,7 @@ from typing import Any, Dict, Optional
 from app import db
 from app.config import settings as app_settings
 
-logger = logging.getLogger("allhack.settings")
+logger = logging.getLogger("syphax.settings")
 
 SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS settings (
@@ -69,12 +69,19 @@ KEY_IS_EPHEMERAL = False
 def _key_candidates():
     from pathlib import Path
     yield app_settings.data_dir / ".settings.key"
+    yield Path.home() / ".syphax" / ".settings.key"
+    # Pre-rename location. Read-only fallback so an existing install keeps
+    # decrypting its stored provider keys after the All-Hack -> Syphax rename.
     yield Path.home() / ".allhack" / ".settings.key"
 
 
 def _secret_material() -> str:
     global KEY_IS_EPHEMERAL
-    key = os.environ.get("ALLHACK_SECRET_KEY", "").strip()
+    # ALLHACK_SECRET_KEY is the pre-rename name. Honoured so an existing
+    # deployment does not silently generate a new key and lose the ability to
+    # decrypt the provider keys already in the database.
+    key = (os.environ.get("SYPHAX_SECRET_KEY", "")
+           or os.environ.get("ALLHACK_SECRET_KEY", "")).strip()
     if key:
         return key
 
@@ -99,11 +106,11 @@ def _secret_material() -> str:
             continue
 
     # Could not persist anywhere: the key is ephemeral and secrets saved now are
-    # lost on restart. Fail LOUD (operator must set ALLHACK_SECRET_KEY).
+    # lost on restart. Fail LOUD (operator must set SYPHAX_SECRET_KEY).
     KEY_IS_EPHEMERAL = True
     logger.critical(
         "CRITICAL: could not persist an at-rest encryption key (tried %s). "
-        "Stored provider keys will NOT survive a restart. Set the ALLHACK_SECRET_KEY "
+        "Stored provider keys will NOT survive a restart. Set the SYPHAX_SECRET_KEY "
         "environment variable to a fixed value to fix this permanently.",
         ", ".join(str(p) for p in candidates),
     )
@@ -135,7 +142,7 @@ def _fernet():
 def _xor_key() -> bytes:
     global _key_cache
     if _key_cache is None:
-        _key_cache = hashlib.sha256(("allhack:" + _secret_material()).encode()).digest()
+        _key_cache = hashlib.sha256(("syphax:" + _secret_material()).encode()).digest()
     return _key_cache
 
 
@@ -213,7 +220,7 @@ async def get_public() -> Dict[str, Any]:
     _xor_key()
     if KEY_IS_EPHEMERAL:
         data["key_warning"] = ("No durable encryption key: stored provider keys "
-                               "will be lost on restart. Set ALLHACK_SECRET_KEY.")
+                               "will be lost on restart. Set SYPHAX_SECRET_KEY.")
     return data
 
 

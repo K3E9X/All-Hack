@@ -1,4 +1,4 @@
-/* All-Hack — Home / Dashboard. Reuses liveview.css chrome. */
+/* Syphax — Home / Dashboard. Reuses liveview.css chrome. */
 
 /* metric row */
 .metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; }

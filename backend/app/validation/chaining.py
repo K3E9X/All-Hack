@@ -18,7 +18,7 @@ from app.llm import ROLE_PLANNER, LLMError, get_router
 from app.validation.models import ValidatedFinding
 from app.validation.storage import ChainRepository, ValidatedFindingRepository
 
-logger = logging.getLogger("allhack.validation.chaining")
+logger = logging.getLogger("syphax.validation.chaining")
 
 _SEVERITY_RANK = {"critical": 0, "high": 1, "medium": 2, "low": 3, "info": 4}
 

@@ -17,7 +17,7 @@ from typing import Any, Dict, Optional
 from app import db
 from app.config import settings
 
-logger = logging.getLogger("allhack.llm.usage")
+logger = logging.getLogger("syphax.llm.usage")
 
 # Set by the loop / API handlers so chat() knows what to bill.
 current_engagement: contextvars.ContextVar[Optional[str]] = contextvars.ContextVar(

@@ -2,8 +2,8 @@
 
 Two automatic methods prove the operator controls the target:
 
-  * DNS TXT  - a TXT record `allhack-verify=<token>` on the target host.
-  * WELL_KNOWN - a file at https://host/.well-known/allhack-<token>.txt
+  * DNS TXT  - a TXT record `syphax-verify=<token>` on the target host.
+  * WELL_KNOWN - a file at https://host/.well-known/syphax-<token>.txt
     whose body is exactly the token.
 
 A MANUAL method exists for signed-authorization uploads but is approved
@@ -23,7 +23,7 @@ import httpx
 
 from app.engagements.models import Engagement, VerificationMethod
 
-logger = logging.getLogger("allhack.engagements.verifier")
+logger = logging.getLogger("syphax.engagements.verifier")
 
 
 @dataclass
@@ -56,14 +56,14 @@ class AuthorizationVerifier:
             ok=False,
             method=None,
             detail=(
-                f"Neither DNS TXT (allhack-verify={token} on {host}) nor "
-                f"https://{host}/.well-known/allhack-{token}.txt could be confirmed. "
+                f"Neither DNS TXT (syphax-verify={token} on {host}) nor "
+                f"https://{host}/.well-known/syphax-{token}.txt could be confirmed. "
                 f"DNS: {dns.detail} | well-known: {well_known.detail}"
             ),
         )
 
     async def _verify_dns(self, host: str, token: str) -> VerificationResult:
-        expected = f"allhack-verify={token}"
+        expected = f"syphax-verify={token}"
         try:
             import dns.asyncresolver  # dnspython
 
@@ -84,7 +84,7 @@ class AuthorizationVerifier:
             return VerificationResult(False, None, f"DNS lookup failed: {type(exc).__name__}")
 
     async def _verify_well_known(self, host: str, token: str) -> VerificationResult:
-        url = f"https://{host}/.well-known/allhack-{token}.txt"
+        url = f"https://{host}/.well-known/syphax-{token}.txt"
         try:
             async with httpx.AsyncClient(
                 timeout=self.http_timeout, follow_redirects=False, verify=True

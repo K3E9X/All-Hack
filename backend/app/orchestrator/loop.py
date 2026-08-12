@@ -28,7 +28,7 @@ from app.scans.models import JobStatus
 from app.scans.storage import JobRepository
 from app.validation import build_chains, validate_engagement
 
-logger = logging.getLogger("allhack.orchestrator.loop")
+logger = logging.getLogger("syphax.orchestrator.loop")
 
 # Safety defaults when the engagement sets no budget.
 DEFAULT_MAX_JOBS = 200

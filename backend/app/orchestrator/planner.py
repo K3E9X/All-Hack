@@ -19,7 +19,7 @@ from app.llm import ROLE_PLANNER, LLMError, get_router
 from app.methodology import CATALOG, CATALOG_BY_ID, PHASE_ORDER, applies
 from app.orchestrator.state import Asset, EngagementState
 
-logger = logging.getLogger("allhack.orchestrator.planner")
+logger = logging.getLogger("syphax.orchestrator.planner")
 
 _SEVERITY_RANK = {"critical": 0, "high": 1, "medium": 2, "low": 3, "info": 4}
 

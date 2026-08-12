@@ -10,8 +10,11 @@ import pytest
 
 from app.config import settings
 from app.network.privacy import MODE_OFF, MODE_PROXY, NetworkPrivacyManager
-from app.scans.identity import (MODE_ROTATE, USER_AGENT_POOL, current_user_agent,
-                                identity_args, proxy_args, supports_proxy)
+from app.scans.identity import (BROWSER_PROFILES, MODE_ROTATE, current_profile,
+                                current_user_agent, identity_args, proxy_args,
+                                supports_proxy)
+
+USER_AGENT_POOL = [p["ua"] for p in BROWSER_PROFILES]
 
 
 @pytest.fixture
@@ -44,10 +47,10 @@ def test_rotate_mode_draws_from_the_pool(clean_settings):
 
 
 def test_no_user_agent_announces_the_tool_name(clean_settings):
-    """Regression: the old crawler sent 'AllHackCrawler/1.0' to every target."""
+    """Regression: the old crawler sent 'SyphaxCrawler/1.0' to every target."""
     settings.user_agent_mode = MODE_ROTATE
     for ua in USER_AGENT_POOL:
-        assert "allhack" not in ua.lower()
+        assert "syphax" not in ua.lower()
         assert "crawler" not in ua.lower()
 
 
@@ -58,14 +61,15 @@ def test_dash_h_tools_get_a_user_agent_header(clean_settings, tool):
     settings.user_agent_mode = "fixed"
     settings.user_agent = "TestAgent/1.0"
     settings.pentest_id = ""
-    assert identity_args(tool) == ["-H", "User-Agent: TestAgent/1.0"]
+    args = identity_args(tool)
+    assert args[:2] == ["-H", "User-Agent: TestAgent/1.0"]
 
 
 def test_sqlmap_uses_its_own_flag(clean_settings):
     settings.user_agent_mode = "fixed"
     settings.user_agent = "TestAgent/1.0"
     settings.pentest_id = ""
-    assert identity_args("sqlmap") == ["--user-agent", "TestAgent/1.0"]
+    assert identity_args("sqlmap")[:2] == ["--user-agent", "TestAgent/1.0"]
 
 
 def test_pentest_id_is_attached_when_set(clean_settings):
@@ -78,9 +82,91 @@ def test_pentest_id_is_attached_when_set(clean_settings):
 
 
 def test_pentest_id_absent_by_default(clean_settings):
+    """It marks traffic as an authorized test, which is the opposite of
+    blending in. Must stay off unless the operator opts in."""
     settings.user_agent_mode = "fixed"
     settings.pentest_id = ""
     assert not any("X-Pentest-ID" in a for a in identity_args("nuclei"))
+    assert settings.model_fields["pentest_id"].default == ""
+
+
+def test_rotate_is_the_default_mode():
+    assert settings.model_fields["user_agent_mode"].default == MODE_ROTATE
+
+
+# ---- Browser profile coherence ----
+# A UA that does not match the headers around it is a stronger signal than a
+# missing UA, so these pin the combinations that exist in the wild.
+
+def test_every_profile_carries_a_full_header_set():
+    for p in BROWSER_PROFILES:
+        h = p["headers"]
+        assert h.get("Accept"), f"{p['ua']} has no Accept"
+        assert h.get("Accept-Language"), f"{p['ua']} has no Accept-Language"
+        assert h.get("Sec-Fetch-Mode") == "navigate"
+
+
+def test_client_hints_only_on_chromium():
+    """Firefox and Safari do not implement Sec-CH-UA. Sending it with their
+    UA is an instant tell."""
+    for p in BROWSER_PROFILES:
+        ua = str(p["ua"])
+        is_chromium = "Chrome/" in ua or "Edg/" in ua
+        has_hints = "Sec-CH-UA" in p["headers"]
+        assert has_hints == is_chromium, f"client-hint mismatch for {ua}"
+
+
+def test_client_hint_version_matches_the_user_agent():
+    import re
+
+    for p in BROWSER_PROFILES:
+        hints = p["headers"].get("Sec-CH-UA")
+        if not hints:
+            continue
+        ua_ver = re.search(r"Chrome/(\d+)", str(p["ua"])).group(1)
+        assert f'"{ua_ver}"' in hints, f"{p['ua']} claims a different hint version"
+
+
+def test_mobile_hint_matches_the_platform():
+    for p in BROWSER_PROFILES:
+        mobile = p["headers"].get("Sec-CH-UA-Mobile")
+        if mobile is None:
+            continue
+        looks_mobile = "Mobile" in str(p["ua"]) or "Android" in str(p["ua"])
+        assert (mobile == "?1") == looks_mobile, f"mobile flag wrong for {p['ua']}"
+
+
+def test_rotation_returns_whole_profiles(clean_settings):
+    settings.user_agent_mode = MODE_ROTATE
+    seen = {str(current_profile()["ua"]) for _ in range(200)}
+    assert len(seen) > 1
+    # And the headers always travel with their own UA
+    for _ in range(50):
+        p = current_profile()
+        assert p["headers"]["Accept"]
+        if "Firefox" in str(p["ua"]):
+            assert "Sec-CH-UA" not in p["headers"]
+
+
+def test_unknown_custom_ua_does_not_get_chromium_hints(clean_settings):
+    """A pinned Firefox UA must not be paired with client hints."""
+    settings.user_agent_mode = "fixed"
+    settings.user_agent = "Mozilla/5.0 (X11; Linux x86_64; rv:99.0) Gecko/20100101 Firefox/99.0"
+    assert "Sec-CH-UA" not in current_profile()["headers"]
+
+
+def test_emitted_headers_are_coherent_for_dash_h_tools(clean_settings):
+    settings.user_agent_mode = MODE_ROTATE
+    settings.pentest_id = ""
+    args = identity_args("nuclei")
+    sent = dict(a.split(": ", 1) for a in args if a != "-H")
+    ua = sent["User-Agent"]
+    if "Firefox" in ua:
+        assert "Sec-CH-UA" not in sent
+    else:
+        assert sent.get("Sec-CH-UA")
+    assert sent["Accept"]
+    assert "X-Pentest-ID" not in sent
 
 
 @pytest.mark.parametrize("tool", ["subfinder", "dnsx", "naabu", "gau", "nmap", "testssl"])
@@ -98,7 +184,7 @@ def test_wpscan_does_not_combine_conflicting_ua_flags(clean_settings):
 
     settings.user_agent_mode = "fixed"
     settings.user_agent = "TestAgent/1.0"
-    assert identity_args("wpscan") == ["--user-agent", "TestAgent/1.0"]
+    assert identity_args("wpscan")[:2] == ["--user-agent", "TestAgent/1.0"]
 
 
 def test_wpscan_wrapper_only_randomises_in_rotate_mode(clean_settings):

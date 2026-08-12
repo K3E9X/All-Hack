@@ -1,4 +1,4 @@
-/* All-Hack — Sandbox PoC runner. Reuses liveview.css chrome. */
+/* Syphax — Sandbox PoC runner. Reuses liveview.css chrome. */
 .sbx-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
 
 .sbx-badge { display: inline-flex; align-items: center; gap: 7px; font-family: var(--font-mono); font-size: 11px; color: var(--term-ok); border: 1px solid rgba(74,222,128,.3); border-radius: var(--radius-full); padding: 3px 11px; }

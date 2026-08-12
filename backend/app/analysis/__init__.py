@@ -25,7 +25,7 @@ from app.analysis.param_discovery import analyze_params
 from app.analysis.graphql import analyze_graphql
 from app.analysis.public_exploits import analyze_public_exploits
 
-logger = logging.getLogger("allhack.analysis")
+logger = logging.getLogger("syphax.analysis")
 
 __all__ = ["analyze_logic", "analyze_js", "analyze_jwt",
            "analyze_access_control", "analyze_cors", "analyze_params",

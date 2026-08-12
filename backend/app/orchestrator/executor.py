@@ -22,7 +22,7 @@ from app.scans import Job, get_runner
 from app.orchestrator.planner import Task
 from app.orchestrator.state import EngagementState
 
-logger = logging.getLogger("allhack.orchestrator.executor")
+logger = logging.getLogger("syphax.orchestrator.executor")
 
 
 class Executor:

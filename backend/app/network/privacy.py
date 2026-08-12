@@ -42,7 +42,7 @@ import httpx
 
 from app.config import settings
 
-logger = logging.getLogger("allhack.network.privacy")
+logger = logging.getLogger("syphax.network.privacy")
 
 # Several services, because any single one can be down or blocked from the
 # exit node. First usable answer wins.

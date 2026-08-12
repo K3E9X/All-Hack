@@ -96,5 +96,5 @@ async def download_ca() -> FileResponse:
     return FileResponse(
         path=str(ca_path),
         media_type="application/x-pem-file",
-        filename="allhack-mitmproxy-ca.pem",
+        filename="syphax-mitmproxy-ca.pem",
     )

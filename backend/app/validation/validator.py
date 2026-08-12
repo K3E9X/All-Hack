@@ -28,7 +28,7 @@ from app.scans.models import Finding
 from app.validation.models import ValidationResult, ValidationStatus
 from app.validation.safe_poc import SafePoC, ScopeError
 
-logger = logging.getLogger("allhack.validation.validator")
+logger = logging.getLogger("syphax.validation.validator")
 
 # Tools whose positive findings are already actively proven.
 _TOOL_CONFIRMED = {"sqlmap", "commix", "dalfox"}
@@ -146,7 +146,7 @@ class FindingValidator:
         url = finding.target
         if not url or "://" not in url or "?" not in url:
             return None
-        marker = "allhack" + secrets.token_hex(4)
+        marker = "syphax" + secrets.token_hex(4)
         injected = _inject_marker(url, marker)
         if injected is None:
             return None

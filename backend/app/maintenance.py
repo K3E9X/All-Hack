@@ -27,7 +27,7 @@ from typing import List
 from app import db
 from app.config import settings
 
-logger = logging.getLogger("allhack.maintenance")
+logger = logging.getLogger("syphax.maintenance")
 
 # Scan artefacts: everything produced by running the tool, safe to drop.
 TRANSIENT_TABLES: List[str] = [
