@@ -19,6 +19,19 @@ const LINKS = [
 ];
 
 export default function TopNav() {
+  // Without this, a backend that is down looks identical to a tool with no
+  // data: every page renders its empty state and says nothing is wrong.
+  const [online, setOnline] = useState(null);
+  useEffect(() => {
+    let alive = true;
+    const ping = () => api.health()
+      .then(() => alive && setOnline(true))
+      .catch(() => alive && setOnline(false));
+    ping();
+    const t = setInterval(ping, 15000);
+    return () => { alive = false; clearInterval(t); };
+  }, []);
+
   // "Live" points at the most-recent engagement's live view.
   const [liveTo, setLiveTo] = useState('/engagements');
   useEffect(() => {
@@ -38,6 +51,10 @@ export default function TopNav() {
         <img className="topnav__mark" src={logoMark} alt="" width="22" height="22" />
         <span className="topnav__wm">syphax</span>
       </NavLink>
+      <span className={'topnav__health topnav__health--' + (online === null ? 'unknown' : online ? 'up' : 'down')}
+            title={online === false ? 'Backend unreachable — pages will look empty' : 'Backend reachable'}>
+        {online === false ? 'backend offline' : ''}
+      </span>
       <div className="topnav__links">
         {LINKS.map((l) => {
           const to = l.label === 'Live' ? liveTo : l.to;

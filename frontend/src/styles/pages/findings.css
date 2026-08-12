@@ -49,3 +49,12 @@
 .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--surface); border: 1px solid var(--accent-ring); color: var(--text-primary); font-size: 13px; padding: 10px 16px; border-radius: var(--radius-sm); box-shadow: var(--shadow-pop); z-index: 50; }
 
 @media (max-width: 980px) { .layout { grid-template-columns: 1fr; } .detail { position: static; } }
+
+/* Kill-chains for the selected engagement. Only rendered when an engagement is
+   picked: chains belong to one engagement, so showing them beside the deduped
+   cross-engagement list would attribute them to the wrong target. */
+.fnd-chain { display: flex; align-items: baseline; gap: 10px; padding: 5px 0;
+  border-bottom: 1px solid var(--border); font-size: 12px; }
+.fnd-chain:last-child { border-bottom: none; }
+.fnd-chain__t { flex: 1; color: var(--text-primary); }
+.fnd-chain__s { color: var(--text-faint); font-family: var(--font-mono); font-size: 11px; }

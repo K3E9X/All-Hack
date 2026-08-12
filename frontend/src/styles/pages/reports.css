@@ -70,3 +70,9 @@
 .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--surface); border: 1px solid var(--accent-ring); color: var(--text-primary); font-size: 13px; padding: 10px 16px; border-radius: var(--radius-sm); box-shadow: var(--shadow-pop); z-index: 50; }
 
 @media (max-width: 820px) { .doc { padding: 24px; } .rr2 { grid-template-columns: 1fr; } .meta-grid, .covline { grid-template-columns: 1fr; } }
+
+/* LLM narrative draft. Rendered as plain text on purpose: it is a draft to
+   read and edit, not a finished section of the report, and styling it like
+   one would invite pasting it into a client deliverable unread. */
+.rep-narrative { white-space: pre-wrap; font-family: var(--font-mono); font-size: 12px;
+  line-height: 1.6; color: var(--text-secondary); max-height: 420px; overflow: auto; }

@@ -34,12 +34,50 @@ export default function Reports() {
   const dist = findings.reduce((acc, f) => { acc[f.severity] = (acc[f.severity] || 0) + 1; return acc; }, {});
   const total = findings.length;
   const maxd = Math.max(...['critical', 'high', 'medium', 'low'].map((s) => dist[s] || 0), 1);
+  const [narrative, setNarrative] = useState(null);
+  const [writing, setWriting] = useState(false);
+
+  // The deterministic report below is assembled from the findings. This asks
+  // the LLM for the prose version - the executive framing a client reads
+  // first, which templates are bad at.
+  async function writeNarrative() {
+    if (!eng) return;
+    setWriting(true); setNarrative(null);
+    try {
+      const r = await api.llm.report({
+        title: `Penetration Test - ${eng.target_host || eng.target_url}`,
+        scope: (eng.scope_hosts || []).join(', '),
+      });
+      setNarrative(r.markdown || '(empty)');
+    } catch (e) {
+      setNarrative(`Could not generate: ${e.message}`);
+    } finally { setWriting(false); }
+  }
+
   const toggle = (id) => setOpen((o) => o.includes(id) ? o.filter((x) => x !== id) : [...o, id]);
 
   function exportAs(fmt) {
     if (!engId) return;
-    const map = { md: 'md', print: 'pdf', json: 'json', sarif: 'sarif' };
+    const map = { md: 'md', print: 'pdf', sarif: 'sarif' };
     window.open(`/api/engagements/${engId}/report?format=${map[fmt] || 'md'}`, '_blank');
+  }
+
+  // JSON goes through the api layer rather than window.open: the browser would
+  // render it as a page instead of saving it, and the operator wants the file.
+  async function exportJson() {
+    if (!engId) return;
+    try {
+      const data = await api.engagements.reportJson(engId);
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `syphax-${engId}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      setNarrative(`JSON export failed: ${e.message}`);
+    }
   }
 
   return (
@@ -59,10 +97,25 @@ export default function Reports() {
           <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-faint)', marginRight: 4 }}>export:</span>
           <button className="btn btn--muted" onClick={() => exportAs('md')}>Markdown</button>
           <button className="btn btn--muted" onClick={() => exportAs('print')}>PDF</button>
-          <button className="btn btn--muted" onClick={() => exportAs('json')}>JSON</button>
+          <button className="btn btn--muted" onClick={exportJson}>JSON</button>
           <button className="btn btn--muted" onClick={() => exportAs('sarif')}>SARIF</button>
+          <button className="btn" onClick={writeNarrative} disabled={!engId || writing}>
+            {writing ? 'Writing...' : 'LLM narrative'}
+          </button>
         </div>
       </div>
+
+      {narrative && (
+        <div className="card">
+          <div className="card__head">
+            <span className="card__title">LLM narrative</span>
+            <span className="card__meta">draft &middot; review before sending</span>
+          </div>
+          <div className="card__body">
+            <pre className="rep-narrative">{narrative}</pre>
+          </div>
+        </div>
+      )}
 
       {!eng ? <div className="card"><div className="card__body"><div className="empty">Select an engagement to assemble its report.</div></div></div> : (
         <div className="doc">

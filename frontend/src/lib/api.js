@@ -18,6 +18,7 @@ function safeJson(text) {
 
 export const api = {
   config: () => request('/api/config'),
+  health: () => request('/api/health'),
   llmPing: (role) => request(`/api/llm/ping${role ? `?role=${role}` : ''}`, { method: 'POST' }),
   dashboard: () => request('/api/dashboard'),
   tools: () => request('/api/tools'),
@@ -41,6 +42,9 @@ export const api = {
     approvals: (id) => request(`/api/engagements/${id}/approvals`),
     surface: (id) => request(`/api/engagements/${id}/surface`),
     coverage: (id) => request(`/api/engagements/${id}/coverage`),
+    findings: (id) => request(`/api/engagements/${id}/findings`),
+    chains: (id) => request(`/api/engagements/${id}/chains`),
+    reportJson: (id) => request(`/api/engagements/${id}/report.json`),
     retestFinding: (id, fid) => request(`/api/engagements/${id}/findings/${fid}/retest`, { method: 'POST' }),
     decideApproval: (id, approvalId, decision) =>
       request(`/api/engagements/${id}/approvals/${approvalId}`, {

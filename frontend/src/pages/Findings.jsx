@@ -21,10 +21,38 @@ export default function Findings() {
   const [q, setQ] = useState('');
   const [sel, setSel] = useState(null);
   const [toast, setToast] = useState(null);
+  const [engagements, setEngagements] = useState([]);
+  const [engId, setEngId] = useState('');
+  const [chains, setChains] = useState([]);
   const flash = (m) => { setToast(m); setTimeout(() => setToast(null), 2000); };
 
+  useEffect(() => {
+    api.engagements.list().then((r) => setEngagements(r.items || [])).catch(() => {});
+  }, []);
+
+  // The default list is deduped across engagements, which is right for triage
+  // but wrong when writing up one client: it merges their findings with
+  // everyone else's. Picking an engagement switches to its own set, with the
+  // kill-chains that belong to it.
   const load = useCallback(async () => {
     try {
+      if (engId) {
+        const [f, c] = await Promise.all([
+          api.engagements.findings(engId), api.engagements.chains(engId),
+        ]);
+        let items = f.items || [];
+        if (sevFilter !== 'all') items = items.filter((x) => x.severity === sevFilter);
+        if (statusFilter !== 'all') items = items.filter((x) => x.status === statusFilter);
+        if (q) {
+          const needle = q.toLowerCase();
+          items = items.filter((x) => `${x.title} ${x.target} ${x.vuln_class}`
+            .toLowerCase().includes(needle));
+        }
+        setRows(items);
+        setChains(c.items || []);
+        return;
+      }
+      setChains([]);
       const r = await api.findings.list({
         severity: sevFilter !== 'all' ? sevFilter : undefined,
         status: statusFilter !== 'all' ? statusFilter : undefined,
@@ -32,7 +60,7 @@ export default function Findings() {
       });
       setRows(r.items || []);
     } catch { /* ignore */ }
-  }, [sevFilter, statusFilter, q]);
+  }, [sevFilter, statusFilter, q, engId]);
   useEffect(() => { load(); }, [load]);
 
   const counts = SEVS.reduce((o, s) => (o[s] = rows.filter((f) => f.severity === s).length, o), {});
@@ -64,12 +92,38 @@ export default function Findings() {
           <button className={statusFilter === 'all' ? 'on' : ''} onClick={() => setStatusFilter('all')}>All status</button>
           {STATUSES.map((s) => <button key={s} className={statusFilter === s ? 'on' : ''} onClick={() => setStatusFilter(s)}>{s.replace('_', ' ')}</button>)}
         </div>
+        <div className="select-box">
+          <select className="select" value={engId} onChange={(e) => setEngId(e.target.value)}>
+            <option value="">All engagements (deduped)</option>
+            {engagements.map((e) => (
+              <option key={e.id} value={e.id}>{e.target_host || e.target_url}</option>
+            ))}
+          </select>
+        </div>
         <input className="filter-search" placeholder="search title / target / class..." value={q} onChange={(e) => setQ(e.target.value)} />
       </div>
 
+      {chains.length > 0 && (
+        <div className="card">
+          <div className="card__head">
+            <span className="card__title">Kill-chains</span>
+            <span className="card__meta">{chains.length} for this engagement</span>
+          </div>
+          <div className="card__body">
+            {chains.map((c) => (
+              <div key={c.id} className="fnd-chain">
+                <span className={'sev sev-' + (c.severity || 'info')}>{c.severity}</span>
+                <span className="fnd-chain__t">{c.title}</span>
+                <span className="fnd-chain__s">{(c.steps || c.steps_json || []).length || ''} step(s)</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="layout">
         <div className="card">
-          <div className="card__head"><span className="card__title">Findings <span style={{ color: 'var(--text-faint)' }}>({rows.length})</span></span><span className="card__meta">deduped across engagements</span></div>
+          <div className="card__head"><span className="card__title">Findings <span style={{ color: 'var(--text-faint)' }}>({rows.length})</span></span><span className="card__meta">{engId ? 'this engagement' : 'deduped across engagements'}</span></div>
           <div className="tbl-scroll">
             <table className="tbl">
               <thead><tr><th>Sev</th><th>CVSS</th><th>Title</th><th>Target</th><th>Status</th><th>Eng.</th><th></th></tr></thead>

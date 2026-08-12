@@ -224,3 +224,10 @@ body { background: var(--bg); color: var(--text-primary); font: var(--font-body)
   .step { border-right: none; border-bottom: 1px solid var(--border); }
   .cov-cat { grid-template-columns: 1fr; gap: 6px; }
 }
+
+/* Backend reachability. Silent when up: a permanent green dot is noise. It only
+   speaks when the backend is gone, because that state otherwise looks exactly
+   like a tool with no data — every page renders its empty state. */
+.topnav__health { font-family: var(--font-mono); font-size: 11px; margin-left: 10px; }
+.topnav__health--up, .topnav__health--unknown { display: none; }
+.topnav__health--down { color: var(--sev-critical); }

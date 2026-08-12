@@ -74,6 +74,18 @@ export default function LiveView() {
   async function run() { setBusy(true); try { await api.engagements.run(id); await loadState(); } catch (e) { flash(e.message); } finally { setBusy(false); } }
   async function stop() { setBusy(true); try { await api.engagements.stop(id); await loadState(); } catch (e) { flash(e.message); } finally { setBusy(false); } }
   async function analyze() { setBusy(true); try { const r = await api.engagements.analyzeTraffic(id); await loadState(); flash('Deep analysis complete'); } catch (e) { flash(e.message); } finally { setBusy(false); } }
+  // Validation runs at the end of an autonomous run. This re-runs it on
+  // demand, which is what you want after adding findings by hand from the
+  // Scans page - otherwise they sit unvalidated until the next full run.
+  async function revalidate() {
+    setBusy(true);
+    try {
+      const r = await api.engagements.validate(id);
+      await loadState();
+      const st = r.stats || {};
+      flash(`Validated ${st.validated ?? st.total ?? 0} finding(s) · ${r.chains ?? 0} chain(s)`);
+    } catch (e) { flash(e.message); } finally { setBusy(false); }
+  }
   async function decide(aid, decision) { try { await api.engagements.decideApproval(id, aid, decision); await loadState(); } catch (e) { flash(e.message); } }
   async function retest(fid) {
     flash('Re-testing...');
@@ -138,6 +150,7 @@ export default function LiveView() {
           {!active && <button className="btn" onClick={run} disabled={busy}>Run</button>}
           {active && <button className="btn btn--danger" onClick={stop} disabled={busy}>Stop</button>}
           <button className="btn" onClick={analyze} disabled={busy}>Deep analysis</button>
+          <button className="btn" onClick={revalidate} disabled={busy} title="Re-run validation and chain building over the current findings">Re-validate</button>
           <a className="btn btn--muted" href={`/api/engagements/${id}/report.md`} target="_blank" rel="noreferrer">Report .md</a>
           <a className="btn btn--muted" href={`/api/engagements/${id}/report.html`} target="_blank" rel="noreferrer">Report (print)</a>
         </div>
