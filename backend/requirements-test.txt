@@ -11,5 +11,8 @@ python-dotenv==1.0.1
 dnspython==2.7.0
 arq==0.26.3
 cryptography==43.0.1
+# The sandbox isolation tests assert against docker-compose.yml: that config
+# IS the isolation (no route to Postgres, no env_file), so CI has to parse it.
+PyYAML==6.0.2
 pytest==9.0.3
 pytest-asyncio==1.4.0

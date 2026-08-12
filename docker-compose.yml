@@ -10,6 +10,7 @@
 
 services:
   postgres:
+    networks: [syphax-net]
     image: postgres:16-alpine
     container_name: syphax-postgres
     restart: unless-stopped
@@ -30,6 +31,7 @@ services:
     #   - "5432:5432"
 
   redis:
+    networks: [syphax-net]
     image: redis:7-alpine
     container_name: syphax-redis
     restart: unless-stopped
@@ -43,6 +45,7 @@ services:
       retries: 20
 
   backend:
+    networks: [syphax-net, sandbox-net]
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -70,6 +73,7 @@ services:
       - NET_ADMIN
 
   worker:
+    networks: [syphax-net]
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -98,6 +102,7 @@ services:
   # Dedicated worker for the autonomous orchestrator loops, on its own queue so
   # a long-lived run never starves the scan worker's pool (avoids deadlock).
   orchestrator:
+    networks: [syphax-net]
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -120,6 +125,7 @@ services:
     command: ["arq", "app.workers.OrchestratorWorkerSettings"]
 
   frontend:
+    networks: [syphax-net]
     build:
       context: ./frontend
       dockerfile: Dockerfile
@@ -129,6 +135,53 @@ services:
       - backend
     ports:
       - "3000:80"
+
+  # Runs untrusted third-party PoCs. Attached to sandbox-net ONLY: Postgres,
+  # Redis and the backend's secrets live on syphax-net, which this container is
+  # not on. There is no route to them, so there is nothing to firewall.
+  #
+  # Deliberately absent, and each absence is the point:
+  #   env_file      - no API keys, no DB password. Nothing worth stealing.
+  #   ./data mount  - no access to the mitmproxy CA or the settings key.
+  #   syphax-net    - cannot address the database or the queue.
+  sandbox-runner:
+    build:
+      context: ./sandbox-runner
+      dockerfile: Dockerfile
+    container_name: syphax-sandbox-runner
+    restart: unless-stopped
+    networks: [sandbox-net]
+    environment:
+      # Comma-separated engagement scope. EMPTY MEANS DENY ALL OUTBOUND - a
+      # sandbox that silently allows the whole internet is worse than one that
+      # fails visibly. Set per engagement before running a PoC.
+      - SANDBOX_ALLOWED_HOSTS=${SANDBOX_ALLOWED_HOSTS:-}
+      - SANDBOX_MAX_TIMEOUT=${SANDBOX_MAX_TIMEOUT:-120}
+    # NET_ADMIN is needed to pin the egress rules at boot; entrypoint.sh drops
+    # to an unprivileged user immediately afterwards, so the PoC never holds it.
+    cap_add:
+      - NET_ADMIN
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /work:size=64m,mode=1777
+      - /run:size=1m
+      - /tmp:size=16m
+    mem_limit: 512m
+    pids_limit: 128
+    # Not published to the host: only the backend, on sandbox-net, can reach it.
+    expose:
+      - "8090"
+
+networks:
+  # Everything that holds state or secrets.
+  syphax-net:
+  # Backend <-> sandbox-runner only. The runner never initiates anything
+  # towards the backend, so a compromised runner has nothing to call.
+  sandbox-net:
 
 volumes:
   postgres-data:
