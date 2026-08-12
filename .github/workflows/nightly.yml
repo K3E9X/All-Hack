@@ -83,21 +83,48 @@ jobs:
         run: npm audit --audit-level=high
 
   docker:
-    name: Images build
+    name: Images build (amd64 + arm64)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
 
-      # The Dockerfiles pull the scanner toolchain from upstream releases, so
-      # this is the step that notices when one of them moves or disappears.
-      - name: Build backend image
-        run: docker build -t syphax-backend:nightly ./backend
+      # Emulation, so the arm64 build is exercised on an amd64 runner. Slow,
+      # which is why this lives in the nightly and not on every push.
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
 
-      - name: Build frontend image
-        run: docker build -t syphax-frontend:nightly ./frontend
+      # Two things break on Apple Silicon and nowhere else: a tool release with
+      # no arm64 archive, and a Python pin with no aarch64 wheel (which then
+      # tries to compile in a slim image with no toolchain). Building both
+      # architectures is the only way to notice before a user does.
+      - name: Build backend image (both architectures)
+        run: |
+          docker buildx build --platform linux/amd64,linux/arm64 \
+            -t syphax-backend:nightly ./backend
+
+      - name: Build sandbox runner (both architectures)
+        run: |
+          docker buildx build --platform linux/amd64,linux/arm64 \
+            -t syphax-sandbox-runner:nightly ./sandbox-runner
+
+      - name: Build frontend image (both architectures)
+        run: |
+          docker buildx build --platform linux/amd64,linux/arm64 \
+            -t syphax-frontend:nightly ./frontend
 
       - name: Compose config is valid
         run: docker compose config --quiet
+
+      # Guards the Windows failure mode: a CRLF shebang on a file used as
+      # ENTRYPOINT makes Docker report "no such file or directory" for a file
+      # that plainly exists. .gitattributes pins these to LF; this checks it held.
+      - name: Container scripts are LF-only
+        run: |
+          fail=0
+          for f in backend/entrypoint.sh sandbox-runner/entrypoint.sh; do
+            if grep -qU $'\r' "$f"; then echo "CRLF found in $f"; fail=1; fi
+          done
+          exit $fail
 
   ci-env-parity:
     name: CI env parity

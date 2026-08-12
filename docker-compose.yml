@@ -71,6 +71,16 @@ services:
       - ./data:/data
     cap_add:
       - NET_ADMIN
+    # WireGuard and OpenVPN both need a TUN device to create the tunnel
+    # interface. Without it wg-quick fails with "Cannot find device", which
+    # reads like a missing binary rather than a missing device.
+    #
+    # Present on Docker Desktop's Linux VM (macOS, Windows) and on Linux hosts.
+    # If your host genuinely lacks it, comment this out and bring the tunnel up
+    # host-side instead: the kill switch compares exit IPs and protects you
+    # either way, whoever owns the tunnel.
+    devices:
+      - /dev/net/tun:/dev/net/tun
 
   worker:
     networks: [syphax-net]

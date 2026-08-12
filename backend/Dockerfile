@@ -42,6 +42,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         procps \
         dnsutils \
         perl \
+        # POST /api/network/vpn/connect shells out to these. Without them the
+        # endpoint could only ever answer "wg-quick is not installed", so the
+        # feature shipped dead. wireguard-tools pulls wireguard-go, the
+        # userspace implementation, which is what actually works inside a
+        # container when the host kernel module is not exposed - the usual case
+        # on Docker Desktop.
+        wireguard-tools \
+        openvpn \
+        iproute2 \
         libnet-ssleay-perl \
         libio-socket-ssl-perl \
     && rm -rf /var/lib/apt/lists/*

@@ -27,7 +27,34 @@ Requirements: Docker with the Compose plugin. Supported hosts:
 - **macOS** (Intel or Apple Silicon): Docker Desktop or OrbStack.
 - **Windows**: via **WSL2** - see below.
 
-Images are multi-arch (`linux/amd64` and `linux/arm64`).
+Images are multi-arch (`linux/amd64` and `linux/arm64`). Every Python pin
+publishes an aarch64 wheel, so Apple Silicon installs without a compiler, and
+the nightly builds both architectures to keep it that way.
+
+### Platform notes
+
+Everything runs in containers, so the tool behaves the same everywhere. Three
+things do differ, and all three are about talking to the host's network stack:
+
+| | Linux | macOS (Docker Desktop / OrbStack) | Windows (WSL2) |
+| --- | --- | --- | --- |
+| Scans, proxy mode, sandbox runner | yes | yes | yes |
+| VPN from the UI (`wg-quick` in the container) | yes | usually — userspace WireGuard via `/dev/net/tun` | usually — same |
+| VPN on the host instead | yes | yes | yes |
+
+The container ships `wireguard-tools` and `openvpn` and is given
+`/dev/net/tun`, which is what the userspace implementation needs when the host
+does not expose the kernel module — the normal situation on Docker Desktop. If
+`POST /api/network/vpn/connect` fails on your machine, bring the tunnel up on
+the host instead and leave the tool in `off` mode: the kill switch compares
+exit IPs, so it protects the scan whoever owns the tunnel.
+
+`wipe.sh` is a bash script. On Windows run it from the WSL shell, like the rest.
+
+Shell scripts are pinned to LF by `.gitattributes`. If you clone with Git for
+Windows and `core.autocrlf=true`, a CRLF shebang would make Docker report
+`exec /usr/local/bin/entrypoint.sh: no such file or directory` for a file that
+plainly exists.
 
 ### Windows (WSL2)
 

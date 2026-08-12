@@ -1,4 +1,9 @@
+# syntax=docker/dockerfile:1.6
 # Isolated runner for untrusted third-party PoCs.
+#
+# Multi-arch: linux/amd64 and linux/arm64 (Apple Silicon). Nothing here is
+# architecture-specific - the base image is multi-arch, apt resolves per-arch,
+# and every pinned wheel publishes an aarch64 build, so no compiler is needed.
 #
 # Kept minimal on purpose: every extra tool in here is a tool a trojaned PoC
 # gets to use. No curl, no git, no ssh client, no package manager at runtime.
