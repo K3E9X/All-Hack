@@ -53,6 +53,38 @@ class Settings(BaseSettings):
     # MITM
     mitm_port: int = 8080
 
+    # ---- Scan identity ----
+    # How the tools present themselves on the wire. "fixed" sends user_agent
+    # below on every request; "rotate" picks a random real browser per job.
+    # This controls tool fingerprinting, not traceability: your source IP is
+    # still in the target's logs.
+    user_agent_mode: str = "fixed"
+    user_agent: str = (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
+    )
+    # When set, every request carries X-Pentest-ID so the client's blue team can
+    # tell an authorized test from a real attack. Empty when testing detection.
+    pentest_id: str = ""
+
+    # ---- Network privacy ----
+    # Refuse to queue any scan unless the exit IP differs from the pre-VPN one.
+    require_vpn: bool = False
+    # SOCKS5/HTTP proxy for scan traffic, e.g. socks5://127.0.0.1:9050 (Tor).
+    scan_proxy: str = ""
+    # WireGuard/OpenVPN config brought up via the API. Needs NET_ADMIN.
+    vpn_config_path: str = ""
+    vpn_mode: str = "wireguard"  # wireguard | openvpn
+
+    # ---- Fresh start ----
+    # Truncate scan artefacts (jobs, findings, flows, events, runs, llm usage)
+    # on backend startup so each boot begins clean.
+    reset_on_start: bool = False
+    # Engagements carry the authorization scope and audit_log is the legal
+    # trail of what was run. Both survive a reset unless explicitly included.
+    reset_engagements_on_start: bool = False
+    reset_audit_on_start: bool = False
+
     # CORS
     cors_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
 

@@ -56,6 +56,8 @@ class LLMClient:
         self.timeout = timeout
         # Updated by chat()/stream() after a successful call.
         self.last_used_model: Optional[str] = None
+        # Raw `usage` block from the last response, when the provider sent one.
+        self.last_usage: Optional[Dict[str, Any]] = None
 
     @property
     def configured(self) -> bool:
@@ -166,6 +168,9 @@ class LLMClient:
         """Best-effort token/cost accounting against the current engagement."""
         if not isinstance(usage, dict):
             return
+        # Kept on the instance so callers (e.g. /api/llm/ping) can report the
+        # token counts of the call they just made without a DB round trip.
+        self.last_usage = usage
         try:
             from app.llm import usage as usage_mod
 

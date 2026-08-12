@@ -6,6 +6,7 @@ DATABASE_URL.
 """
 from __future__ import annotations
 
+import time
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
@@ -31,6 +32,7 @@ from app.api.engagements import router as engagements_router
 from app.api.findings import router as findings_router
 from app.api.llm import router as llm_router
 from app.api.methodology import router as methodology_router
+from app.api.network import router as network_router
 from app.api.orchestrator import router as orchestrator_router
 from app.api.proxy import router as proxy_router
 from app.api.reports import router as reports_router
@@ -46,8 +48,20 @@ from app.llm import LLMError, get_llm, get_router, iter_roles
 @asynccontextmanager
 async def lifespan(app: FastAPI):  # noqa: ARG001
     await db.init_db()
+    # Fresh start: drop the previous run's scan artefacts before anything else
+    # reads them. Runs after init_db so the tables are guaranteed to exist.
+    if settings.reset_on_start:
+        from app.maintenance import reset_transient_data
+        await reset_transient_data()
     from app import settings_store
     await settings_store.apply_saved_on_startup()
+    # Record the real exit IP now, while nothing is tunnelled, so the kill
+    # switch has something to compare against later.
+    try:
+        from app.network.privacy import get_network_manager
+        await get_network_manager().record_baseline()
+    except Exception:  # noqa: BLE001 - no outbound access must not block boot
+        pass
     yield
     await db.close_pool()
 
@@ -93,6 +107,8 @@ async def llm_ping(role: str = "planner") -> dict:
         llm = get_router().get(role)
     else:
         llm = get_llm()
+
+    started = time.perf_counter()
     try:
         reply = await llm.chat(
             [
@@ -104,12 +120,20 @@ async def llm_ping(role: str = "planner") -> dict:
         )
     except LLMError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
+    latency_ms = round((time.perf_counter() - started) * 1000)
+
+    # A reply alone does not tell you whether the model is usable in a loop:
+    # a reasoning model answering in 12s changes how you budget a run.
+    usage = getattr(llm, "last_usage", None) or {}
     return {
         "role": role,
         "primary_model": llm.model,
         "model_used": llm.last_used_model or llm.model,
         "fallback_used": (llm.last_used_model or llm.model) != llm.model,
         "reply": reply.strip(),
+        "latency_ms": latency_ms,
+        "prompt_tokens": usage.get("prompt_tokens", 0),
+        "completion_tokens": usage.get("completion_tokens", 0),
     }
 
 
@@ -127,3 +151,4 @@ app.include_router(settings_router)
 app.include_router(findings_router)
 app.include_router(surface_router)
 app.include_router(sandbox_router)
+app.include_router(network_router)

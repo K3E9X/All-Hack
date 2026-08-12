@@ -37,6 +37,23 @@ class Runner:
         if not wrapper.is_available():
             raise RuntimeError(f"tool '{tool}' is not installed in this container")
 
+        # ----- VPN kill switch (EVERY submission, same reasoning as the -----
+        # authorization gate below: the orchestrator and exploit modules call
+        # submit() directly, so this is the only place that catches them all).
+        # A tunnel that dropped mid-engagement must not leak the real IP.
+        from app.network.privacy import get_network_manager
+
+        netmgr = get_network_manager()
+        guard = await netmgr.guard_scan()
+        if not guard.get("allowed"):
+            try:
+                from app.audit import audit
+                await audit("scan.blocked_no_vpn", engagement_id=engagement_id,
+                            tool=tool, target=target, reason=guard.get("reason"))
+            except Exception:  # noqa: BLE001
+                pass
+            raise RuntimeError(f"scan blocked: {guard.get('reason')}")
+
         options = list(options or [])
 
         if engagement_id:
@@ -111,6 +128,20 @@ class Runner:
                 options = extra + options
         except Exception:  # noqa: BLE001
             logger.exception("oob wiring failed for %s", tool)
+
+        # Scan identity: User-Agent policy and the X-Pentest-ID attribution
+        # header, plus the proxy when one is configured. Appended last so an
+        # explicit caller-supplied flag still wins.
+        try:
+            from app.scans.identity import identity_args, proxy_args
+
+            options = identity_args(tool) + options
+            proxy = netmgr.proxy_for_tools()
+            if proxy:
+                options = proxy_args(tool, proxy) + options
+        except Exception:  # noqa: BLE001 - never block a scan on identity wiring
+            logger.exception("identity wiring failed for %s", tool)
+
         job = Job(
             id=new_job_id(),
             tool=tool,

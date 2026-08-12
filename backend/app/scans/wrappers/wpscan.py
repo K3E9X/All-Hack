@@ -28,7 +28,6 @@ class WpscanWrapper(BaseWrapper):
             "--url", target,
             "--format", "json",
             "--no-banner",
-            "--random-user-agent",
             "--disable-tls-checks",
             # vulnerable plugins/themes, timthumbs, config backups, DB exports,
             # users, media - the full high-value enumeration set.
@@ -38,6 +37,13 @@ class WpscanWrapper(BaseWrapper):
         token = os.environ.get("WPSCAN_API_TOKEN")
         if token:
             cmd.extend(["--api-token", token])
+        # In rotate mode let wpscan do its own per-request rotation; in fixed
+        # mode identity_args() supplies an explicit --user-agent instead. Both
+        # flags together conflict, so it is one or the other.
+        from app.scans.identity import MODE_ROTATE
+        from app.config import settings as _settings
+        if (_settings.user_agent_mode or "").strip().lower() == MODE_ROTATE:
+            cmd.append("--random-user-agent")
         cmd.extend(options)
         return cmd
 
