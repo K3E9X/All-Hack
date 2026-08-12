@@ -1,0 +1,146 @@
+name: Nightly
+
+# The push CI proves the code is consistent with itself. This one catches the
+# failures that arrive without anyone touching the repo:
+#   * a transitive dependency publishes a breaking release
+#   * a pinned version is yanked from PyPI / npm
+#   * the container image stops building
+#   * a wrapped tool disappears from its upstream install source
+#
+# Runs on a schedule, and on demand from the Actions tab.
+on:
+  schedule:
+    # 05:17 UTC daily. Off the hour on purpose: GitHub queues scheduled jobs
+    # and the top of the hour is heavily contended, which delays runs.
+    - cron: "17 5 * * *"
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+jobs:
+  backend:
+    name: Backend (tests, pinned + latest deps)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Upgrade pip
+        run: python -m pip install --upgrade pip
+
+      - name: Resolve production requirements
+        run: pip install --dry-run -r requirements.txt
+
+      - name: Install test dependencies (pinned)
+        run: pip install -r requirements-test.txt
+
+      - name: Byte-compile
+        run: python -m compileall -q app
+
+      - name: Unit tests (pinned versions)
+        run: pytest -q
+
+      # Same suite against the newest releases of every test dependency. A
+      # failure here is a warning about what the next pin bump will bring, not
+      # a broken commit, so it does not fail the job.
+      - name: Unit tests (latest dependencies)
+        continue-on-error: true
+        run: |
+          pip install --upgrade $(grep -oE '^[a-zA-Z0-9_.-]+' requirements-test.txt | tr '\n' ' ')
+          pip list --format=freeze | grep -iE 'pydantic|httpx|asyncpg|arq|cryptography|pytest'
+          pytest -q
+
+  frontend:
+    name: Frontend (build + audit)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Build
+        run: npm run build
+
+      # Advisory: a new CVE in a transitive dep is worth knowing about, but it
+      # should not turn the whole nightly red on its own.
+      - name: Audit (advisory)
+        continue-on-error: true
+        run: npm audit --audit-level=high
+
+  docker:
+    name: Images build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      # The Dockerfiles pull the scanner toolchain from upstream releases, so
+      # this is the step that notices when one of them moves or disappears.
+      - name: Build backend image
+        run: docker build -t allhack-backend:nightly ./backend
+
+      - name: Build frontend image
+        run: docker build -t allhack-frontend:nightly ./frontend
+
+      - name: Compose config is valid
+        run: docker compose config --quiet
+
+  ci-env-parity:
+    name: CI env parity
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      # Guard against the failure that broke CI once already: a test importing
+      # app.api (FastAPI) passes locally, where the full stack is installed,
+      # and fails in CI, which installs only requirements-test.txt. Import
+      # every test module with just the CI dependency set - any module that
+      # needs more than that is caught here rather than on the next push.
+      - name: Install test dependencies only
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-test.txt
+
+      - name: Every test module imports with CI dependencies alone
+        run: |
+          python - <<'PY'
+          import importlib.util, pathlib, sys, traceback
+          sys.path.insert(0, ".")
+          failed = []
+          for path in sorted(pathlib.Path("tests").glob("test_*.py")):
+              spec = importlib.util.spec_from_file_location(path.stem, path)
+              module = importlib.util.module_from_spec(spec)
+              try:
+                  spec.loader.exec_module(module)
+              except Exception:
+                  failed.append(path.name)
+                  print(f"--- {path.name} ---")
+                  traceback.print_exc()
+          if failed:
+              print(f"\n{len(failed)} test module(s) need dependencies CI does not install:")
+              for name in failed:
+                  print(f"  - {name}")
+              print("Either use pytest.importorskip, or test the pure-logic layer instead.")
+              sys.exit(1)
+          print("all test modules import cleanly")
+          PY

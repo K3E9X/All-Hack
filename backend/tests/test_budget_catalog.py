@@ -73,7 +73,12 @@ def test_budget_defaults_are_off():
 
 
 def test_settings_api_accepts_budget():
-    """Regression: a field missing from SettingsPatch is silently dropped."""
+    """Regression: a field missing from SettingsPatch is silently dropped.
+
+    Skipped in CI, which installs only the pure-logic test dependencies and
+    deliberately leaves FastAPI out.
+    """
+    pytest.importorskip("fastapi")
     from app.api.settings import SettingsPatch
 
     patch = SettingsPatch(budget={"monthly_usd": 50})
@@ -81,32 +86,38 @@ def test_settings_api_accepts_budget():
 
 
 # ---- Standalone catalog ----
+# These exercise catalog_entries() rather than the endpoint, so they run in CI
+# without the web stack. The endpoint is a one-line wrapper over it.
 
-async def test_catalog_carries_grouping_labels():
+def test_catalog_carries_grouping_labels():
     """The catalog view groups items itself, so it needs the same category
     labels the coverage view uses - otherwise the two screens disagree."""
-    from app.api.methodology import catalog
+    from app.coverage_util import catalog_entries
+    from app.methodology import CATALOG
 
-    result = await catalog()
-    assert result["count"] > 0
-    for item in result["items"]:
+    entries = catalog_entries(CATALOG)
+    assert entries
+    for item in entries:
         assert item["wstg_category"], f"{item['id']} has no wstg_category"
         assert item["category"], f"{item['id']} has no category label"
 
 
-async def test_catalog_labels_match_the_coverage_view():
-    from app.api.methodology import catalog
-    from app.coverage_util import WSTG_CAT, wstg_prefix
-
-    for item in (await catalog())["items"]:
-        prefix = wstg_prefix(item["wstg_id"])
-        expected = WSTG_CAT.get(prefix, ("Other", "Recon"))[0]
-        assert item["category"] == expected
-
-
-async def test_catalog_covers_every_item_in_the_engine():
-    from app.api.methodology import catalog
+def test_catalog_labels_match_the_coverage_view():
+    from app.coverage_util import (WSTG_CAT, catalog_entries, coverage_groups,
+                                   wstg_prefix)
     from app.methodology import CATALOG
 
-    result = await catalog()
-    assert {i["id"] for i in result["items"]} == {i.id for i in CATALOG}
+    for item in catalog_entries(CATALOG):
+        prefix = wstg_prefix(item["wstg_id"])
+        assert item["category"] == WSTG_CAT.get(prefix, ("Other", "Recon"))[0]
+
+    # And the labels the coverage view actually renders are the same set.
+    coverage_labels = {g["cat"] for g in coverage_groups(CATALOG, [], set())}
+    assert {i["category"] for i in catalog_entries(CATALOG)} == coverage_labels
+
+
+def test_catalog_covers_every_item_in_the_engine():
+    from app.coverage_util import catalog_entries
+    from app.methodology import CATALOG
+
+    assert {i["id"] for i in catalog_entries(CATALOG)} == {i.id for i in CATALOG}

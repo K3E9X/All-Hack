@@ -60,6 +60,23 @@ def covered_ids(coverage_rows: Iterable[Dict[str, Any]]) -> Set[str]:
     return {r["catalog_item_id"] for r in coverage_rows if (r.get("status") or "") in _DONE}
 
 
+def catalog_entries(catalog: Iterable[Any]) -> List[Dict[str, Any]]:
+    """The catalog as dicts, carrying the same category labels coverage_groups
+    assigns.
+
+    Kept here rather than in the API layer so the two views cannot drift apart
+    and so it stays testable without importing FastAPI.
+    """
+    entries: List[Dict[str, Any]] = []
+    for item in catalog:
+        d = item.to_dict()
+        prefix = wstg_prefix(d.get("wstg_id", ""))
+        d["wstg_category"] = prefix
+        d["category"] = WSTG_CAT.get(prefix, ("Other", "Recon"))[0]
+        entries.append(d)
+    return entries
+
+
 def coverage_groups(catalog: Iterable[Any], coverage_rows: Iterable[Dict[str, Any]],
                     finding_classes: Set[str]) -> List[Dict[str, Any]]:
     """Group the catalog by WSTG category with per-item status + hit flag."""
