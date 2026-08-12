@@ -66,7 +66,7 @@ export default function Reports() {
 
       {!eng ? <div className="card"><div className="card__body"><div className="empty">Select an engagement to assemble its report.</div></div></div> : (
         <div className="doc">
-          <div className="doc__brand"><span className="doc__wm">syphax</span><span className="doc__cls">confidential</span></div>
+          <div className="doc__brand"><span className="doc__wm">Syphax</span><span className="doc__cls">confidential</span></div>
           <h1 className="doc__title">Web Application Penetration Test</h1>
           <div className="doc__sub">{eng.target_url}</div>
 

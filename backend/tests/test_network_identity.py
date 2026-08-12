@@ -155,17 +155,23 @@ def test_unknown_custom_ua_does_not_get_chromium_hints(clean_settings):
     assert "Sec-CH-UA" not in current_profile()["headers"]
 
 
-def test_emitted_headers_are_coherent_for_dash_h_tools(clean_settings):
-    settings.user_agent_mode = MODE_ROTATE
+@pytest.mark.parametrize("profile", BROWSER_PROFILES, ids=lambda p: str(p["ua"])[:40])
+def test_emitted_headers_are_coherent_for_dash_h_tools(clean_settings, profile):
+    """Every profile, not a random draw: relying on rotation made this flaky
+    and hid the fact that Safari also sends no client hints."""
+    settings.user_agent_mode = "fixed"
+    settings.user_agent = str(profile["ua"])
     settings.pentest_id = ""
+
     args = identity_args("nuclei")
     sent = dict(a.split(": ", 1) for a in args if a != "-H")
+
     ua = sent["User-Agent"]
-    if "Firefox" in ua:
-        assert "Sec-CH-UA" not in sent
-    else:
-        assert sent.get("Sec-CH-UA")
+    assert ua == str(profile["ua"])
+    is_chromium = "Chrome/" in ua or "Edg/" in ua
+    assert bool(sent.get("Sec-CH-UA")) == is_chromium
     assert sent["Accept"]
+    assert sent["Accept-Language"]
     assert "X-Pentest-ID" not in sent
 
 
