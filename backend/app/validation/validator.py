@@ -37,7 +37,7 @@ _TOOL_CONFIRMED = {"sqlmap", "commix", "dalfox"}
 # finding.metadata (see app/analysis/*). We trust that verdict verbatim.
 _ANALYSIS_TOOLS = {"logic", "js-recon", "jwt", "access-control", "cors",
                    "params", "graphql", "exploit", "public-exploits", "cve-checks",
-                   "auth-brute", "llm-recon"}
+                   "auth-brute", "llm-recon", "payload-probe"}
 
 # path-signature pairs: if the finding target ends with <path>, fetching it
 # should contain <signature> to confirm the exposure.

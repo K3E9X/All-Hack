@@ -265,6 +265,15 @@ async def run_engagement_loop(run_id: str) -> dict:
                 await judge_engagement(engagement.id)
             except Exception:  # noqa: BLE001 - judging never fails the run
                 logger.exception("[%s] llm-judge error", run.id)
+            # Intelligence #5: settle what is still 'likely' by firing an
+            # adaptive, oracle-backed probe at the target. Active, so it obeys
+            # the same gate + denial suppression as the exploitation block.
+            if engagement.allow_active_exploit and run.stop_reason not in _suppressed:
+                try:
+                    from app.exploit.payload_gen import run_payload_validation
+                    await run_payload_validation(engagement.id)
+                except Exception:  # noqa: BLE001 - probing never fails the run
+                    logger.exception("[%s] payload-probe error", run.id)
             chains = await build_chains(engagement.id)
             await audit(
                 "engagement.validated",
