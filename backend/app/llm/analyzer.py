@@ -140,11 +140,21 @@ class Analyzer:
 
 # ----- helpers -----
 
-def _flow_to_context(flow: Dict[str, Any]) -> Dict[str, Any]:
+def _flow_to_context(
+    flow: Dict[str, Any],
+    *,
+    req_cap: int = REQUEST_BODY_PREVIEW_CHARS,
+    resp_cap: int = RESPONSE_BODY_PREVIEW_CHARS,
+) -> Dict[str, Any]:
+    """Flatten a stored flow into prompt-ready strings.
+
+    The body caps are parameters so a long-context caller (llm_recon) can feed
+    far more of each response than the small default used by the copilot.
+    """
     req_headers = _format_headers(flow.get("request_headers"))
     resp_headers = _format_headers(flow.get("response_headers"))
-    req_body = _body_to_str(flow.get("request_body_preview"), REQUEST_BODY_PREVIEW_CHARS)
-    resp_body = _body_to_str(flow.get("response_body_preview"), RESPONSE_BODY_PREVIEW_CHARS)
+    req_body = _body_to_str(flow.get("request_body_preview"), req_cap)
+    resp_body = _body_to_str(flow.get("response_body_preview"), resp_cap)
     return {
         "method": flow.get("method", ""),
         "url": flow.get("url", ""),

@@ -43,6 +43,18 @@ class Settings(BaseSettings):
     # Models not listed (e.g. OpenRouter :free) cost 0; tokens are still tracked.
     llm_pricing: str = ""
 
+    # LLM response-analyst (analysis/llm_recon.py) context budget. The analyst
+    # reasons better the more real traffic it sees, so these scale with the
+    # model's context window. Defaults are safe for a ~128K-context model;
+    # with a long-context model (e.g. Qwen3.8-27B, 262K native) raise them:
+    #   LLM_RECON_MAX_FLOWS=200
+    #   LLM_RECON_BUDGET_CHARS=600000
+    # budget_chars is the hard ceiling on the prompt (~3.5-4 chars per token);
+    # flows are added by priority until it is reached.
+    llm_recon_max_flows: int = 60
+    llm_recon_body_chars: int = 6000
+    llm_recon_budget_chars: int = 150_000
+
     # Storage
     data_dir: Path = Path("/data")
     # Postgres + Redis are mandatory from Phase 1 onward. Defaults match the

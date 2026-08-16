@@ -97,3 +97,32 @@ def test_tamper_allowlist_and_strip():
     assert tamper_option(["nope"]) == []
     assert parse_tamper_reply('{"tampers":["randomcase","DROP TABLE"]}') == ["randomcase"]
     assert strip_tamper(["--tamper=x", "--delay=1"]) == ["--delay=1"]
+
+
+# ---- #1b long-context: prioritization + budget ----
+def test_flow_priority_ranks_errors_and_params_first():
+    from app.analysis.llm_recon import flow_priority
+    server_err = flow_priority("GET", 500, "https://t/a")
+    auth = flow_priority("GET", 403, "https://t/a")
+    plain = flow_priority("GET", 200, "https://t/a")
+    not_found = flow_priority("GET", 404, "https://t/a")
+    assert server_err < auth < plain < not_found
+
+    # a parameterised / state-changing / JSON flow outranks its plain twin
+    assert flow_priority("GET", 200, "https://t/a?id=1") < plain
+    assert flow_priority("POST", 200, "https://t/a") < plain
+    assert flow_priority("GET", 200, "https://t/a", "application/json") < plain
+
+
+def test_flow_priority_handles_missing_status():
+    from app.analysis.llm_recon import flow_priority
+    # no response recorded must not crash and must not outrank a real 500
+    assert flow_priority("GET", None, "https://t/a") > flow_priority("GET", 500, "https://t/a")
+
+
+def test_context_size_counts_bodies():
+    from app.analysis.llm_recon import context_size
+    ctx = {"url": "u" * 10, "request_headers": "h" * 5, "request_body_preview": "",
+           "response_headers": "H" * 5, "response_body_preview": "b" * 100}
+    assert context_size(ctx) == 120
+    assert context_size({}) == 0

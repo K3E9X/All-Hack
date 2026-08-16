@@ -31,7 +31,10 @@ from app.scans.models import Finding
 
 logger = logging.getLogger("syphax.analysis.llm_recon")
 
-MAX_FLOWS = 12
+# How much traffic we hand the analyst is a context-window question, so it is
+# configurable (see Settings.llm_recon_*). Long-context models (Qwen3.8-27B and
+# friends) can take an order of magnitude more than the old fixed 12 flows,
+# which is where the cross-endpoint correlations a human analyst spots live.
 _STATIC_EXT = (".js", ".css", ".png", ".jpg", ".jpeg", ".gif", ".svg",
                ".woff", ".woff2", ".ttf", ".ico", ".map", ".webp")
 
@@ -58,28 +61,52 @@ async def analyze_llm_recon(engagement_id: str) -> Dict[str, int]:
     if not client.configured:
         return {"skipped": 1, "reason": "no LLM configured"}
 
+    from app.config import settings
+    max_flows = max(1, int(settings.llm_recon_max_flows))
+    body_chars = max(500, int(settings.llm_recon_body_chars))
+    budget = max(10_000, int(settings.llm_recon_budget_chars))
+
     flows_repo = FlowRepository()
     try:
-        summaries = await flows_repo.list_flows(limit=1000)
+        summaries = await flows_repo.list_flows(limit=2000)
     except Exception:  # noqa: BLE001
         summaries = []
 
-    contexts: List[Dict] = []
+    # 1. In-scope, non-static, one entry per (method, path).
+    candidates = []
     seen_paths = set()
     for f in summaries:
         host = (urlparse(f.url).hostname or "").lower()
         if not eng.host_in_scope(host) or _is_static(f.url):
             continue
-        path = urlparse(f.url).path
-        key = (f.method, path)
+        key = (f.method, urlparse(f.url).path)
         if key in seen_paths:
             continue
         seen_paths.add(key)
-        full = await flows_repo.get_flow(f.id)
-        if full:
-            contexts.append(_flow_to_context(full))
-        if len(contexts) >= MAX_FLOWS:
+        candidates.append(f)
+
+    # 2. Rank before fetching bodies: with a budget, WHICH flows we send matters
+    # more than how many. Errors and parameterised endpoints come first.
+    candidates.sort(key=lambda f: (
+        flow_priority(f.method, f.status_code, f.url, f.response_content_type),
+        -(f.response_size or 0),
+    ))
+
+    # 3. Fill up to the flow count / character budget, whichever binds first.
+    contexts: List[Dict] = []
+    used = 0
+    for f in candidates[:max_flows * 2]:
+        if len(contexts) >= max_flows:
             break
+        full = await flows_repo.get_flow(f.id)
+        if not full:
+            continue
+        ctx = _flow_to_context(full, req_cap=body_chars, resp_cap=body_chars)
+        size = context_size(ctx)
+        if contexts and used + size > budget:
+            break
+        contexts.append(ctx)
+        used += size
 
     if not contexts:
         await save_analysis_job(engagement_id, "llm-recon", [], target="(captured traffic)")
@@ -98,13 +125,59 @@ async def analyze_llm_recon(engagement_id: str) -> Dict[str, int]:
 
     findings = findings_from_llm(extract_json(raw), corpus)
     await save_analysis_job(engagement_id, "llm-recon", findings, target="(captured traffic)")
-    logger.info("[%s] llm-recon: flows=%d findings=%d (grounded)",
-                engagement_id, len(contexts), len(findings))
-    return {"flows": len(contexts), "findings": len(findings)}
+    logger.info("[%s] llm-recon: flows=%d/%d chars=%d/%d findings=%d (grounded)",
+                engagement_id, len(contexts), len(candidates), used, budget,
+                len(findings))
+    return {"flows": len(contexts), "candidates": len(candidates),
+            "chars": used, "findings": len(findings)}
 
 
 # --------------------------------------------------------------------------- #
 # Pure core (unit-tested)
+
+def flow_priority(method: str, status_code, url: str,
+                  response_content_type: Optional[str] = None) -> int:
+    """Rank a captured flow for the analyst. LOWER sorts first.
+
+    Ordering reflects where disclosure actually lives: server errors leak stack
+    traces and versions, auth/validation errors leak internal logic, and
+    parameterised or state-changing requests are the injection surface. Plain
+    200s and 404s are the least informative per character spent.
+    """
+    sc = int(status_code or 0)
+    if 500 <= sc < 600:
+        score = 0                       # stack traces, framework internals
+    elif sc in (401, 403):
+        score = 10                      # auth boundaries
+    elif sc in (400, 422):
+        score = 12                      # validation errors leak field names
+    elif 405 <= sc < 500:
+        score = 15
+    elif sc == 404:
+        score = 60                      # mostly noise
+    elif 300 <= sc < 400:
+        score = 45                      # redirects, usually empty bodies
+    elif 200 <= sc < 300:
+        score = 30
+    else:
+        score = 50                      # unknown / no response recorded
+
+    if urlparse(url or "").query:
+        score -= 8                      # injection surface
+    if str(method or "").upper() not in ("GET", "HEAD"):
+        score -= 6                      # state-changing, richer bodies
+    ct = str(response_content_type or "").lower()
+    if "json" in ct or "xml" in ct:
+        score -= 4                      # API surface
+    return score
+
+
+def context_size(ctx: Dict) -> int:
+    """Approximate prompt cost (characters) of one flow context."""
+    return sum(len(str(ctx.get(k, ""))) for k in
+               ("url", "request_headers", "request_body_preview",
+                "response_headers", "response_body_preview"))
+
 
 def _corpus(contexts: List[Dict]) -> str:
     parts = []
